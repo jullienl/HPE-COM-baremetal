@@ -54,11 +54,6 @@ ansible-galaxy collection install -r files/requirements.yml --force
 `--force` is required if you need to upgrade the collections to the latest available versions from the Galaxy server. 
 
 
-## HPE OneView collection requirements
-```
-pip3 install -r ~/.ansible/collections/ansible_collections/hpe/oneview/requirements.txt
-```
-
 ## VMware collection requirements
 ```
 pip3 install --upgrade pip setuptools
