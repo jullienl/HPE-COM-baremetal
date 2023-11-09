@@ -116,7 +116,7 @@ A more detailed process flow is avalable at https://miro.com/app/board/uXjVNZ9eH
 
 ### Ansible control node configuration
 
-To configure the Ansible control node, see [Ansible_control_node_requirements.md](https://github.com/jullienl/HPE-Synergy-baremetal/blob/master/files/Ansible_control_node_requirements.md) in `/files`
+To configure the Ansible control node, see [Ansible_control_node_requirements.md](https://github.com/jullienl/HPE-COM-baremetal/blob/main/files/Ansible_control_node_requirements.md) in `/files`
 
 By default, Ansible executes tasks on a maximum of 5 hosts in parallel. If you want to increase the parallelism and have the provisioning tasks executed on more hosts simultaneously, you can modify this value directly in the playbooks using the `ansible_forks` variable.
 
