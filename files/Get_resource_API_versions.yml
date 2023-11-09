@@ -1,0 +1,40 @@
+---
+- name: Capture resource API versions from the COM API reference
+  uri:
+    url: "https://developer.greenlake.hpe.com/_auth/sidebar/__alternative-sidebar__-data-hpe-hcss-doc-portal-docs-greenlake-services-compute-ops-sidebars.yaml"
+    method: GET
+    return_content: true
+  register: data
+  until: data.status == 200
+  retries: 5
+  delay: 5
+  delegate_to: localhost
+
+# - debug: var=data
+
+- name: Set a variable for the COM API reference content
+  set_fact:
+    API_reference_content: "{{ data.content }}"
+
+# - debug: var=API_reference_content
+
+- name: Set a variable for items property of the COM API reference content 
+  set_fact:
+    items: "{{ API_reference_content | json_query(query) }}"
+  vars:
+    query: "items[?label=='API reference'].items"
+
+# - debug:
+#     msg: "{{ items[0] }}"
+
+- name: Set variables for each API version
+  set_fact:
+    API_resources_list: "{{ API_resources_list|default([]) +   [ { 'name': item.label | regex_replace('.{10}$', '') | replace('-', '_') , 'value': item.label[-7:] } ]    }}"
+    "{{ (item.label | regex_replace('.{10}$', '') | replace('-', '_') ) + '_API_version' }}": "{{ item.label[-7:] }}"
+  loop: "{{ items[0][1:-1] | reverse }}"
+  loop_control:
+    label: "Variable set: {{ (item.label | regex_replace('.{10}$', '')  | replace('-', '_')) + '_API_version' }} = {{ item.label[-7:] }}"
+# - name: Print API_resources_list variables
+#   debug:
+#       var=API_resources_list
+#       var=hostvars[inventory_hostname]

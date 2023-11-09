@@ -1,0 +1,19 @@
+---
+# Information required for the creation of the DNS record
+
+# AD domain name
+domain: "lj.lab"
+
+# DNS server FQDN
+dns_server: "dc.lj.lab"
+
+# Windows DNS Server credentials
+ansible_user: xxxxxxxxx@lj.lab
+ansible_password: xxxxxxxxxx
+
+ansible_connection: winrm
+ansible_winrm_transport: ntlm
+ansible_port: 5985
+
+# The following is necessary for Python 2.7.9+ when using default WinRM self-signed certificates:
+ansible_winrm_server_cert_validation: ignore

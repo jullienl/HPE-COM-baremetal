@@ -1,0 +1,162 @@
+
+PLAY [Deleting provisioned compute module(s)] **********************************
+
+TASK [Gather subset facts on localhost] ****************************************
+ok: [ESX-3 -> localhost]
+ok: [ESX-2 -> localhost]
+
+TASK [Capture the start time] ***
+ok: [ESX-2]
+ok: [ESX-3]
+
+TASK [debug] *******************************************************************
+ok: [ESX-2] => {
+    "start_time": "2023-11-06T17:50:57Z"
+}
+ok: [ESX-3] => {
+    "start_time": "2023-11-06T17:50:56Z"
+}
+
+TASK [Create HPE Compute Ops Management session] *******************************
+ok: [ESX-2 -> localhost]
+ok: [ESX-3 -> localhost]
+
+TASK [Set variable access_token for the bearer token] **************************
+ok: [ESX-2]
+ok: [ESX-3]
+
+TASK [Capture resource API versions from the COM API reference] ****************
+ok: [ESX-3 -> localhost]
+ok: [ESX-2 -> localhost]
+
+TASK [Set a variable for the COM API reference content] ************************
+ok: [ESX-2]
+ok: [ESX-3]
+
+TASK [Set a variable for items property of the COM API reference content] ******
+ok: [ESX-2]
+ok: [ESX-3]
+
+TASK [Set variables for each API version] **************************************
+ok: [ESX-2] => (item=Variable set: user_preferences_API_version = v1beta1)
+ok: [ESX-2] => (item=Variable set: servers_API_version = v1beta2)
+ok: [ESX-3] => (item=Variable set: user_preferences_API_version = v1beta1)
+ok: [ESX-2] => (item=Variable set: server_settings_API_version = v1beta1)
+ok: [ESX-3] => (item=Variable set: servers_API_version = v1beta2)
+ok: [ESX-2] => (item=Variable set: schedules_API_version = v1beta2)
+ok: [ESX-3] => (item=Variable set: server_settings_API_version = v1beta1)
+ok: [ESX-2] => (item=Variable set: reports_API_version = v1beta1)
+ok: [ESX-3] => (item=Variable set: schedules_API_version = v1beta2)
+ok: [ESX-2] => (item=Variable set: jobs_API_version = v1beta2)
+ok: [ESX-3] => (item=Variable set: reports_API_version = v1beta1)
+ok: [ESX-2] => (item=Variable set: jobs_API_version = v1beta3)
+ok: [ESX-3] => (item=Variable set: jobs_API_version = v1beta2)
+ok: [ESX-2] => (item=Variable set: job_templates_API_version = v1beta2)
+ok: [ESX-3] => (item=Variable set: jobs_API_version = v1beta3)
+ok: [ESX-2] => (item=Variable set: groups_API_version = v1beta2)
+ok: [ESX-3] => (item=Variable set: job_templates_API_version = v1beta2)
+ok: [ESX-2] => (item=Variable set: firmware_bundles_API_version = v1beta2)
+ok: [ESX-3] => (item=Variable set: groups_API_version = v1beta2)
+ok: [ESX-2] => (item=Variable set: filters_API_version = v1beta1)
+ok: [ESX-3] => (item=Variable set: firmware_bundles_API_version = v1beta2)
+ok: [ESX-2] => (item=Variable set: external_services_API_version = v1beta1)
+ok: [ESX-3] => (item=Variable set: filters_API_version = v1beta1)
+ok: [ESX-2] => (item=Variable set: activities_API_version = v1beta2)
+ok: [ESX-3] => (item=Variable set: external_services_API_version = v1beta1)
+ok: [ESX-3] => (item=Variable set: activities_API_version = v1beta2)
+
+TASK [Capture server 'ESX-2' information] **************************************
+ok: [ESX-2 -> localhost]
+ok: [ESX-3 -> localhost]
+
+TASK [Exit if server 'ESX-2' does not exist] ***********************************
+skipping: [ESX-2]
+skipping: [ESX-3]
+
+TASK [Capture server 'ESX-2' uri] **********************************************
+ok: [ESX-2]
+ok: [ESX-3]
+
+TASK [debug] *******************************************************************
+ok: [ESX-2] => {
+    "server_uri": "/compute-ops/v1beta2/servers/P28948-B21+CZ2311004G"
+}
+ok: [ESX-3] => {
+    "server_uri": "/compute-ops/v1beta2/servers/P28948-B21+CZ2311004H"
+}
+
+TASK [Exit if server 'ESX-2' is not connected to COM] **************************
+skipping: [ESX-2]
+skipping: [ESX-3]
+
+TASK [Capture server 'ESX-2' raw inventory information] ************************
+ok: [ESX-2 -> localhost]
+ok: [ESX-3 -> localhost]
+
+TASK [Taking "esx-2.lj.lab" to maintenance mode] *******************************
+changed: [ESX-2 -> localhost]
+changed: [ESX-3 -> localhost]
+
+TASK [Removing ESXi host "ESX-2" from vCenter "vcenter.lj.lab"] ****************
+changed: [ESX-2 -> localhost]
+changed: [ESX-3 -> localhost]
+
+TASK [Check if server 'ESX-2' is already member of a server group] *************
+ok: [ESX-2 -> localhost]
+ok: [ESX-3 -> localhost]
+
+TASK [Capture the id of the server group of which the server 'ESX-2' is a member (if applicable)] ***
+ok: [ESX-2]
+ok: [ESX-3]
+
+TASK [debug] *******************************************************************
+ok: [ESX-2] => {
+    "server_group_name_found": "ESXi_group"
+}
+ok: [ESX-3] => {
+    "server_group_name_found": "ESXi_group"
+}
+
+TASK [Remove server 'ESX-2' from the server group of which it is currently a member] ***
+ok: [ESX-2 -> localhost]
+ok: [ESX-3 -> localhost]
+
+TASK [Wait for deletion to complete] *******************************************
+Pausing for 15 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [ESX-2]
+
+TASK [Capture all job templates] ***********************************************
+ok: [ESX-3 -> localhost]
+ok: [ESX-2 -> localhost]
+
+TASK [Capture jobTemplateUri of PowerOff.New] **********************************
+ok: [ESX-2]
+ok: [ESX-3]
+
+TASK [debug] *******************************************************************
+ok: [ESX-2] => {
+    "job_template_resourceuri": "/compute-ops/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4"
+}
+ok: [ESX-3] => {
+    "job_template_resourceuri": "/compute-ops/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4"
+}
+
+TASK [Power off server ESX-2] **************************************************
+ok: [ESX-2 -> localhost]
+ok: [ESX-3 -> localhost]
+
+TASK [Removing ESX-2 SSH key from known_hosts file on Ansible control node] ****
+ok: [ESX-2 -> localhost]
+ok: [ESX-3 -> localhost]
+
+PLAY [Removing the DNS record from DNS server] *********************************
+
+TASK [Removing "ESX-2" from "dc.lj.lab"] ***************************************
+changed: [ESX-3 -> dc.lj.lab]
+changed: [ESX-2 -> dc.lj.lab]
+
+PLAY RECAP *********************************************************************
+ESX-2                      : ok=26   changed=3    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+ESX-3                      : ok=25   changed=3    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+

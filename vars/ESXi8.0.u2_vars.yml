@@ -1,0 +1,74 @@
+---
+# Host information (name, IP and Serial number) is provided by the Ansible inventory 'hosts' file:
+#   ESX-2 os_ip_address=192.168.3.172 serial_number=CZ2311004G
+#   ESX-3 os_ip_address=192.168.3.175 serial_number=CZ2311004H
+
+
+#---------------------- Network settings -------------------------------------------------------------------------------------
+
+gateway: "192.168.1.1"
+nameserver: "192.168.2.1,192.168.2.3"
+netmask: "255.255.252.0"
+domain: "lj.lab"
+
+
+#---------------------- VMware vCenter settings ------------------------------------------------------------------------------
+
+vcenter_hostname: "vcenter.lj.lab"
+cluster_name: "DL-Cluster-01" # created if not present
+datacenter_name: "Mougins"
+
+
+#---------------------- Server settings --------------------------------------------------------------------------------------
+
+# OS boot volume RAID type and size
+raid_type: RAID1       # Supported RAID types: RAID0, RAID1, RAID5
+volume_size_in_GB: -1  # It must be a number >0 or -1, where -1 indicates to use the entire disk.
+
+# BIOS/Workload profile
+workload_profile_name: "Virtualization - Power Efficient"       
+  # Supported workload profiles:  
+  # - Virtualization - Max Performance
+  # - Virtualization - Power Efficient
+  # - General Peak Frequency Compute
+  # - General Power Efficient Compute
+  # - General Throughput Compute
+  # - Low Latency
+
+
+#---------------------- COM server group settings ----------------------------------------------------------------------------
+
+# Name of the definitive server group where to place the host at the end of provisioning
+server_group_name: "ESXi_group"
+# Name of the firmware baseline to be used with the definitive server group
+firmware_server_setting_name: "ESXi firmware baseline"
+
+# Firmware bundles to be set in the firmware baseline of the definitive server group
+Gen10_10p_firmware_bundle_name: "2023.03.00.00"
+Gen10_10p_patch_name_associated_with_firmware_bundle: "2023.03.00.03"
+
+Gen11_firmware_bundle_name: "2023.04.00.00"
+Gen11_patch_name_associated_with_firmware_bundle: "2023.04.00.04"
+
+
+
+#------------------------ ISO settings -------------------------------------------------------------------------------------
+
+# OS vendor ISO file information
+src_iso_url: "https://liogw.lj.lab/deployment/esxi80u2"
+src_iso_file: "VMware-ESXi-8.0.2-22380479-HPE-802.0.0.11.4.0.14-Sep2023.iso"
+
+
+# Directory on the Ansible control node where the source ISO will be copied:
+src_iso_directory: "{{ lookup('env','HOME') }}/ISOs/esxiisosrc"
+
+# Directory on the Ansible control node to stage all files to build and generate the new ISO image with the custom kickstart:
+staging_directory: "{{ lookup('env','HOME') }}/staging"
+
+# Folder located in <Ansible_project_dir>/files to store the boot.cfg file
+# Use the template name: ESXi_<build>. <build> is found in boot.cfg in the root of src_iso_file iso
+esxi_build: "ESXi_22380479"
+
+# Name of the kickstart file available in files/ESXi_<build>
+kickstart: "ks-esxi8.0u2.sh"
+

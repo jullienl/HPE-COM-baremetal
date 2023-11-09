@@ -1,0 +1,23 @@
+---
+
+- name: Create HPE Compute Ops Management session
+  uri:
+    url: "https://sso.common.cloud.hpe.com/as/token.oauth2"
+    method: POST
+    body_format: raw
+    headers:
+      Content-Type: "application/x-www-form-urlencoded"
+    body: "grant_type=client_credentials&client_id={{ ClientID }}&client_secret={{ ClientSecret }}"
+  register: login
+  until: login.status == 200
+  retries: 5
+  delay: 5    
+  delegate_to: localhost
+
+# - debug: var=login
+
+- name: Set variable access_token for the bearer token
+  set_fact:
+    access_token: "{{ login.json.access_token }}"
+
+# - debug: var=access_token
