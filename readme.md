@@ -211,10 +211,6 @@ The provisioned OS tested successfully are:
   - VMware-ESXi-8.0.2-22380479-HPE-802.0.0.11.4.0.14-Sep2023.iso
 
 
-## Thank you
-
-Thank you to bryansullins for his inspiring work for [baremetalesxi](https://github.com/bryansullins/baremetalesxi).
-
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details
