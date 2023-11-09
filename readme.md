@@ -129,11 +129,11 @@ The Windows DNS Server to be managed by Ansible should meet below requirements:
 - .NET 4.0 to be installed
 - A WinRM listener should be created and activated
 
-To configure WinRM, you can simply run [ConfigureRemotingForAnsible.ps1](https://raw.githubusercontent.com/jullienl/HPE-Synergy-baremetal/master/files/ConfigureRemotingForAnsible.ps1) on the Windows Server to set up the basics. 
+To configure WinRM, you can simply run [ConfigureRemotingForAnsible.ps1](https://github.com/jullienl/HPE-COM-baremetal/blob/main/files/ConfigureRemotingForAnsible.ps1) on the Windows Server to set up the basics. 
 
 > **Note**: The purpose of this script is solely for training and development, and it is strongly advised against using it in a production environment since it enables both HTTP and HTTPS listeners with a self-signed certificate and enables Basic authentication that can be inherently insecure.
 
-To learn more about **Setting up Windows host**, see https://docs.ansible.com/ansible/2.5/user_guide/windows_setup.html#winrm-setup
+To learn more about **Setting up Windows host**, see [https://docs.ansible.com/ansible/2.5/user_guide/windows_setup.html#winrm-setup](https://docs.ansible.com/ansible/2.5/user_guide/windows_setup.html#winrm-setup)
 
 ## Preparation to run the playbooks
 
@@ -155,7 +155,7 @@ To learn more about **Setting up Windows host**, see https://docs.ansible.com/an
      ```
     > **Note**: To learn more about Ansible vault, see https://docs.ansible.com/ansible/latest/user_guide/vault.html
     
-    > **Note**: To access the HPE Compute Ops Management API, you need to create your client credentials on the HPE GreenLake platform. To learn more, see https://support.hpe.com/hpesc/public/docDisplay?docId=a00120892en_us 
+    > **Note**: To access the HPE Compute Ops Management API, you need to create your client credentials on the HPE GreenLake platform. To learn more, see [https://support.hpe.com/hpesc/public/docDisplay?docId=a00120892en_us](https://support.hpe.com/hpesc/public/docDisplay?docId=a00120892en_us) 
 
 
 5. Secure your VMware vCenter credentials using:   
