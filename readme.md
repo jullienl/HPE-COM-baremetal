@@ -69,11 +69,13 @@ The following diagrams describe the overall process flow that is used for ESXi:
 
 **Provisioning**:   
 
-![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/3739e49c-eed7-4a8a-91b5-d4a2e43f2522)
+![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/8c89fa9b-56d8-4767-88fa-a959888733ba)
+
 
 **Unprovsioning**:   
 
-![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/4be409f8-c1de-41d5-a5ee-7a8814e20bee)
+![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/decc72b3-4a79-429d-b888-e98032aa5ef6)
+
 
 A more detailed process flow is avalable at https://miro.com/app/board/uXjVNZ9eH-w=/?share_link_id=812370641566 
 
