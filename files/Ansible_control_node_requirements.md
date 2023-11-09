@@ -70,10 +70,7 @@ pip3 install pywinrm
 ```
 pip3 install jmespath
 ```
-## Community.general.hpilo_boot requirement
-```
-pip3 install python-hpilo
-```
+
 ## ngnix web service
 ngnix is used to host the OS ISOs from which provisioned servers will boot using iLO virtual media.
 ```
