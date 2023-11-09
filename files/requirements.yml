@@ -1,9 +1,6 @@
 ---
 collections:
-  # hpe.oneview collection is required for HPE Oneview 
-  - name: hpe.oneview
-  # Community.general collection is required for hpilo_boot module 
-  - name: community.general
+  
   # Community.vmware collection is required for vCenter
   - name: community.vmware
   # Community.windows collection is required to create a DNS record - Also install ansible.windows collection 
