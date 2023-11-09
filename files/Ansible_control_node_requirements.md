@@ -10,7 +10,7 @@ hostnamectl set-hostname <hostname>.<your-domain>
 sudo dnf install git
 mkdir ~/Projects
 cd ~/Projects
-git clone https://github.com/jullienl/HPE-Synergy-baremetal
+git clone https://github.com/jullienl/HPE-COM-baremetal
 ```
 
 ## openssh installation
