@@ -137,9 +137,8 @@ To learn more about **Setting up Windows host**, see [https://docs.ansible.com/a
 
 ## Preparation to run the playbooks
 
-1. Clone or download this repository or use Ansible Galaxy:   
-   `ansible-galaxy role install HPE_COM_baremetal_provisioning`
-
+1. Clone or download this repository on your Ansible control node   
+   
 2. Update all variables located in `/vars` and for the Windows host provisioning, the variable in `/group_vars/Windows.yml` 
 
 3. Copy the operating system ISOs to a web server defined by the variables `src_iso_url` and `src_iso_file` 
