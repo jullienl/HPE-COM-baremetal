@@ -85,8 +85,11 @@ sudo firewall-cmd --reload
 ``` 
 
 ## Enabling ngnix directory browsing
+``` 
 sudo sed -i '0,/server {/s//&\n        autoindex on;/' /etc/nginx/nginx.conf
 sudo systemctl restart nginx
+``` 
+
 
 ## unzip
 
