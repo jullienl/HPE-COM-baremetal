@@ -4,8 +4,5 @@
 vcenter_username: "administrator@vsphere.local"
 vcenter_password: "xxxxxxxxxxxxxxxx"
 
-# Password to assign to the ESXi root user - Make sure you set a password following the password restrictions policy of the ESXi release
-root_password: "xxxxxxxxxxx"
-
 # License to be assigned to the ESXi host
 esxi_license: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
