@@ -1118,6 +1118,19 @@
 
   # vCenter and ESXi configuration
 
+  - name: Check if ESXi cluster '{{ cluster_name }}' exists in vCenter '{{ vcenter_hostname }}'
+    community.vmware.vmware_cluster_info:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      datacenter: "{{ datacenter_name }}"
+      cluster_name: "{{ cluster_name }}"
+      validate_certs: false
+    register: cluster_facts
+    delegate_to: localhost
+
+  # - debug: var=cluster_facts
+
   - name: Create ESXi cluster '{{ cluster_name }}' in vCenter '{{ vcenter_hostname }}' if not present 
     community.vmware.vmware_cluster:
       hostname: '{{ vcenter_hostname }}'
@@ -1125,7 +1138,10 @@
       password: '{{ vcenter_password }}'
       datacenter_name: "{{ datacenter_name }}"
       cluster_name: "{{ cluster_name }}"
+      state: present
       validate_certs: false
+    when: cluster_facts.clusters is not defined or cluster_name not in cluster_facts.clusters
+    ignore_errors: yes # added as sometimes a failure is thrown saying "the name xyz already exists" when hosts are provisionned in parallel
     delegate_to: localhost
 
   - name: Enable HA without admission control on '{{ cluster_name }}' cluster
