@@ -19,6 +19,14 @@ cluster_name: "DL-Cluster-01" # created if not present
 datacenter_name: "Mougins"
 
 
+#------------------------ kickstart file customization ----------------------------------------------------------------------
+
+# Password for root
+# To create an encrypted passord, you can use the following command:
+#    python3 -c 'import crypt,getpass;pw=getpass.getpass();print(crypt.crypt(pw) if (pw==getpass.getpass("Confirm: ")) else exit())'
+encrypted_root_password: "$6$jsCkM/q1rcozIdi8$b1uUXnQmzv59.CKN01w2wdfEGnigRdfK2T.EpJznpyKDXR4uYrajcUZQHrkSrlt1Hwviyc2AWqR409f.i.I741"
+
+
 #---------------------- Server settings --------------------------------------------------------------------------------------
 
 # OS boot volume RAID type and size
