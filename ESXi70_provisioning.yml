@@ -733,7 +733,7 @@
       sed -i 's/kernelopt=cdromBoot runweasel/kernelopt=runweasel ks=cdrom:\/KS.CFG/' {{ staging_directory }}/baremetal/{{ inventory_hostname }}/efi/boot/boot.cfg
     delegate_to: localhost
 
-  # Creation of the ks.tgz kickstart file
+  # Creation of the KS.CFG kickstart file
 
   - name: Create kickstart file 
     become: yes
