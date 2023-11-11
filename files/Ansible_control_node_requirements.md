@@ -37,7 +37,6 @@ sudo dnf install isomd5sum
 
 ## Ansible installation and requirements
 ```
-
 sudo dnf install python3-pip
 pip3 install setuptools-rust wheel
 pip3 install ansible-core
