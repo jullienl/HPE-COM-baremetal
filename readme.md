@@ -146,7 +146,9 @@ To learn more about **Setting up Windows host**, see [https://docs.ansible.com/a
 3. Copy the operating system ISOs to a web server defined by the variables `src_iso_url` and `src_iso_file` 
 
 4. Secure your HPE Compute Ops Management credentials, using Ansible vault to encrypt them. From the root of this Ansible project on the Ansible control node, run:   
-    `ansible-vault create vars/GLCP_US_West_credentials_encrypted.yml`   
+    ```
+    ansible-vault create vars/GLCP_US_West_credentials_encrypted.yml
+    ```   
     Once the password is entered, type the following content using your own API client credentials and connectivity endpoint:
      ```
      ---
