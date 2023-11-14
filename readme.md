@@ -83,7 +83,9 @@ A more detailed process flow is avalable at https://miro.com/app/board/uXjVNZ9eH
 
 ## Pre-requisites
 
-- A web server with ISO images of the various operating systems to be provisioned.
+- A web server with ISO images of the various operating systems to be provisioned. 
+
+  > To reduce the speed of creating customized ISO images, this projet uses RHEL Boot ISO images instead of DVD ISOs. The boot ISO does not contain any installable packages so it is necessary to have an installation source set defined by the variable `src_iso_url` in /vars/RHEL9.0_vars.yml. This network location stores a copy of the content of the DVD ISO image which contains the required repository and software packages  by the installation.
 
 - HPE Compute Ops Management API Client Credentials with the Compute Ops Management Administrator role.
 
@@ -105,6 +107,8 @@ A more detailed process flow is avalable at https://miro.com/app/board/uXjVNZ9eH
 - An Ansible control node at the right date and time to support the various time-dependent playbook operations. 
 
 - A Windows DNS server configured to be managed by Ansible. See below for more information.
+
+- For Linux provisioning, 
 
 
 ## Ansible control node information

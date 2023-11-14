@@ -1620,14 +1620,14 @@
       status_code: 204
       headers:
         Authorization: "Bearer {{ access_token }}"
-    when: server_found_in_definitive_group | length != 0
+    when: server_found_in_definitive_group is defined and server_found_in_definitive_group | length != 0
     register: group_unassignment_result
     delegate_to: localhost
 
   - name: Wait for deletion to complete
     pause:
       seconds: 15
-    when: server_found_in_definitive_group | length != 0
+    when: server_found_in_definitive_group is defined and server_found_in_definitive_group | length != 0
     
   # Add server to the definitive server group 
 
