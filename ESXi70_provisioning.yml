@@ -1305,68 +1305,80 @@
     register: firmwarebundles
     delegate_to: localhost
 
-  # - name: Display all firmware bundles
-  #   debug: var=firmwarebundles
+  # - debug: var=firmwarebundles
+
+  # Gen10 firmware bundle
 
   - name: Set variable for Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}'
     set_fact:
       Gen10_10p_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
     vars:
       query: "json.items[?releaseVersion=='{{ Gen10_10p_firmware_bundle_name }}'].id"
-    when: Gen10_10p_firmware_bundle_name is defined and (firmwarebundles | json_query(query) )[0] | default([]) != []
+    when: (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
 
   - name:  Exit if Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}' does not exist
     fail:
       msg: "Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}' does not exist!"
-    when: Gen10_10p_firmware_bundle_name is defined and Gen10_10p_firmware_bundle_ID is not defined
+    when: (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0) and Gen10_10p_firmware_bundle_ID is not defined
 
   - debug: var=Gen10_10p_firmware_bundle_ID
-    when: Gen10_10p_firmware_bundle_name is defined
+    when: (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0)
     
+  # Gen10 associated patch
+
   - name: Set variable for '{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}' associated patch for Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}'
     set_fact:
       Gen10_10p_patch_firmware_ID: "{{ (firmwarebundles | json_query(query) )[0] }}"
     vars:
       query: "json.items[?releaseVersion=='{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}'].id"
-    when: Gen10_10p_patch_name_associated_with_firmware_bundle is defined and (firmwarebundles | json_query(query) )[0] | default([]) != []
+    when: (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
 
   - name: Exit if Gen10 associated patch '{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}' does not exist
     fail:
       msg: "Gen10 associated patch '{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}' does not exist!"
-    when: Gen10_10p_patch_name_associated_with_firmware_bundle is defined and Gen10_10p_patch_firmware_ID is not defined
+    when: (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0) and Gen10_10p_patch_firmware_ID is not defined
 
   - debug: var=Gen10_10p_patch_firmware_ID
-    when: Gen10_10p_patch_name_associated_with_firmware_bundle is defined
+    when: (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0)
 
+  # Gen11 firmware bundle
+  
   - name: Set variable for Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}'
     set_fact:
       Gen11_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
     vars:
       query: "json.items[?releaseVersion=='{{ Gen11_firmware_bundle_name }}'].id"
-    when: Gen11_firmware_bundle_name is defined and (firmwarebundles | json_query(query) )[0] | default([]) != []
+    when: (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
 
   - name: Exit if Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}' does not exist
     fail:
       msg: "Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}' does not exist!"
-    when: Gen11_firmware_bundle_name is defined and Gen11_firmware_bundle_ID is not defined
+    when: (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0) and Gen11_firmware_bundle_ID is not defined
 
   - debug: var=Gen11_firmware_bundle_ID
-    when: Gen11_firmware_bundle_name is defined
+    when:  (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0)
 
-  - name: Set variable for '{{ Gen11_patch_name_associated_with_firmware_bundle }}' associated patch for Gen10 firmware bundle '{{ Gen11_firmware_bundle_name }}'
+  # Gen11 associated patch
+  
+  - debug: var=Gen11_patch_name_associated_with_firmware_bundle
+    when: (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0)
+
+  - name: Set variable for '{{ Gen11_patch_name_associated_with_firmware_bundle }}' associated patch for Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}'
     set_fact:
       Gen11_patch_firmware_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
     vars:
       query: "json.items[?releaseVersion=='{{ Gen11_patch_name_associated_with_firmware_bundle }}'].id"
-    when: Gen11_patch_name_associated_with_firmware_bundle is defined and (firmwarebundles | json_query(query) )[0] | default([]) != []
+    when:  (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
 
   - name: Exit if Gen11 associated patch '{{ Gen11_patch_name_associated_with_firmware_bundle }}' does not exist
     fail:
-      msg: "Gen11 associated patch '{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}' does not exist!"
-    when: Gen11_patch_name_associated_with_firmware_bundle is defined and Gen11_patch_firmware_ID is not defined
+      msg: "Gen11 associated patch '{{ Gen11_patch_name_associated_with_firmware_bundle }}' does not exist!"
+    when:  (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) and Gen11_patch_firmware_ID is not defined
 
   - debug: var=Gen11_patch_firmware_ID
-    when: Gen11_patch_name_associated_with_firmware_bundle is defined
+    when: (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) 
+
+  # Setting final SPP variables if a fw patch exists
 
   - name: Set the final variable value for the Gen10 firmware bundle ID
     set_fact:
@@ -1378,7 +1390,23 @@
       Gen11_firmware_bundle_ID: "{{ Gen11_patch_firmware_ID }}"
     when: Gen11_patch_firmware_ID is defined
 
+  # Failure if firmware bundles set are not found
 
+  - name: Fail if the firmware baselines for Gen10/Gen10+ and Gen11 servers could not be found.
+    fail:
+      msg: 'The firmware bundles for Gen10/Gen10+ and Gen11 servers could not be found, check your firmware baseline variables.' 
+    when: Gen10_10p_firmware_bundle_ID is not defined and Gen11_firmware_bundle_ID is not defined
+
+  - name: Fail if the firmware baseline for Gen10/Gen10+ servers could not be found.
+    fail:
+      msg: 'The firmware bundle for Gen10/Gen10+ servers could not be found, check your firmware baseline variables.' 
+    when: Gen10_10p_firmware_bundle_ID is not defined 
+
+  - name: Fail if the firmware baseline for Gen11 servers could not be found.
+    fail:
+      msg: 'The firmware bundle for Gen11 servers could not be found, check your firmware baseline variables.' 
+    when: Gen11_firmware_bundle_ID is not defined 
+  
  # Create the firmware server setting 
 
   - name: Check if the firmware server setting '{{ firmware_server_setting_name }}' exists
@@ -1507,7 +1535,7 @@
             storageVolumeName: ""
             osInstall: 'false'
           onSettingsApply:
-            firmwareDowngrade: 'false'
+            firmwareDowngrade: "{{ firmware_downgrade_policy }}"
         autoAddServerTags:
     register: definitive_server_group_result
     when: definitive_server_group.json.count == 0
@@ -1550,7 +1578,7 @@
             storageVolumeName: ""
             osInstall: 'false'
           onSettingsApply:
-            firmwareDowngrade: 'false'
+            firmwareDowngrade: "{{ firmware_downgrade_policy }}"
         autoAddServerTags:
     vars: 
       group_id: "{{ definitive_server_group  | json_query('json.items[0].id') }}"

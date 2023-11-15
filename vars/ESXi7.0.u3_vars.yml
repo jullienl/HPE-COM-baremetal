@@ -46,18 +46,21 @@ workload_profile_name: "Virtualization - Power Efficient"
 
 #---------------------- COM server group settings ----------------------------------------------------------------------------
 
-# Name of the definitive server group where to place the host at the end of provisioning
+# Name of the definitive server group where to place the host at the end of provisioning (created if not already present)
 server_group_name: "ESXi_group"
-# Name of the firmware baseline to be used with the definitive server group
+# Name of the firmware server setting to be defined in definitive server group (created if not already present)
 firmware_server_setting_name: "ESXi firmware baseline"
 
-# Firmware bundles to be set in the firmware baseline of the definitive server group
-Gen10_10p_firmware_bundle_name: "2023.03.00.00"
-Gen10_10p_patch_name_associated_with_firmware_bundle: "2023.03.00.03"
+# Firmware baselines to be defined in the firmware server setting of the definitive server group 
+#  Note: it is mandatory to define at least one firmware baseline for Gen10/Gen10+ servers and one for Gen11 servers.
+Gen10_10p_firmware_bundle_name: "2023.09.00.00"  
+Gen10_10p_patch_name_associated_with_firmware_bundle: "2023.09.00.01" 
+Gen11_firmware_bundle_name: "2023.10.00.00" 
+Gen11_patch_name_associated_with_firmware_bundle: "" 
 
-Gen11_firmware_bundle_name: "2023.04.00.00"
-Gen11_patch_name_associated_with_firmware_bundle: "2023.04.00.04"
-
+# Downgrade components policy to match baseline (boolean)
+# If "true", any component version higher than the baseline will be downgraded to match the baseline. 
+firmware_downgrade_policy: "true"
 
 
 #------------------------ ISO settings -------------------------------------------------------------------------------------
