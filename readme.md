@@ -83,9 +83,25 @@ A more detailed process flow is avalable at https://miro.com/app/board/uXjVNZ9eH
 
 ## Pre-requisites
 
-- A web server with ISO images of the various operating systems to be provisioned. 
+- An Ansible control node running Ansible:
+  - With an access to the internet to access the HPE GreenLake platform and to the management network where the servers to be provisioned reside.
 
-  > To reduce the speed of creating customized ISO images, this projet uses RHEL Boot ISO images instead of DVD ISOs. The boot ISO does not contain any installable packages so it is necessary to have an installation source set defined by the variable `src_iso_url` in /vars/RHEL9.0_vars.yml. This network location stores a copy of the content of the DVD ISO image which contains the required repository and software packages  by the installation.
+  - With a storage volume large enough to host a copy of the ISO files, and the temporary extraction of an ISO and the new generated ISO with the customized kickstart for each server being provisioned 
+
+    > **Note**: 1TB+ is recommended if you plan to provision several servers in parallel. 
+
+  - At the right date and time to support the various time-dependent playbook operations. 
+
+- A web server containing ISO images of the different operating systems to be provisioned. 
+
+- A network location containing an installation source for each Linux version to be provisioned. 
+
+  > To reduce the process of creating Red Hat (and community Enterprise Linux: CentOS, Alma Linux, Rocky Linux) customized ISO images, this projet uses BOOT ISO images (~700MB) instead of traditional DVD ISOs (~8GB). The BOOT ISO does not contain any installable packages. It is therefore necessary to set up an installation source that stores a copy of the DVD ISO image contents, so that the BOOT ISO image installer can access the software packages and start the installation.
+
+  > To learn how to prepare an installation source using HTTP/HTTPS, see [Creating an installation source using HTTP or HTTPS](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/performing_a_standard_rhel_8_installation/prepare-installation-source_installing-rhel#creating-an-installation-source-on-http_prepare-installation-source)
+
+  > The installation source URL which points to the extracted contents of the DVD ISO image is defined by the variable `<OS>_repo_url` in /vars.  
+  
 
 - HPE Compute Ops Management API Client Credentials with the Compute Ops Management Administrator role.
 
@@ -99,16 +115,8 @@ A more detailed process flow is avalable at https://miro.com/app/board/uXjVNZ9eH
 
 - The `Hosts` inventory file needs to be updated. Each server should be listed in the corresponding inventory group along with its serial number and the IP address that should be assigned to the operating system.
 
-
-- An Ansible control node with a storage volume large enough to host a copy of the ISO files, and the temporary extraction of an ISO and the new generated ISO with the customized kickstart for each server being provisioned 
-
-   > **Note**: 1TB+ is recommended if you plan to provision several servers in parallel. 
-
-- An Ansible control node at the right date and time to support the various time-dependent playbook operations. 
-
 - A Windows DNS server configured to be managed by Ansible. See below for more information.
 
-- For Linux provisioning, 
 
 
 ## Ansible control node information

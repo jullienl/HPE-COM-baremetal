@@ -22,8 +22,6 @@
     - vars/GLCP_US_West_credentials_encrypted.yml    
     - vars/VMware_vCenter_vars_encrypted.yml
   vars:
-    # HPE Synergy Composer configuration
-    config: "{{ playbook_dir }}/oneview_config.json"
     inventory_fqdn: "{{ inventory_hostname | lower }}.{{ domain }}"
     ansible_forks: 5
 
