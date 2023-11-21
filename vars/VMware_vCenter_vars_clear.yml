@@ -6,3 +6,6 @@ vcenter_password: "xxxxxxxxxxxxxxxx"
 
 # License to be assigned to the ESXi host
 esxi_license: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# ESXi root password:
+root_password: "xxxxxxxxx"
