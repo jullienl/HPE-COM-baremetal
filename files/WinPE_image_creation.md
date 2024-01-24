@@ -3,9 +3,9 @@
 
 Creating a Windows Preinstallation Environment (WinPE) image is an essential part of deploying Windows servers, especially for custom or automated installations. Below are the steps to follow to create a WinPE image suited to the Ansible playbook of this project for the deployment of Windows Server:
 
-Prerequisites
+**Prerequisites**:
 - A Windows machine to install the Windows Assessment and Deployment Kit (Windows ADK) 
-- Adequate permissions to execute commands on your machine.
+- Adequate permissions to execute commands on your machine
 
 ## Step 1: Install Windows ADK
 

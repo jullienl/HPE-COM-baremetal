@@ -9,6 +9,8 @@
 #
 # Each variable value is equal to the resourceUri attribute of the corresponding job template (e.g. /compute-ops/v1beta2/job-templates/d17898e6-6907-491e-8430-7c2da795d2e5). 
 
+
+
 ---
   - name: Capture all job templates
     uri:
@@ -34,4 +36,5 @@
     loop: "{{ job_templates }}"
     loop_control:
       label: "Variable set: {{ (item.name | replace('-', '_') | replace('.', '_')  ) + '_job_template_resourceUri' }} = {{ item.resourceUri }}"
+
 

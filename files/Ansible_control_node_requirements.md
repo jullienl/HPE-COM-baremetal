@@ -5,6 +5,7 @@ To ensure proper functionality of the Ansible playbooks, it is important to use 
 hostnamectl set-hostname <hostname>.<your-domain>
 ```
 
+
 ## Clone the Github project
 ```
 sudo dnf install git

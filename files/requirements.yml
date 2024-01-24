@@ -6,4 +6,3 @@ collections:
   - name: community.windows
   # Microsoft AD collection is required to add a computer to a Microsoft Active Directory domain.
   - name: microsoft.ad
-
