@@ -117,7 +117,7 @@ The following diagrams describe the overall process flows:
    
 **ESXi Unprovisioning**:   
    
-![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/0b9a414b-9dc7-4b12-9e17-00a4741a4f79)
+![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/20234a57-95c1-4563-b399-b16ef2f259c1)
 
 
 ## Pre-requisites
@@ -311,7 +311,7 @@ The resources in this repository have been tested with Ansible control node runn
 The provisioned OS tested successfully are:
   - VMware-ESXi-7.0.3-21930508-HPE-703.0.0.11.4.0.5-Sep2023.iso
   - VMware-ESXi-8.0.2-22380479-HPE-802.0.0.11.4.0.14-Sep2023.iso
-  - rhel-baseos-9.0-x86_64-boot.iso
+  - rhel-9.3-x86_64-boot.iso
   - Windows Server 2022 using a custom WinPE image.
 
 
