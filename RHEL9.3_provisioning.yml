@@ -1,0 +1,1919 @@
+---
+# Performing automated Red Hat Enterprise Linux 9.3 installation on HPE Compute Ops Managmeent server(s) using an auto-generated ISO file with customized kickstart.
+#
+#  Command that can be used to run this playbook:
+#
+#   $ ansible-playbook -i hosts_RHEL RHEL9.3_provisioning.yml --ask-vault-password --ask-become-pass
+#
+#  Note: Make sure to provide the list of servers to be provisioned with their details in the inventory file 'hosts_RHEL'
+#
+#----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+# Adding a DNS record for the server that will be provisioned in the defined DNS server
+
+#-------------------------------------- DNS record (WinRM Mode) -------------------------------------------------------------------------------------------------------
+
+- name: DNS record for the bare metal RHEL server
+  hosts: All
+  gather_facts: no
+  vars:
+    ansible_forks: 5
+  vars_files:
+    - vars/Windows_DNS_vars_encrypted.yml
+  tasks:
+    - name: Add '{{ inventory_hostname }}' with '{{ os_ip_address }}' on '{{ dns_server }}' in '{{ domain }}' DNS domain
+      community.windows.win_dns_record:
+        name: "{{ inventory_hostname }}"
+        type: "A"
+        value: "{{ os_ip_address }}"
+        zone: "{{ domain }}"
+        state: present
+      delegate_to: "{{ dns_server }}"
+
+#-------------------------------------- Bare Metal Provisioning -------------------------------------------------------------------------------------------------------
+
+- name: Automated RHEL 9.3 installation on HPE Compute Ops Managmeent server(s) using an auto-generated ISO file with customized kickstart.
+  hosts: All
+  gather_facts: no
+  vars_files:
+    - vars/GLP_HPE_Mougins_EU_Central_credentials_encrypted.yml    
+    - vars/RHEL9.3_vars.yml
+  vars:
+    inventory_fqdn: "{{ inventory_hostname | lower }}.{{ domain }}"
+    ansible_host_key_checking: false
+    validate_certs: false
+    user: "{{ lookup('env', 'USER') }}"
+    ssh_known_hosts_file: "{{ lookup('env','HOME') + '/.ssh/known_hosts' }}"
+    ansible_ssh_public_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+    ansible_forks: 5
+
+  tasks:
+
+#--------------------------------------Capture start time--------------------------------------------------------------------------------------------------------------
+
+  - name: Gather subset facts on localhost
+    setup:
+      gather_subset: [all]
+    delegate_to: localhost
+
+  - name: Capture the start time (will be used later to filter COM activities and get the runtime of the playbook)
+    set_fact:
+      start_time: "{{ ansible_date_time.iso8601 }}"
+      # yesterday_date: "{{ '%Y-%m-%dT%H:%M:%SZ' | strftime(ansible_date_time.epoch | int - (24 * 3600)) }}"
+  
+  - debug: var=start_time
+      
+
+#--------------------------------------Authentication with COM---------------------------------------------------------------------------------------------------------
+
+  - name: Create HPE Compute Ops Management session
+    import_tasks: files/Create_COM_session.yml
+
+
+#--------------------------------------Capture COM resource API versions ----------------------- ----------------------------------------------------------------------
+
+  - name: Capture Resource API versions
+    import_tasks: files/Get_resource_API_versions.yml
+
+
+#--------------------------------------Capture Job Templates Resource Uri-----------------------------------------------------------------------------------------------
+  
+  - name: Capture Job Templates ResourceUri
+    import_tasks: files/Get_job_templates_resourceuri.yml
+
+
+#--------------------------------------Capture server information -----------------------------------------------------------------------------------------------------
+
+  - name: Capture server '{{ serial_number }}' information
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ serial_number }}'"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server
+    delegate_to: localhost
+
+  # - debug: var=server
+
+  - name: Exit if server '{{ serial_number }}' does not exist
+    fail:
+      msg: "Server '{{ serial_number }}' does not exist!"
+    when: server.json.count == 0
+
+  - name: Capture server '{{ serial_number }}' generation, id, uri, connection status and iLO IP
+    set_fact:
+      server_generation:  "{{ server | json_query('json.items[0].serverGeneration') }}"
+      server_id:  "{{ server | json_query('json.items[0].id') }}"
+      server_resourceUri:  "{{ server | json_query('json.items[0].resourceUri') }}"
+      server_connected_status:  "{{ server | json_query('json.items[0].state.connected') }}"
+      server_ilo_ip:  "{{ server | json_query('json.items[0].hardware.bmc.ip') }}"
+
+  - debug: 
+      msg:
+        - "Generation: {{ server_generation }}"
+        - "ID: {{ server_id }}"
+        - "URI: {{ server_resourceUri }}"
+        - "Connection status: {{ server_connected_status }}"
+        - "iLO IP: {{ server_ilo_ip }}"
+
+  - name: Exit if server '{{ serial_number }}' is not connected to COM
+    fail:
+      msg: 
+        - "Server '{{ serial_number }}' is not connected to COM!" 
+        - "Make sure to connect the server's iLO to COM ! Go to iLO UI / Management / Compute Ops Management"
+    when: server_connected_status == false
+
+  - name: Wait until the server '{{ serial_number }}' raw inventory information is available (necessary when the server has recently been added to COM) then capture the data
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server_raw_inventory
+    failed_when: server_raw_inventory.status != 200 and server_raw_inventory.status != 404
+    until: server_raw_inventory.status == 200 
+    retries: 30
+    delay: 60
+    delegate_to: localhost
+    
+  - name: Wait until the complete discovery of server '{{ serial_number }}' is complete (necessary when the server has recently been added to COM).
+    uri:
+      url: "{{ ConnectivityEndpoint }}/ui-doorway/compute/v2/servers/{{ server_id }}"
+      method: GET
+      return_content: yes
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server_inventory_from_ui_doorway
+    until: server_inventory_from_ui_doorway.json.state_ != "Retrieving server information in progress" 
+    retries: 30
+    delay: 60
+    delegate_to: localhost
+
+
+#--------------------------------------Check BIOS/Workload profile settings -------------------------------------------------------------------------------------------
+
+  # BIOS/Workload profiles are predefined by HPE, so there's no need to create/update them, just check that they exist. 
+
+  - name: Check if workload profile '{{ workload_profile_name }}' exists
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars:
+      filter: "category eq 'BIOS' and name eq '{{ workload_profile_name }}'"
+    register: bios_server_setting
+    delegate_to: localhost
+
+  # - debug: var=bios_server_setting
+
+  - name: Exit if workload profile '{{ workload_profile_name }}' does not exist
+    fail:
+      msg: "Workload profile '{{ workload_profile_name }}' does not exist!"
+    when: bios_server_setting.json.count == 0
+
+  - name: Set a variable for the resourceUri of workload profile '{{ workload_profile_name }}'
+    set_fact: 
+      bios_server_setting_resourceuri: "{{ bios_server_setting | json_query('json.items[0].resourceUri') }}"   
+    
+  # - debug: var=bios_server_setting_resourceuri    
+
+
+#--------------------------------------Create internal storage settings -----------------------------------------------------------------------------------------------
+
+  - name: Wait until PCI devices information is available then capture the server '{{ serial_number }}' raw inventory information 
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server_raw_inventory
+    # until: (server_raw_inventory.json.pciDevices | length>0)
+    until: server_raw_inventory.json.pciDevices is defined and server_raw_inventory.json.pciDevices is not none
+    retries: 30
+    delay: 60
+    delegate_to: localhost
+
+  # Is the server equipped with an NVMe NS204i boot controller?
+
+  - name: Capture the presence of a NS204i NVMe boot controller in server '{{ serial_number }}'
+    set_fact:
+      NS204i_data: "{{ matched_item }}"
+    vars:
+        matched_item: "{{ item }}"
+    loop: "{{ server_raw_inventory.json.storageInventory | dict2items }}"
+    loop_control:
+      label: never
+    when: item.value.Name is search('NS204i')
+
+  # - debug: var=NS204i_data
+
+  - debug:
+     msg: "NS204i found in server '{{ serial_number }}'! NVMe RAID1 volume will be used as the target volume for the installation of RHEL!"
+    when: NS204i_data is defined
+  
+  - debug:
+     msg: "No NS204i found in server '{{ serial_number }}'! Let's check if a storage controller with drives is available..."
+    when: NS204i_data is undefined
+
+  # - debug: var=server_raw_inventory.json.storageInventory
+
+  - name: Capture size of the NS204i RAID1 volume if any
+    set_fact:
+      boot_drive_bytes_size: "{{ matched_item }}"
+    vars:
+        matched_item: "{{ item.value.Volumes.Members[0].CapacityBytes }}"
+    loop: "{{ server_raw_inventory.json.storageInventory | dict2items }}"
+    loop_control:
+      label: never
+    when: NS204i_data is defined and item.value.Name is search('NS204i')
+    
+  - debug: 
+      msg: "Size of NS204i volume: {{ ((boot_drive_bytes_size | int) / (1024 ** 3)) | round(1) }} GB"
+    when: NS204i_data is defined 
+
+  # Is the server equipped with an HPE MR or SR controller and with drives available?
+
+  - name: Capture storage RAID controller information when an HPE MR or SR controller is used with available drives
+    set_fact:
+      storage_controller_data: "{{ matched_item }}"
+    vars:
+        matched_item: "{{ item.value }}"
+    loop: "{{ server_raw_inventory.json.storageInventory | dict2items }}"
+    loop_control:
+      label: never
+    when: NS204i_data is undefined and item.value.Drives | length > 0 and (item.value.Name is search('HPE MR') or item.value.Name is search('HPE SR'))
+
+  # - debug: var=storage_controller_data
+
+  - name: Set a variable for the name of the storage RAID controller found
+    set_fact:
+      storage_controller_name: "{{ storage_controller_data.Name }}"
+    when: NS204i_data is undefined and storage_controller_data is defined
+    
+  - debug: 
+      msg: "Storage RAID controller found: '{{ storage_controller_name }}' with '{{ storage_controller_data.Drives | length }}' drives"
+    when: NS204i_data is undefined and storage_controller_data is defined
+
+  - name: Exit when no NS204i and no SR/MR controller is found
+    fail: 
+      msg: "Error ! No NS204i and no SR/MR controller with disk available found !"
+    when: NS204i_data is undefined and storage_controller_data is undefined
+
+  - name: Set a controller type variable for kickstart creation when a NS204i is present
+    set_fact:
+      Controller_type: "NS204i"
+    when: NS204i_data is defined 
+
+  - name: Set a controller type variable for kickstart creation when there is no NS204i but an SR/MR controller is present.
+    set_fact:
+      Controller_type: "{{ storage_controller_name }}"
+    when: NS204i_data is undefined and storage_controller_data is defined
+
+  - debug: 
+      msg: "Controller type found that will be used by autounattend.xml: {{ Controller_type }}" 
+    
+  - name: Check if server settings '{{ raid_type }}' already exist
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars:
+      filter: "name eq '{{ raid_type }}'"
+    register: internal_storage_server_setting
+    when: NS204i_data is undefined
+    delegate_to: localhost
+
+  # - debug: var=internal_storage_server_setting
+
+  # If NS204i NVMe boot controller is found then no need to set a RAID internal storage configuration
+  # If NS204i NVMe boot controller is not found then need to set a RAID internal storage configuration
+ 
+  - name: Create internal storage configuration using '{{ raid_type }}' with a volume size of '{{ volume_size_in_GB }}' GB for the OS boot volume when it does not exist
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "{{ raid_type }}"
+        description: "Local storage settings using {{ raid_type }} for OS"
+        platformFamily: "Any"
+        category:  "STORAGE"
+        settings:
+          DEFAULT:
+            raidType:  "{{ raid_type }}"         
+            volumeSizeInGB: "{{ volume_size_in_GB }}"
+    register: internal_storage_server_setting_result
+    delegate_to: localhost
+    when:  NS204i_data is undefined and internal_storage_server_setting.json.count == 0
+
+  - name: Result of the '{{ raid_type }}' creation task
+    debug: var=internal_storage_server_setting_result
+    when:  NS204i_data is undefined and internal_storage_server_setting.json.count == 0
+
+  - name: Set a variable for the resourceUri of the internal storage configuration '{{ raid_type }}' just created
+    set_fact: 
+      internal_storage_server_setting_resourceuri: "{{ internal_storage_server_setting_result.json.resourceUri }}"
+    when:  NS204i_data is undefined and internal_storage_server_setting.json.count == 0
+
+  - name: Update internal storage configuration using '{{ raid_type }}' with a volume size of '{{ volume_size_in_GB }}' GB for the OS boot volume 
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings/{{ internal_storage_server_setting_id }}"
+      method: PATCH
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/merge-patch+json"
+      body_format: json
+      body:
+        name: "{{ raid_type }}"
+        description: "Local storage settings using {{ raid_type }} for OS"
+        platformFamily: "Any"
+        category:  "STORAGE"
+        settings:
+          DEFAULT:
+            raidType:  "{{ raid_type }}"         
+            volumeSizeInGB: "{{ volume_size_in_GB }}"
+    vars: 
+      internal_storage_server_setting_id: "{{ internal_storage_server_setting  | json_query('json.items[0].id') }}"
+    register: internal_storage_server_setting_result
+    delegate_to: localhost
+    when:  NS204i_data is undefined and internal_storage_server_setting.json.count == 1
+
+  - name: Result of the '{{ raid_type }}' update task
+    debug: var=internal_storage_server_setting_result.msg
+    when:  NS204i_data is undefined and internal_storage_server_setting.json.count == 1
+
+  - name: Set a variable for the resourceUri of the internal storage configuration '{{ raid_type }}' just updated
+    set_fact: 
+      internal_storage_server_setting_resourceuri: "{{ internal_storage_server_setting | json_query('json.items[0].resourceUri') }}"
+    when:  NS204i_data is undefined and internal_storage_server_setting.json.count == 1  
+
+  - debug: var=internal_storage_server_setting_resourceuri
+    when:  NS204i_data is undefined
+
+
+#--------------------------------------Create temporary server group with server settings -----------------------------------------------------------------------------
+
+  # Create a temporary group name from hostname + _server_group
+
+  - name: Create server group name '{{ inventory_hostname }}_server_group' variable
+    set_fact:
+      temporary_server_group_name: "{{ inventory_hostname }}_server_group" 
+
+  # Group is created or modified based on whether this particular resource is present or not
+  
+  - name: Check if group '{{ temporary_server_group_name }}' already exists
+    uri:
+      url:  "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars: 
+      filter: "name eq '{{ temporary_server_group_name }}'"      
+    register: temporary_server_group
+    delegate_to: localhost
+
+  # - debug: var=temporary_server_group
+
+  # Server group creation or modification when NS204i is found => no local storage configuration definition
+
+  - name: Create temporary group '{{ temporary_server_group_name }}' with no local storage configuration definition (if it does not exist)
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "{{ temporary_server_group_name }}"
+        description: "Temporary server group for RHEL installation on server '{{ inventory_hostname }}'"
+        serverSettingsUris: 
+          - "{{ bios_server_setting_resourceuri }}"     
+        serverPolicies:
+          onServerAdd:
+            firmwareUpdate: false
+            biosApplySettings: true
+            storageConfiguration: false
+            storageVolumeDeletion: false
+            storageVolumeName: ""
+            osInstall: false
+          onSettingsApply:
+            firmwareDowngrade: false
+        autoAddServerTags:
+    register: server_group_result
+    when: NS204i_data is defined and temporary_server_group.json.count == 0
+    delegate_to: localhost
+
+  - name: Display response of the temporary group '{{ temporary_server_group_name }}' creation request
+    debug: var=server_group_result.msg
+    when:  NS204i_data is defined and temporary_server_group.json.count == 0
+
+  - name: Set variables for the id and the resourceUri of temporary group '{{ temporary_server_group_name }}' just created
+    set_fact:
+      temporary_group_id: "{{ server_group_result.json.id }}" 
+      temporary_group_resourceuri: "{{ server_group_result.json.resourceUri }}"
+    when:  NS204i_data is defined and temporary_server_group.json.count == 0
+  
+  - name: Update temporary group '{{ temporary_server_group_name }}' with no local storage configuration definition (if it does exist)
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ group_id }}"
+      method: PATCH
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/merge-patch+json"
+      body_format: json
+      body:
+        name: "{{ temporary_server_group_name }}"
+        description: "Temporary server group for RHEL installation on server '{{ inventory_hostname }}'"
+        serverSettingsUris: 
+          - "{{ bios_server_setting_resourceuri }}"   
+        serverPolicies:
+          onServerAdd:
+            firmwareUpdate: false
+            biosApplySettings: true
+            storageConfiguration: false
+            storageVolumeDeletion: false
+            storageVolumeName: ""
+            osInstall: false
+          onSettingsApply:
+            firmwareDowngrade: false
+        autoAddServerTags:
+    vars: 
+      group_id: "{{ temporary_server_group  | json_query('json.items[0].id') }}"
+    register: server_group_result
+    when:  NS204i_data is defined and temporary_server_group.json.count == 1
+    delegate_to: localhost
+
+  - name: Display response of the temporary group '{{ temporary_server_group_name }}' update request
+    debug: var=server_group_result.msg
+    when:  NS204i_data is defined and temporary_server_group.json.count == 1
+
+  - name: Set variables for the id and the resourceUri of temporary group '{{ temporary_server_group_name }}' just updated
+    set_fact:
+      temporary_group_id: "{{ temporary_server_group | json_query('json.items[0].id') }}" 
+      temporary_group_resourceuri: "{{ temporary_server_group | json_query('json.items[0].resourceUri') }}"
+    when:  NS204i_data is defined and temporary_server_group.json.count == 1
+
+  # Server group creation or modification when NS204i is not found => with local storage configuration definition
+
+  - name: Create temporary group '{{ temporary_server_group_name }}' with local storage configuration definition (if it does not exist)
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "{{ temporary_server_group_name }}"
+        description: "Temporary server group for RHEL installation on server '{{ inventory_hostname }}'"
+        serverSettingsUris: 
+          - "{{ bios_server_setting_resourceuri }}"   
+          - "{{ internal_storage_server_setting_resourceuri }}"       
+        serverPolicies:
+          onServerAdd:
+            firmwareUpdate: false
+            biosApplySettings: true
+            storageConfiguration: true
+            storageVolumeDeletion: true
+            storageVolumeName: "OS_boot_volume"
+            osInstall: false
+          onSettingsApply:
+            firmwareDowngrade: false
+        autoAddServerTags:
+    register: server_group_result
+    when: NS204i_data is undefined and temporary_server_group.json.count == 0
+    delegate_to: localhost
+
+  - name: Display response of the temporary group '{{ temporary_server_group_name }}' creation request
+    debug: var=server_group_result.msg
+    when:  NS204i_data is undefined and temporary_server_group.json.count == 0
+
+  - name: Set variables for the id and the resourceUri of temporary group '{{ temporary_server_group_name }}' just created
+    set_fact:
+      temporary_group_id: "{{ server_group_result.json.id }}" 
+      temporary_group_resourceuri: "{{ server_group_result.json.resourceUri }}"
+    when: NS204i_data is undefined and temporary_server_group.json.count == 0
+  
+  - name: Update temporary group '{{ temporary_server_group_name }}' with local storage configuration definition (if it does exist)
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ group_id }}"
+      method: PATCH
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/merge-patch+json"
+      body_format: json
+      body:
+        name: "{{ temporary_server_group_name }}"
+        description: "Temporary server group for RHEL installation on server '{{ inventory_hostname }}'"
+        serverSettingsUris: 
+          - "{{ bios_server_setting_resourceuri }}"   
+          - "{{ internal_storage_server_setting_resourceuri }}"           
+        serverPolicies:
+          onServerAdd:
+            firmwareUpdate: false
+            biosApplySettings: true
+            storageConfiguration: true
+            storageVolumeDeletion: true
+            storageVolumeName: "OS_boot_volume"
+            osInstall: false
+          onSettingsApply:
+            firmwareDowngrade: false
+        autoAddServerTags:
+    vars: 
+      group_id: "{{ temporary_server_group  | json_query('json.items[0].id') }}"
+    register: server_group_result
+    when:  NS204i_data is undefined and temporary_server_group.json.count == 1
+    delegate_to: localhost
+
+  - name: Display response of the temporary group '{{ temporary_server_group_name }}' update request
+    debug: var=server_group_result.msg
+    when:  NS204i_data is undefined and temporary_server_group.json.count == 1
+
+  - name: Set variables for the id and the resourceUri of temporary group '{{ temporary_server_group_name }}' just updated
+    set_fact:
+      temporary_group_id: "{{ temporary_server_group | json_query('json.items[0].id') }}" 
+      temporary_group_resourceuri: "{{ temporary_server_group | json_query('json.items[0].resourceUri') }}"
+    when: NS204i_data is undefined and temporary_server_group.json.count == 1
+
+  - debug: var=temporary_group_id
+
+  - debug: var=temporary_group_resourceuri
+
+
+#--------------------------------------Add server to temporary server group for server configuration ------------------------------------------------------------------
+
+  - name: Check if server '{{ serial_number }}' is already member of a server group 
+    uri:
+      url: "{{ ConnectivityEndpoint }}/ui-doorway/compute/v2/servers/{{ server_id }}"
+      method: GET
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server_info_from_ui_doorway
+    delegate_to: localhost
+
+  # - debug: var=server_info_from_ui_doorway
+
+  - debug: var=server_info_from_ui_doorway.json.group_
+    when: server_info_from_ui_doorway.json.group_ is defined
+
+  - name: Capture the id of the server group of which the server '{{ serial_number }}' is a member (if applicable)
+    set_fact:
+      server_group_id_found: "{{ server_info_from_ui_doorway.json.group_.id }}"
+      server_group_name_found: "{{ server_info_from_ui_doorway.json.group_.name }}"
+    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+
+  - debug: var=server_group_name_found
+    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+
+  - name: Remove server '{{ serial_number }}' from the server group of which it is currently a member
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ server_group_id_found }}/devices/{{ server_id }}"
+      method: DELETE
+      status_code: 204
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+    register: group_unassignment_result
+    delegate_to: localhost
+
+  - name: Wait for deletion to complete
+    pause:
+      seconds: 15
+    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+    
+  # Add server to the temporary server group 
+
+  - name: Assign server '{{ serial_number }}' to temporary group '{{ temporary_server_group_name }}'
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ temporary_group_id }}/devices"
+      method: POST
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        devices:
+          # Only servers that are not part of a group can be assigned to a group.
+          - serverId: "{{ server_id }}"
+    register: group_assignment_result
+    delegate_to: localhost
+
+  - name: Display response of the group assignment task
+    debug: var=group_assignment_result.msg
+
+
+#--------------------------------------Monitor the server configuration status ----------------------------------------------------------------------------------------
+  
+  # Wait for the server configuration to complete 
+
+  - name: Wait for the configuration of server '{{ serial_number }}' to complete 
+    uri:
+      url:  "{{ ConnectivityEndpoint }}/compute-ops/{{ activities_API_version }}/activities?filter={{ filter | urlencode  }}"  
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars: 
+      filter: "associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"      
+      query: "json.items[? name=='Server automatic configuration' && (contains(message,'Automatic configuration of server is complete') || contains(message,'failed'))]"
+    register: server_activities
+    until: server_activities | json_query(query) 
+    retries: 30
+    delay: 60
+    delegate_to: localhost
+
+  - name: Exit if configuration of server '{{ serial_number }}' failed to complete
+    fail:
+      msg: "The configuration of server '{{ serial_number }}' failed to complete! Refer to the individual server activity entries in GLCP UI for details."
+    vars:
+      query: "json.items[? name=='Server automatic configuration' && contains(message,'failed')]"
+    when: server_activities | json_query(query) 
+
+ # Capture the size of the volume created once the server configuration is complete only when NS204i is not found
+
+  - name: Capture server '{{ serial_number }}' raw inventory information
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server_raw_inventory
+    delegate_to: localhost
+    when: NS204i_data is undefined
+  
+  # - debug: var=server_raw_inventory
+  
+  - name: Capture storage RAID controller information when an HPE MR or SR controller is used with available drives
+    set_fact:
+      storage_controller_data: "{{ matched_item }}"
+    vars:
+        matched_item: "{{ item.value }}"
+    loop: "{{ server_raw_inventory.json.storageInventory | dict2items }}"
+    loop_control:
+      label: never
+    when: NS204i_data is undefined and item.value.Name == storage_controller_name 
+   
+  - name: Capture the size of the OS volume configured on the {{ storage_controller_name }}
+    set_fact:
+      boot_drive_bytes_size: "{{ (storage_controller_data |  json_query(query))[0]  }}"
+    vars:
+      query: "Volumes.Members[?Name=='OS_boot_volume'].CapacityBytes"
+    when: NS204i_data is undefined
+    
+  - debug: var=boot_drive_bytes_size
+        
+  - debug: 
+      msg: "Size of RAID volume: {{ ((boot_drive_bytes_size | int) / (1024 ** 3)) | round(1) }} GB"
+    when: NS204i_data is undefined
+
+
+#--------------------------------------Build ISO image with customized kickstart --------------------------------------------------------------------------------------
+
+  # - set_fact:
+  #      boot_drive_bytes_size: "599584145408"
+  #      Controller_type: "SR/MR controller"
+
+  # - set_fact:
+  #      boot_drive_bytes_size: "480036519936"
+  #      Controller_type: "NS204i"
+       
+
+  - name: Check if RHEL Custom ISO file '{{ src_iso_file }}' exists in '{{ src_iso_directory }}' on '{{lookup("pipe","hostname")}}' 
+    stat:
+      path: "{{ src_iso_directory }}/{{ src_iso_file }}"
+    register: ISO_Present
+    delegate_to: localhost
+
+  - name: Create the directory '{{ src_iso_directory }}' to host the ISO file on '{{ lookup("pipe","hostname") }}'
+    file:
+      path: "{{ src_iso_directory }}"
+      state: directory
+    when: ISO_Present.stat.exists == False
+    delegate_to: localhost
+
+  - name: Check if RHEL ISO '{{ src_iso_url }}/{{ src_iso_file }}' exists  
+    uri:
+      url: "{{ src_iso_url }}/{{ src_iso_file }}"
+      method: HEAD
+      status_code: 200 # The HTTP status code for a successful request.
+      validate_certs: false
+    when: ISO_Present.stat.exists == False
+    delegate_to: localhost
+
+  - name: Download file '{{ src_iso_file }}' to '{{ lookup("pipe","hostname") }}' in '{{ src_iso_directory }}' if not present
+    get_url:
+      url: "{{ src_iso_url }}/{{ src_iso_file }}"
+      dest: "{{ src_iso_directory }}"
+      validate_certs: no
+    when: ISO_Present.stat.exists == False
+    delegate_to: localhost
+
+  - name: Collect ISO label (can be required for some booltloader modifications)
+    shell: isoinfo -i {{ src_iso_directory }}/{{ src_iso_file }} -d  | grep "Volume id" | awk '{ print substr ($0, 12 ) }'
+    register: iso_info
+    delegate_to: localhost
+
+  - set_fact: iso_label={{ iso_info.stdout }}
+
+  # - debug: msg='{{ iso_label }}'
+
+  - name: Create '/mnt/{{ inventory_hostname }}' on '{{lookup("pipe","hostname")}}'
+    become: yes
+    file:
+      path: /mnt/{{ inventory_hostname }}
+      state: directory
+      mode: "0755"
+    delegate_to: localhost
+
+  - name: Create '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/' on '{{lookup("pipe","hostname")}}' if it does not exist
+    file:
+      path: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}"
+      state: directory
+    delegate_to: localhost
+
+  - name: Mount RHEL ISO '{{ src_iso_directory }}/{{ src_iso_file }}' to '/mnt/{{ inventory_hostname }}/' 
+    become: yes
+    shell: 
+      mount -o loop -t iso9660 --read-only {{ src_iso_directory }}/{{ src_iso_file }} /mnt/{{ inventory_hostname }}/
+    delegate_to: localhost
+
+  - name: Copy ISO files to '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/' on '{{lookup("pipe","hostname")}}' 
+    become: yes
+    shell: |
+      rsync -a /mnt/{{ inventory_hostname }}/. {{ staging_directory }}/baremetal/{{ inventory_hostname }}/
+    delegate_to: localhost
+
+  - name: Set permissions to allow the user running the Ansible playbook to delete the folder '{{ staging_directory }}/baremetal/{{ inventory_hostname }}'
+    become: yes
+    file:
+      path: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}"
+      mode: ug+w
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      recurse: yes
+      state: directory
+    delegate_to: localhost
+
+  - name: Unmount directory '/mnt/{{ inventory_hostname }}'
+    become: yes
+    shell: 
+      umount /mnt/{{ inventory_hostname }}
+    delegate_to: localhost
+
+  - name: Modify UEFI bootloader for kickstart installation from CDROM
+    shell: |
+      sed -i '1,/quiet/s/quiet/quiet inst.ks=cdrom:\/ks.cfg/'  {{ staging_directory }}/baremetal/{{ inventory_hostname }}/EFI/BOOT/grub.cfg
+      sed -i '1,/60/{s/60/5/}'  {{ staging_directory }}/baremetal/{{ inventory_hostname }}/EFI/BOOT/grub.cfg
+      sed -i '1,/1/{s/1/0/}'  {{ staging_directory }}/baremetal/{{ inventory_hostname }}/EFI/BOOT/grub.cfg
+    delegate_to: localhost
+
+  # Creation of the kickstart file
+
+  - name: Create kickstart file in '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/' on '{{lookup("pipe","hostname")}}' with variable substitution
+    template:
+      src: files/{{ rhel_version }}/{{ kickstart }}
+      dest: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/ks.cfg"
+    delegate_to: localhost
+
+  # Copy of HPE Agentless Management Service rpm to /rpms on the ISO (AMS is required by COM to detect completion of OS install)
+
+  - name: Create '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/rpms/' on '{{lookup("pipe","hostname")}}' if it does not exist
+    file:
+      path: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/rpms"
+      state: directory
+    delegate_to: localhost
+
+  - name: Copying HPE AMS rpm file to '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/rpms' on '{{lookup("pipe","hostname")}}'
+    copy:
+      src: files/{{ rhel_version }}/{{ AMS_package }}
+      dest: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/rpms/{{ AMS_package }}"
+    delegate_to: localhost
+
+  # Creation of the new RHEL ISO image with unattended installation
+
+  - name: Create customized bootable ISO in '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/'
+    # become: yes
+    shell: >
+      mkisofs
+      -V {{ iso_label }}
+      -J
+      -R
+      -l
+      -v
+      -b isolinux/isolinux.bin
+      -c isolinux/boot.cat
+      -no-emul-boot
+      -boot-load-size 4
+      -boot-info-table
+      -eltorito-alt-boot
+      -e images/efiboot.img
+      -no-emul-boot
+      -o {{ staging_directory }}/baremetal/{{ inventory_hostname }}.iso
+      -graft-points
+      {{ staging_directory }}/baremetal/{{ inventory_hostname }}/
+    delegate_to: localhost
+
+  - name: Implant MD5 checksum into the ISO to make it bootable
+    # become: yes
+    shell: |
+      # Convert the ISO image to be compatible for a USB boot image
+      isohybrid --uefi {{ staging_directory }}/baremetal/{{ inventory_hostname }}.iso
+      # Implant MD5 checksum into the ISO, if not done, ISO will not boot…
+      implantisomd5 {{ staging_directory }}/baremetal/{{ inventory_hostname }}.iso
+    delegate_to: localhost 
+
+  - name: Create '/usr/share/nginx/html/isos/' on '{{lookup("pipe","hostname")}}' if it does not exist
+    become: yes
+    file:
+      path: /usr/share/nginx/html/isos/
+      state: directory
+      mode: "0755"
+    delegate_to: localhost
+
+  - name: Move created ISO to the nginx default html folder. ISO URL='http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}.iso'
+    become: yes
+    shell: |
+      mv {{ staging_directory }}/baremetal/{{ inventory_hostname }}.iso /usr/share/nginx/html/isos/
+    delegate_to: localhost
+
+  - name: Update SELinux security contexts so that Nginx is allowed to serve content from the '/usr/share/nginx/html/isos/' directory.
+    become: yes
+    shell: |
+      chcon -vR system_u:object_r:httpd_sys_content_t:s0 /usr/share/nginx/html/isos/
+    delegate_to: localhost
+
+  # - fail:
+
+
+#--------------------------------------Create OS image settings -------------------------------------------------------------------------------------------------------
+
+  # OS image server setting is created or modified based on whether this particular resource is present or not
+
+  - name: Check if the operating system image server setting 'OS_Image_RHEL9.3_for_{{ inventory_hostname }}' exists
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars:
+      filter: "name eq 'OS_Image_RHEL9.3_for_{{ inventory_hostname }}'"
+    register: OS_image_server_setting
+    delegate_to: localhost
+
+  # - debug: var=OS_image_server_setting
+
+  - name: Create an operating system image server setting 'OS_Image_RHEL9.3_for_{{ inventory_hostname }}' if it does not exist
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name:  "OS_Image_RHEL9.3_for_{{ inventory_hostname }}"
+        description: ""
+        platformFamily: "Any"
+        category:  "OS"
+        settings:
+          DEFAULT:
+            osType: "RHEL"
+            mediaUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}.iso'
+    register: OS_image_server_setting_result
+    delegate_to: localhost
+    when: OS_image_server_setting.json.count == 0
+
+  - name: Result of the 'OS_Image_RHEL9.3_for_{{ inventory_hostname }}' creation task
+    debug: var=OS_image_server_setting_result.msg
+    when: OS_image_server_setting.json.count == 0
+
+  - name: Set variables for the id and the resourceUri of the OS Image configuration 'OS_Image_RHEL9.3_for_{{ inventory_hostname }}' just created 
+    set_fact:
+      OS_image_server_setting_id: "{{ OS_image_server_setting_result.json.id }}" 
+      OS_image_server_setting_resourceuri: "{{ OS_image_server_setting_result.json.resourceUri }}"
+    when: OS_image_server_setting.json.count == 0
+
+  - name: Update the operating system image server setting 'OS_Image_RHEL9.3_for_{{ inventory_hostname }}' if it does not exist
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings/{{ OS_image_server_setting_id }}"
+      method: PATCH
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/merge-patch+json"
+      body_format: json
+      body:
+        name:  "OS_Image_RHEL9.3_for_{{ inventory_hostname }}"
+        description: ""
+        platformFamily: "Any"
+        category:  "OS"
+        settings:
+          DEFAULT:
+            osType: "RHEL"
+            mediaUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}.iso'
+    vars: 
+      OS_image_server_setting_id: "{{ OS_image_server_setting  | json_query('json.items[0].id') }}"
+    register: OS_image_server_setting_result
+    delegate_to: localhost
+    when: OS_image_server_setting.json.count == 1
+
+  # - debug: var=OS_image_server_setting_result  
+
+  - name: Result of the 'OS_Image_RHEL9.3_for_{{ inventory_hostname }}' update task
+    debug: var=OS_image_server_setting_result.msg
+    when: OS_image_server_setting.json.count == 1
+
+  - name: Set variables for the id and the resourceUri of the OS Image configuration 'OS_Image_RHEL9.3_for_{{ inventory_hostname }}' just updated
+    set_fact:
+      OS_image_server_setting_id: "{{ OS_image_server_setting | json_query('json.items[0].id') }}" 
+      OS_image_server_setting_resourceuri: "{{ OS_image_server_setting | json_query('json.items[0].resourceUri') }}"
+    when:  OS_image_server_setting.json.count == 1
+
+  - debug: var=OS_image_server_setting_resourceuri
+  
+  - debug: var=OS_image_server_setting_id
+
+
+#--------------------------------------Start OS image installation-----------------------------------------------------------------------------------------------------
+
+  # Server group modification when NS204i is found => no local storage configuration definition
+
+  - name: Update temporary group '{{ temporary_server_group_name }}' to add OS image installation settings with NS204i
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ temporary_group_id }}"
+      method: PATCH
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/merge-patch+json"
+      body_format: json
+      body:
+        name: "{{ temporary_server_group_name }}"
+        description: "Temporary server group for RHEL installation on server '{{ inventory_hostname }}'"
+        serverSettingsUris: 
+          - "{{ bios_server_setting_resourceuri }}"   
+          - "{{ OS_image_server_setting_resourceuri }}"
+        serverPolicies:
+          onServerAdd:
+            firmwareUpdate: false
+            biosApplySettings: true
+            storageConfiguration: false
+            storageVolumeDeletion: false
+            storageVolumeName: ""
+            osInstall: true
+          onSettingsApply:
+            firmwareDowngrade: false
+        autoAddServerTags:
+    register: server_group_result
+    when:  NS204i_data is defined 
+    delegate_to: localhost
+
+  - name: Display response of the group '{{ temporary_server_group_name }}' update request with NS204i
+    debug: var=server_group_result.msg
+    when:  NS204i_data is defined 
+
+  # Server group modification when NS204i is not found => set local storage configuration definition
+
+  - name: Update temporary group '{{ temporary_server_group_name }}' to add OS image installation settings with storage controller (without NS204i)
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ temporary_group_id }}"
+      method: PATCH
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/merge-patch+json"
+      body_format: json
+      body:
+        name: "{{ temporary_server_group_name }}"
+        description: "Temporary server group for RHEL installation on server '{{ inventory_hostname }}'"
+        serverSettingsUris: 
+          - "{{ bios_server_setting_resourceuri }}"   
+          - "{{ internal_storage_server_setting_resourceuri }}"       
+          - "{{ OS_image_server_setting_resourceuri }}"
+        serverPolicies:
+          onServerAdd:
+            firmwareUpdate: false
+            biosApplySettings: true
+            storageConfiguration: true
+            storageVolumeDeletion: true
+            storageVolumeName: "OS_boot_volume"
+            osInstall: true
+          onSettingsApply:
+            firmwareDowngrade: false
+        autoAddServerTags:
+    register: server_group_result
+    when:  NS204i_data is undefined 
+    delegate_to: localhost
+
+  - name: Display response of the group '{{ temporary_server_group_name }}' update request with storage controller
+    debug: var=server_group_result.msg
+    when:  NS204i_data is undefined 
+
+  - name: Start OS image installation in group '{{ temporary_server_group_name }}'
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ jobs_API_version }}/jobs"
+      method: POST
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        resourceUri: "{{ temporary_group_resourceuri }}"
+        jobTemplateUri: "{{ GroupOSInstallation_job_template_resourceUri }}"
+        data:
+          devices:
+            - "{{ server_id }}"
+          parallel: true
+          stopOnFailure: true
+    register: group_os_installation_result
+    delegate_to: localhost
+
+  - name: Display response of the OS image installation request in group '{{ temporary_server_group_name }}' 
+    debug: var=group_os_installation_result.msg
+
+
+#--------------------------------------Wait for OS image installation to complete -------------------------------------------------------------------------------------
+  
+  # Monitor server activity
+
+  - name: Wait for the OS image installation of server '{{ serial_number }}' to complete 
+    uri:
+      url:  "{{ ConnectivityEndpoint }}/compute-ops/{{ activities_API_version }}/activities?filter={{ filter | urlencode  }}"  
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars: 
+      filter: "associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"      
+      query: "json.items[?contains(message,'Operating system image installation task marked as complete')]"
+    register: server_activities
+    until: server_activities | json_query(query) 
+    retries: 60
+    delay: 60
+    delegate_to: localhost
+
+  # - debug: var=server_activities
+
+  - name: Exit if operating system image installation task of server '{{ serial_number }}' failed to complete
+    fail:
+      msg: "The operating system image installation task of server '{{ serial_number }}' failed to complete!"
+    when: server_activities.attempts >= 60
+
+
+#--------------------------------------Delete temporary server group and server settings ------------------------------------------------------------------------------
+
+  # Remove server from temporary group 
+
+  - name: Unassign server '{{ serial_number }}' from temporary group '{{ temporary_server_group_name }}' 
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ temporary_group_id }}/devices/{{ server_id }}"
+      method: DELETE
+      status_code: 204
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: group_unassignment_result
+    delegate_to: localhost
+
+  - name: Wait for deletion to complete
+    pause:
+      seconds: 15
+
+  - name: Display response of the temporary group unassignment task
+    debug: var=group_unassignment_result.msg
+
+  # Delete temporary group
+
+  - name: Delete temporary group '{{ temporary_server_group_name }}' 
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ temporary_group_id }}"
+      method: DELETE
+      status_code: 204
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server_group_deletion_result
+    delegate_to: localhost
+
+  - name: Display response of the temporary group deletion task
+    debug: var=server_group_deletion_result.msg
+
+  # Delete OS image server setting
+
+  - name: Delete operating system image server setting 'OS_Image_RHEL9.3_for_{{ inventory_hostname }}' 
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings/{{ OS_image_server_setting_id }}"
+      method: DELETE
+      status_code: 204
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: OS_image_server_setting_deletion_result
+    delegate_to: localhost
+
+  - name: Display response of the operating system image server setting deletion task
+    debug: var=OS_image_server_setting_deletion_result.msg
+
+
+# -------------------------------------Start post-installation steps -------------------------------------------------------------------------------------------------
+
+  - name: Wait for '{{ os_ip_address }}' to respond on port 22...
+    wait_for:
+      timeout: 2000
+      host: "{{ os_ip_address }}"
+      port: 22
+    delegate_to: localhost
+
+  # Backup kickstart file for troubleshooting purposes
+
+  - name: Create a kickstart backup directory if it does not exist
+    file:
+      path: "{{ staging_directory }}/kickstarts_backup/RHEL"
+      state: directory
+    delegate_to: localhost
+
+  - name: Create a backup of the kickstart file named '{{ inventory_hostname }}_ks.cfg' in '{{ staging_directory }}/kickstarts_backup/RHEL' folder
+    shell: |
+      cp -f {{ staging_directory }}/baremetal/{{ inventory_hostname }}/ks.cfg {{ staging_directory }}/kickstarts_backup/RHEL/{{ inventory_hostname }}_ks.cfg
+    delegate_to: localhost
+
+  # Cleaning up staging files
+
+  - name: Delete all related files from staging location and nginx web server folder
+    become: yes
+    shell: |
+      rm -rf {{ inventory_hostname }}
+      rm -f /usr/share/nginx/html/isos/{{ inventory_hostname }}.iso
+      rm -rf /mnt/{{ inventory_hostname }}
+    args:
+      chdir: "{{ staging_directory }}/baremetal"
+    delegate_to: localhost
+
+  # Installing HPE Integrated Smart Update Tools (SUT) package on the server for online installation of HPE drivers and software
+
+  - name: Copy HPE Integrated Smart Update Tools (SUT) package '{{ SUT_package }}' to '{{ inventory_hostname }}'
+    remote_user: root
+    copy:
+      src: files/{{ rhel_version }}/{{ SUT_package }}
+      dest: /tmp/sut.rpm
+      mode: 0755
+
+  - name: Wait for host to become reachable (faced a few times a host unreachable after the previous copy task)
+    wait_for:
+      host: "{{ inventory_hostname }}"
+      port: 22
+      state: started
+      timeout: 300
+    delegate_to: localhost
+    
+  - name: Install HPE SUT on '{{ inventory_hostname }}'
+    remote_user: root
+    yum:
+      name: /tmp/sut.rpm
+      state: present
+      disable_gpg_check: yes
+    register: SUT_install_result
+
+  - name: Debug HPE SUT install result
+    debug:
+      var: SUT_install_result
+
+  - name: Initiate HPE SUT service
+    remote_user: root
+    shell: sut -status   
+    register: sut_status
+
+  #  Rebooting the server as required after installing SUT 
+
+  - name: Rebooting the server as required after installing SUT 
+    remote_user: root
+    ansible.builtin.reboot:
+      msg: "Reboot initiated by Ansible to install HPE SUT"
+      connect_timeout: 30  # Wait 30 seconds before attempting to connect again
+      reboot_timeout: 600  # Wait up to 10 minutes for the machine to reboot
+      pre_reboot_delay: 60  # Wait 60 seconds before shutting down
+      post_reboot_delay: 10  # Wait 10 seconds after booting before continuing with play
+      test_command: uptime  # Command to run on the system after the reboot to test if it is successful and ready
+
+  - name: Wait for HPE SUT service to be running
+    remote_user: root
+    service:
+      name: sut.service 
+      state: started
+    register: sut_service_status
+    until: sut_service_status.status.ActiveState == "active"
+    retries: 20
+    delay: 10
+
+  - name: Report the status of the HPE SUT service
+    debug:
+      msg: "HPE SUT service is {{ 'running' if sut_service_status.status.ActiveState == 'active' else 'not running' }}."
+
+  - name: Fail if HPE SUT Service status is not running
+    fail:   
+      msg: "Error ! HPE SUT service is not running !"
+    when: sut_service_status.status.ActiveState != "active"
+    
+  - name: Ensure HPE AMS service is in a running state
+    remote_user: root
+    service:
+      name: amsd.service 
+      state: started
+    register: ams_service_status
+    until: ams_service_status.status.ActiveState == "active"
+    retries: 5
+    delay: 5
+
+  - name: Report the status of the HPE AMS service
+    debug:
+      msg: "HPE AMS service is {{ 'running' if ams_service_status.status.ActiveState == 'active' else 'not running' }}."
+
+  - name: Fail if HPE AMS Service status is not running
+    fail:   
+      msg: "Error ! HPE AMS service is not running !"
+    when: ams_service_status.status.ActiveState != "active"
+
+  # Wait for 1 minute after the server reboot before initiating a firmware update.
+
+  - name: Wait a little while for things to stabilize
+    pause: 
+      seconds: 60
+
+  # Wait for the communication between COM and SUT
+
+  - name: Wait for COM to detect SUT service to be running
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: sut_ServiceState
+    until: sut_ServiceState.json['smartUpdateTool '].ServiceState == "Running"
+    retries: 7
+    delay: 60
+    delegate_to: localhost
+    
+  # # Command required if iLO Security mode is FIPS
+  # - name: Configure SUT credentials to communicate with iLO
+  #   remote_user: root
+  #   command: sut -set ilousername="{{ iLO_username }}" ilopassword="{{ iLO_password }}"
+  #   register: sut_credentials
+
+  # - debug: msg="{{ sut_credentials.stdout }}"
+
+  # # Command required if iLO configured in CAC mode
+  # - name: Add iLO certificate for SUT to communicate with iLO
+  #   remote_user: root
+  #   command: sut -addcertificate /path/to/certificate.crt
+  #   register: sut_certificate
+
+  # - debug: msg="{{ sut_certificate.stdout }}"
+
+
+#--------------------------------------Capture firmware bundle information --------------------------------------------------------------------------------------------
+
+  - name: Set fact for the first host in inventory
+    set_fact:
+      is_first_host: "{{ play_hosts[0] == inventory_hostname }}"
+
+  - name: Collect firmware bundles
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ firmware_bundles_API_version }}/firmware-bundles"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: firmwarebundles
+    delegate_to: localhost
+    when: is_first_host
+
+  # - debug: var=firmwarebundles
+
+  # Gen10 firmware bundle
+
+  - name: Set variable for Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}'
+    set_fact:
+      Gen10_10p_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
+    vars:
+      query: "json.items[?releaseVersion=='{{ Gen10_10p_firmware_bundle_name }}'].id"
+    when: is_first_host and (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+
+  - name:  Exit if Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}' does not exist
+    fail:
+      msg: "Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}' does not exist!"
+    when: is_first_host and (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0) and Gen10_10p_firmware_bundle_ID is not defined
+
+  - debug: var=Gen10_10p_firmware_bundle_ID
+    when: is_first_host and (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0)
+    
+  # Gen10 associated patch
+
+  - name: Set variable for '{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}' associated patch for Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}'
+    set_fact:
+      Gen10_10p_patch_firmware_ID: "{{ (firmwarebundles | json_query(query) )[0] }}"
+    vars:
+      query: "json.items[?releaseVersion=='{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}'].id"
+    when: is_first_host and (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+
+  - name: Exit if Gen10 associated patch '{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}' does not exist
+    fail:
+      msg: "Gen10 associated patch '{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}' does not exist!"
+    when: is_first_host and (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0) and Gen10_10p_patch_firmware_ID is not defined
+
+  - debug: var=Gen10_10p_patch_firmware_ID
+    when: is_first_host and (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0)
+
+  # Gen11 firmware bundle
+  
+  - name: Set variable for Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}'
+    set_fact:
+      Gen11_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
+    vars:
+      query: "json.items[?releaseVersion=='{{ Gen11_firmware_bundle_name }}'].id"
+    when: is_first_host and (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+
+  - name: Exit if Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}' does not exist
+    fail:
+      msg: "Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}' does not exist!"
+    when: is_first_host and (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0) and Gen11_firmware_bundle_ID is not defined
+
+  - debug: var=Gen11_firmware_bundle_ID
+    when: is_first_host and (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0)
+
+  # Gen11 associated patch
+  
+  - debug: var=Gen11_patch_name_associated_with_firmware_bundle
+    when: is_first_host and (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0)
+
+  - name: Set variable for '{{ Gen11_patch_name_associated_with_firmware_bundle }}' associated patch for Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}'
+    set_fact:
+      Gen11_patch_firmware_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
+    vars:
+      query: "json.items[?releaseVersion=='{{ Gen11_patch_name_associated_with_firmware_bundle }}'].id"
+    when: is_first_host and (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+
+  - name: Exit if Gen11 associated patch '{{ Gen11_patch_name_associated_with_firmware_bundle }}' does not exist
+    fail:
+      msg: "Gen11 associated patch '{{ Gen11_patch_name_associated_with_firmware_bundle }}' does not exist!"
+    when: is_first_host and (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) and Gen11_patch_firmware_ID is not defined
+
+  - debug: var=Gen11_patch_firmware_ID
+    when: is_first_host and (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) 
+
+  # Setting final SPP variables if a fw patch exists
+
+  - name: Set the final variable value for the Gen10 firmware bundle ID
+    set_fact:
+      Gen10_10p_firmware_bundle_ID: "{{ Gen10_10p_patch_firmware_ID }}"
+    when: is_first_host and Gen10_10p_patch_firmware_ID is defined
+
+  - name: Set the final variable value for the Gen11 firmware bundle ID
+    set_fact:
+      Gen11_firmware_bundle_ID: "{{ Gen11_patch_firmware_ID }}"
+    when: is_first_host and Gen11_patch_firmware_ID is defined
+
+  # Failure if firmware bundles set are not found
+
+  - name: Fail if the firmware baselines for Gen10/Gen10+ and Gen11 servers could not be found.
+    fail:
+      msg: 'The firmware bundles for Gen10/Gen10+ and Gen11 servers could not be found, check your firmware baseline variables.' 
+    when: is_first_host and Gen10_10p_firmware_bundle_ID is not defined and Gen11_firmware_bundle_ID is not defined
+
+  - name: Fail if the firmware baseline for Gen10/Gen10+ servers could not be found.
+    fail:
+      msg: 'The firmware bundle for Gen10/Gen10+ servers could not be found, check your firmware baseline variables.' 
+    when: is_first_host and Gen10_10p_firmware_bundle_ID is not defined 
+
+  - name: Fail if the firmware baseline for Gen11 servers could not be found.
+    fail:
+      msg: 'The firmware bundle for Gen11 servers could not be found, check your firmware baseline variables.' 
+    when: is_first_host and Gen11_firmware_bundle_ID is not defined 
+
+  # Set firmware bundle id for the server generation
+
+  - name: Set firmware bundle id for Gen10/Gen10+ server
+    set_fact: 
+      bundle_id: "{{ Gen10_10p_firmware_bundle_ID }}"
+    when: is_first_host and server_generation == "GEN_10"
+ 
+  - name: Set firmware bundle id for Gen11 server
+    set_fact: 
+      bundle_id: "{{ Gen11_firmware_bundle_ID }}"
+    when: is_first_host and server_generation == "GEN_11"
+
+  - debug: var=bundle_id
+    when: is_first_host
+
+  # Create the firmware server setting 
+
+  - name: Check if the firmware server setting '{{ firmware_server_setting_name }}' exists
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars:
+      filter: "name eq '{{ firmware_server_setting_name }}'"
+    register: firmware_server_setting
+    delegate_to: localhost
+    when: is_first_host
+
+  # - debug: var=firmware_server_setting
+
+  - name: Create the firmware server setting '{{ firmware_server_setting_name }}' 
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "{{ firmware_server_setting_name }}"
+        description: "Firmware baseline for RHEL 9.3"
+        category: "FIRMWARE"
+        platformFamily: "Any"
+        settings:
+          GEN10:
+            id: "{{ Gen10_10p_firmware_bundle_ID }}"
+          GEN11:
+            id: "{{ Gen11_firmware_bundle_ID }}"
+    register: firmware_server_setting_result
+    when: is_first_host and firmware_server_setting.json.count == 0
+    delegate_to: localhost
+
+  - name: Display response of the firmware server setting '{{ firmware_server_setting_name }}' creation request
+    debug: var=firmware_server_setting_result.msg
+    when: is_first_host and firmware_server_setting.json.count == 0
+
+  - name: Set variable for the resourceuri of the firmware server setting '{{ firmware_server_setting_name }}' just created
+    set_fact: 
+      firmware_server_setting_resourceuri: "{{ firmware_server_setting_result.json.resourceUri }}"
+    when: is_first_host and firmware_server_setting.json.count == 0
+
+  - name: Update the firmware server setting '{{ firmware_server_setting_name }}' 
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings/{{ firmware_server_setting_id }}"
+      method: PATCH
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/merge-patch+json"
+      body_format: json
+      body:
+        name: "{{ firmware_server_setting_name }}"
+        description: "Firmware baseline for RHEL 9.3"
+        category: "FIRMWARE"
+        platformFamily: "Any"
+        settings:
+          GEN10:
+            id: "{{ Gen10_10p_firmware_bundle_ID }}"
+          GEN11:
+            id: "{{ Gen11_firmware_bundle_ID }}"
+    vars: 
+      firmware_server_setting_id: "{{ firmware_server_setting | json_query('json.items[0].id')  }}"
+    register: firmware_server_setting_result
+    when: is_first_host and firmware_server_setting.json.count == 1
+    delegate_to: localhost
+
+  - name: Display response of the firmware server setting '{{ firmware_server_setting_name }}' update task
+    debug: var=firmware_server_setting_result.msg
+    when: is_first_host and firmware_server_setting.json.count == 1
+    
+  - name: Set variable for the resourceuri of the firmware server setting '{{ firmware_server_setting_name }}' just updated
+    set_fact: 
+      firmware_server_setting_resourceuri: "{{ firmware_server_setting | json_query('json.items[0].resourceUri') }}"
+    when: is_first_host and firmware_server_setting.json.count == 1
+
+  - debug: var=firmware_server_setting_resourceuri
+    when: is_first_host
+
+
+#--------------------------------------Firmware update preparation: Create a definitive server group or update if existing --------------------------------------------
+
+ # Check if definitive server group exists
+  
+  - name: Check if definitive group '{{ server_group_name }}' already exist
+    uri:
+      url:  "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars: 
+      filter: "name eq '{{ server_group_name }}'"      
+    register: definitive_server_group
+    delegate_to: localhost
+    when: is_first_host
+
+  # - debug: var=definitive_server_group
+
+  # Create the definitive server group if it does not exist
+
+  - name: Create definitive group '{{ server_group_name }}' if it does not exist
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "{{ server_group_name }}"
+        description: "Server group for RHEL servers"
+        serverSettingsUris: 
+          - "{{ bios_server_setting_resourceuri }}"     
+          - "{{ firmware_server_setting_resourceuri }}"     
+        serverPolicies:
+          onServerAdd:
+            firmwareUpdate: false
+            biosApplySettings: false
+            storageConfiguration: false
+            storageVolumeDeletion: false
+            storageVolumeName: ""
+            osInstall: false
+          onSettingsApply:
+            firmwareDowngrade: "{{ firmware_downgrade_policy }}"
+        autoAddServerTags:
+    register: definitive_server_group_result
+    when: is_first_host and definitive_server_group.json.count == 0
+    delegate_to: localhost
+
+  - name: Display response of the definitive group '{{ server_group_name }}' creation request
+    debug: var=definitive_server_group_result.msg
+    when: is_first_host and definitive_server_group.json.count == 0
+
+  - name: Set variables for the id and the resourceUri of the definitive group '{{ server_group_name }}' just created
+    set_fact:
+      definitive_group_id: "{{ definitive_server_group_result.json.id }}" 
+      definitive_group_resourceuri: "{{ definitive_server_group_result.json.resourceUri }}"
+    when: is_first_host and definitive_server_group.json.count == 0
+
+  # Update the definitive server group if the group exists
+    
+  - name: Update definitive group '{{ server_group_name }}' if it does exist
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ group_id }}"
+      method: PATCH
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/merge-patch+json"
+      body_format: json
+      body:
+        name: "{{ server_group_name }}"
+        description: "Server group for RHEL servers"
+        serverSettingsUris: 
+          - "{{ bios_server_setting_resourceuri }}"   
+          - "{{ firmware_server_setting_resourceuri }}"     
+        serverPolicies:
+          onServerAdd:
+            firmwareUpdate: false
+            biosApplySettings: false
+            storageConfiguration: false
+            storageVolumeDeletion: false
+            storageVolumeName: ""
+            osInstall: false
+          onSettingsApply:
+            firmwareDowngrade: "{{ firmware_downgrade_policy }}"
+        autoAddServerTags:
+    vars: 
+      group_id: "{{ definitive_server_group  | json_query('json.items[0].id') }}"
+    register: definitive_server_group_result
+    when: is_first_host and definitive_server_group.json.count == 1
+    delegate_to: localhost
+
+  - name: Display response of the group '{{ server_group_name }}' update request
+    debug: var=definitive_server_group_result.msg
+    when: is_first_host and definitive_server_group.json.count == 1
+
+  - name: Set variables for the id and the resourceUri of the existing definitive group '{{ server_group_name }}' just updated
+    set_fact:
+      definitive_group_id: "{{ definitive_server_group | json_query('json.items[0].id') }}" 
+      definitive_group_resourceuri: "{{ definitive_server_group | json_query('json.items[0].resourceUri') }}"
+    when: is_first_host and definitive_server_group.json.count == 1
+
+  - debug: var=definitive_group_id  
+    when: is_first_host
+
+  - debug: var=definitive_group_resourceuri
+    when: is_first_host
+
+
+#--------------------------------------Adding server to definitive server group and starting group firmware update (including HPE drivers and software) ---------------------
+
+  # Capture the start time of the firmware update
+  - name: Gather subset facts on localhost
+    setup:
+      gather_subset: [all]
+    delegate_to: localhost
+
+  - name: Capture the start time of the firmware update (will be used later to filter COM activities, etc.)
+    set_fact:
+      firmware_update_start_time: "{{ ansible_date_time.iso8601 }}"
+
+  - name: Display the start time of the firmware update
+    debug: 
+      msg: "{{ firmware_update_start_time }}"
+
+  - name: Get definitive group '{{ server_group_name }}' information
+    uri:
+      url:  "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars: 
+      filter: "name eq '{{ server_group_name }}'"      
+    register: definitive_server_group
+    delegate_to: localhost
+
+  - name: Set variable for existing definitive group '{{ server_group_name }}' id
+    set_fact:
+      definitive_group_id: "{{ definitive_server_group | json_query('json.items[0].id') }}" 
+      
+  # Check if the server is already member of the definitive server group if it does exist
+
+  - name: Check if server '{{ serial_number }}' is already member of definitive server group '{{ server_group_name }}' 
+    set_fact: 
+      server_found_in_definitive_group: "{{ definitive_server_group  | json_query(query) }}"
+    vars:
+      query: "json.items[0].devices[?serial=='{{ serial_number }}']"
+    when: definitive_server_group.json.count == 1
+      
+  # - debug: var=server_found_in_definitive_group  
+
+  # Remove the server from the definitive server group if it's already part of it (which shouldn't be the case, unless the playbook has failed and been rerun)
+
+  # - name: Remove server '{{ serial_number }}' from definitive server group '{{ server_group_name }}' if it is already a member
+  #   uri:
+  #     url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ definitive_group_id }}/devices/{{ server_id }}"
+  #     method: DELETE
+  #     status_code: 204
+  #     headers:
+  #       Authorization: "Bearer {{ access_token }}"
+  #   when: server_found_in_definitive_group is defined and server_found_in_definitive_group | length != 0
+  #   register: group_unassignment_result
+  #   delegate_to: localhost
+
+  # - name: Wait for deletion to complete
+  #   pause:
+  #     seconds: 15
+  #   when: server_found_in_definitive_group is defined and server_found_in_definitive_group | length != 0
+    
+  # Add server to the definitive server group 
+
+  - name: Assign server '{{ serial_number }}' to definitive server group '{{ server_group_name }}'
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ definitive_group_id }}/devices"
+      method: POST
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        devices:
+          - serverId: "{{ server_id }}"
+    register: group_assignment_result
+    when: server_found_in_definitive_group is not defined or server_found_in_definitive_group | length == 0
+    delegate_to: localhost
+
+  - name: Display response of the group assignment task
+    debug: var=group_assignment_result.msg
+    when: server_found_in_definitive_group is not defined or server_found_in_definitive_group | length == 0
+
+  - name: Wait for assignment to truly complete
+    pause:
+      seconds: 15
+    when: server_found_in_definitive_group is not defined or server_found_in_definitive_group | length == 0
+
+  # Start an HPE drivers, software and firmware update job
+
+  # To run a firmware update in parallel on each host and save time, it is necessary to use the group firmware update job
+  # This job will only be executed on the first host in the Ansible inventory
+
+  # Get the list of devices in the definitive server group with the first host only
+
+  - name: Get definitive group '{{ server_group_name }}' information (first host only)
+    uri:
+      url:  "{{ ConnectivityEndpoint }}{{ definitive_group_resourceuri  }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: definitive_server_group
+    delegate_to: localhost
+    when: is_first_host
+
+  - name: Set fact for the list of server IDs member of the definitive server group (first host only)
+    set_fact:
+      server_ids: "{{ definitive_server_group.json.devices  | map(attribute='id') | list  }}"
+    when: is_first_host
+
+  - name: Display the server IDs found (first host only)
+    debug: var=server_ids
+    when: is_first_host
+
+  # If updating HPE drivers, software and firmware takes a long time, it's safer to ask for a new COM token now
+
+  - name: Create a new HPE Compute Ops Management session to avoid token expiration during the firmware update job
+    import_tasks: files/Create_COM_session.yml
+
+  # Start a group firmware update job with the first host only
+
+  - name: Start a group firmware update job using the defined firmware baseline (first host only)
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ jobs_API_version }}/jobs"
+      method: POST
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        resourceUri: "{{ definitive_group_resourceuri }}"
+        jobTemplateUri: "{{ GroupFirmwareUpdate_job_template_resourceUri }}"
+        data:
+          devices: "{{ server_ids }}"
+          parallel: true
+          stopOnFailure: false
+          installSWDrivers: "{{ install_SWDrivers_policy }}"
+          downgrade: "{{ firmware_downgrade_policy }}"
+          powerOff: false
+    register: group_firmware_update_job
+    delegate_to: localhost
+    when: is_first_host
+
+  - name: Display response of the group firmware update job (first host only)
+    debug: var=group_firmware_update_job.msg
+    when: is_first_host
+
+
+#--------------------------------------Wait until the update of the HPE server drivers, software and firmware is complete. --------------------------------------------
+
+  - name: Capture the resourceUri of the group firmware update job (first host only)
+    set_fact:
+      group_firmware_update_job_resourceUri: "{{ group_firmware_update_job.json.resourceUri }}"
+    when: is_first_host
+
+  - name: Display the group firmware update job resource uri (first host only)
+    debug: var=group_firmware_update_job_resourceUri
+    when: is_first_host
+ 
+  - name: Wait for the group firmware update job to complete (first host only)
+    uri:
+      url: "{{ ConnectivityEndpoint }}{{ group_firmware_update_job_resourceUri }}"
+      method: GET
+      return_content: yes
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    retries: 600
+    delay: 60
+    until: >
+      (group_firmware_update_job_status.json.state == "COMPLETE" or 
+      group_firmware_update_job_status.json.state == "ERROR")
+    register: group_firmware_update_job_status
+    ignore_errors: yes
+    changed_when: false
+    delegate_to: localhost
+    when: is_first_host
+
+  # - debug: var=group_firmware_update_job_status
+
+  - name: Display the group firmware update job result (first host only)
+    debug: 
+      msg:
+        - "State: {{ group_firmware_update_job_status.json.state }}"
+        - "ResultCode: {{ group_firmware_update_job_status.json.resultCode }}"
+        - "Status: {{ group_firmware_update_job_status.json.status }}"
+    when: is_first_host
+
+ # Display the server firmware update activity status
+
+  - name: Get the latest activity of server '{{ serial_number }}'
+    uri:
+      url:  "{{ ConnectivityEndpoint }}/compute-ops/{{ activities_API_version }}/activities?filter={{ filter | urlencode  }}"  
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars: 
+      filter: "associatedServerId eq '{{ server_id }}' and createdAt gt {{ firmware_update_start_time }}"      
+    register: Server_activity_status
+    delegate_to: localhost
+
+  # - debug: var=Server_activity_status
+
+  - name: Extract items containing 'Firmware update'  
+    set_fact:
+      firmware_update_items: "{{ (Server_activity_status | json_query(query))[0] }}"
+    vars:
+      query: "json.items[? contains(name, 'Firmware update') && contains(groupDisplayName, '{{ server_group_name }}')]"
+
+  # - debug: var=firmware_update_items
+
+  - name: Display the firmware update activity status when successful 
+    vars:
+      msg: |
+          Message: {{ firmware_update_items.message }}
+    debug:
+      msg: "{{ msg.split('\n') }}"
+    when: firmware_update_items.message is search('Firmware update successful', ignorecase=True)
+
+  - name: Display the firmware update activity status with recommanded actions when failed
+    vars:
+      msg: |
+          Message: {{ firmware_update_items.message }}
+
+          Recommended action:
+          {{ firmware_update_items.recommendedAction  | regex_replace('\\n', '\n') | regex_replace('\n\n', '\n') }}
+    debug:
+      msg: "{{ msg.split('\n') }}"
+    when: firmware_update_items.message is search('Firmware update failed', ignorecase=True)
+    
+  # Capture last firmware update information
+
+  - name: Capture server information   
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ serial_number }}'"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server
+    delegate_to: localhost
+  
+  - name: Capture last firmware update information 
+    set_fact:
+      last_firmware_update: "{{ server | json_query('json.items[0].lastFirmwareUpdate') }}"
+
+  # - debug: var=last_firmware_update.attemptedAt
+
+  - name: Display server last firmware update information if up-to-date
+    debug: 
+      msg: "{{ last_firmware_update }}"  
+    when: last_firmware_update.attemptedAt > firmware_update_start_time
+
+
+  # # Wait until the RHEL host is accessible again if a reboot was necessary to activate some firmware components
+
+  # - name: Wait for '{{ os_ip_address }}' to respond on port 22...
+  #   wait_for:
+  #     timeout: 2000
+  #     host: "{{ os_ip_address }}"
+  #     port: 22
+  #   delegate_to: localhost
+
+
+#--------------------------------------Display end-of-installation message --------------------------------------------------------------------------------------------
+
+  # Get the runtime
+
+  - name: Force update of current timestamp
+    setup: filter='ansible_date_time'
+    delegate_to: localhost
+
+  - name: Get runtime
+    set_fact:
+      runtime: "{{ ((ansible_date_time.iso8601[:19] | to_datetime('%Y-%m-%dT%H:%M:%S')) - (start_time[:19] | to_datetime('%Y-%m-%dT%H:%M:%S'))) }}"
+
+  # Display server installation completed message
+
+  - name: Status of the OS installation with the firmware update with HPE drivers and software
+    debug:
+      msg:
+        - "{{ inventory_hostname }}.{{domain}} installation and firmware update completed successfully!"
+        - "OS is configured and running with the HPE drivers and software."
+        - "To SSH to the new host from Ansible control node, use: ssh root@{{ inventory_hostname }}.{{domain}}"
+        - "The provisioning task took {{ runtime }}."
+    when: (firmware_update_items.message is search('Firmware update successful', ignorecase=True)) and (install_SWDrivers_policy|bool == True)
+ 
+  - name: Status of the OS installation with the firmware update without HPE drivers and software
+    debug:
+      msg:
+        - "{{ inventory_hostname }}.{{domain}} installation and firmware update completed successfully!"
+        - "OS is configured and running. To SSH to the new host from Ansible control node, run: ssh root@{{ inventory_hostname }}.{{domain}}"
+        - "The provisioning task took {{ runtime }}."
+    when: (firmware_update_items.message is search('Firmware update successful', ignorecase=True)) and (install_SWDrivers_policy|bool == False)    
+   
+  - name: Status of the OS installation with firmware update failure
+    debug:
+      msg:
+        - "{{ inventory_hostname }}.{{domain}} installation completed but the firmware update operation failed to complete!"  
+        - "OS is configured and running."
+        - "Refer to the individual server activity entries in the HPE Compute Ops Management UI for more details."
+        - "To SSH to the new host from Ansible control node, use: ssh root@{{ inventory_hostname }}.{{domain}}"
+        - "The provisioning task took {{ runtime }}."
+    when: (firmware_update_items.message is search('Firmware update failed', ignorecase=True)) or (group_firmware_update_job_status.json.resultCode is none)
+
+
+    

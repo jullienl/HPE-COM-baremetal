@@ -1,0 +1,19 @@
+###################
+## Project Specific
+###################
+
+
+#*.zip
+.vscode
+.publish
+.vs/
+#*- Copy*
+#*ORIGINAL.*
+#*.json
+#*.xml
+#*.yml
+
+other/
+vars/other
+
+

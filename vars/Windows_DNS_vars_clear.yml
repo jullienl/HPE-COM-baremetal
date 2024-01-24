@@ -1,15 +1,20 @@
 ---
+#---------------------- DNS settings -------------------------------------------------------------------------------------
+
 # Information required for the creation of the DNS record
 
-# AD domain name
+# DNS domain name
 domain: "lj.lab"
 
-# DNS server FQDN
+# MS Windows DNS server name (FQDN)
 dns_server: "dc.lj.lab"
 
+#---------------------- WinRM settings -------------------------------------------------------------------------------------
+
+
 # Windows DNS Server credentials
-ansible_user: xxxxxxxxx@lj.lab
-ansible_password: xxxxxxxxxx
+ansible_user: "xxxxxxxxxx@lj.lab"
+ansible_password: "xxxxxxxxxxxxx"
 
 ansible_connection: winrm
 ansible_winrm_transport: ntlm

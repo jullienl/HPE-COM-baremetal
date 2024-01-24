@@ -1,0 +1,36 @@
+---
+
+#------------------------ Kickstart file customization ----------------------------------------------------------------------
+
+# Password for the default built-in `administrator` account 
+administrator_password: "xxxxxxxxxxxxxxxxxxxxxx"
+
+# Microsoft Windows Server activation key
+windows_key: "xxxxx-xxxxx-xxxxx-xxxxx-xxxxx"
+
+
+#----------------------  Admin account to join a Microsoft Active Directory domain -----------------------------------------
+
+# Account with permission to add computers to the domain
+# Note: use no quotes or single quotes with \ or use \\ with double quotes
+win_domain_admin_user: xx\Administrator 
+win_domain_admin_password: "xxxxxxxxxxxxxxxxxxxxxx"
+
+
+#---------------------- WinRM settings -------------------------------------------------------------------------------------
+
+# Information required for Ansible to manage the Windows hosts 
+
+# Microsoft Windows account username 
+# These variable names are mandatory for Ansible to manage Windows hosts so don't rename them)
+ansible_user: administrator
+# Password of that account
+ansible_password: "************"
+
+# Defines WinRM as the connection method (instead of SSH)
+ansible_connection: winrm
+ansible_winrm_transport: ntlm
+ansible_port: 5985
+
+# The following is necessary for Python 2.7.9+ when using default WinRM self-signed certificates:
+ansible_winrm_server_cert_validation: ignore

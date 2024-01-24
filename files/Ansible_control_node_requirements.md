@@ -42,6 +42,12 @@ pip3 install setuptools-rust wheel
 pip3 install ansible-core
 ```
 
+## Installation of Ansible lint (optional, useful to identify problems in playbooks)
+```
+pip install ansible-lint
+```
+
+
 ## Installation of ksvalidator (optional, useful to validate kickstart file modifications)
 ```
 sudo dnf install pykickstart
@@ -93,4 +99,12 @@ unzip is used to extract HPE Package to get product id information.
 
 ```
 sudo dnf install unzip #(should be already installed)
+```
+
+## wimlib
+
+wimlib is used to inject scripts into the WinPE image (only used for Windows provisioning).
+
+```
+sudo dnf install wimlib-utils
 ```

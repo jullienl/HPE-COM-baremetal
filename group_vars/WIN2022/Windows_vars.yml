@@ -1,0 +1,147 @@
+---
+# Host information (name, IP and Serial number) is provided by the Ansible inventory 'hosts' file:
+#   WIN-1 os_ip_address=192.168.3.172 serial_number=CZ2311004G
+#   WIN-2 os_ip_address=192.168.3.175 serial_number=CZ2311004H
+
+
+#---------------------- Network settings -------------------------------------------------------------------------------------
+
+gateway: "192.168.1.1"
+nameserver1: "192.168.2.1"
+nameserver2: "192.168.2.3"
+netmask: "255.255.252.0"
+
+
+#----------------------  Microsoft Active Directory -------------------------------------------------------------------------------------
+
+# Name of the Microsoft domain to which the servers must be added
+domain: "lj.lab"
+
+# Account with permission to add computers to the domain
+# `win_domain_admin_user` and `win_domain_admin_password` are encrypted using Ansible vault in vars/Windows_sensitive_vars_encrypted.yml
+
+
+#---------------------- Server settings --------------------------------------------------------------------------------------
+
+# OS boot volume RAID type and size
+raid_type: RAID1       # Supported RAID types: RAID0, RAID1, RAID5
+volume_size_in_GB: -1  # It must be a number >0 or -1, where -1 indicates to use the entire disk.
+
+# BIOS/Workload profile
+workload_profile_name: "Virtualization - Power Efficient"       
+  # Supported workload profiles:  
+  # - Virtualization - Max Performance
+  # - Virtualization - Power Efficient
+  # - General Peak Frequency Compute
+  # - General Power Efficient Compute
+  # - General Throughput Compute
+  # - Low Latency
+
+
+#---------------------- COM server group settings ----------------------------------------------------------------------------
+
+# Name of the definitive server group where to place the host at the end of provisioning (created if not already present)
+server_group_name: "WIN_group"
+# Name of the firmware server setting to be defined in definitive server group (created if not already present)
+firmware_server_setting_name: "Windows Server firmware baseline"
+
+ # Firmware baselines to be defined in the firmware server setting of the definitive server group 
+#  Note: it is mandatory to define at least one firmware baseline for Gen10/Gen10+ servers and one for Gen11 servers.
+Gen10_10p_firmware_bundle_name: "2023.09.00.00" 
+Gen10_10p_patch_name_associated_with_firmware_bundle: "2023.09.00.01" 
+Gen11_firmware_bundle_name: "2023.04.00.00"
+Gen11_patch_name_associated_with_firmware_bundle: "" #"2023.04.00.04"
+
+# Downgrade components policy of the definitive server group to match baseline (boolean)
+# If "true", any component version higher than the baseline will be downgraded to match the baseline. 
+firmware_downgrade_policy: true
+
+# Install HPE drivers and software policy in the definitive server group 
+# If "true", firmware updates will include HPE drivers and software. 
+install_SWDrivers_policy: true
+
+
+#------------------------ ISO settings -------------------------------------------------------------------------------------
+
+# URL where the WinPE ISO image can be found
+winpe_iso_url: "https://liogw.lj.lab/deployment"
+# WinPE ISO file name
+winpe_iso_file: "WinPEx64.iso"
+
+# UNC path (i.e. \\server\share) where the Windows Server ISO image can be found (be sure to use a backslash for each backslash used)
+src_iso_network_share: "\\\\liogw.lj.lab\\deployment"
+# Note: In Ansible, the backslash (\) character is used as an escape character in strings. 
+#       To use a literal backslash in an Ansible variable, you need to escape it with another backslash.
+
+# Windows Server ISO image location in the network share (be sure to use a backslash for each backslash used)
+src_iso_file_path: "win2022-x64-en_us\\en-us_windows_server_version_2022_updated_october_2021_x64_dvd_b6e25591.iso"
+
+# Directory on the Ansible control node where the source ISO will be copied (will be created if not already present). 
+# Note: You must define a directory in your user home directory using {{ lookup('env','HOME') }}. 
+src_iso_directory: "{{ lookup('env','HOME') }}/ISOs/windowsisosrc"
+
+# Directory on the Ansible control node to stage all files to build and generate the new ISO image with the custom unattend file (will be created if not already present).
+# Note: You must define a directory in your user home directory using {{ lookup('env','HOME') }}. 
+staging_directory: "{{ lookup('env','HOME') }}/staging"
+
+
+#------------------------ Unattend file and HPE Packages ---------------------------------------------------------------------
+
+# Folder located in /files to store the unattend file and HPE AMS and SUT files
+# Recommended to use the template name: WIN_<version> with <version> equal to 2019, 2022, etc.
+windows_version: "WIN_2022"
+
+# Name of the unattend file 
+unattend: "autounattend.xml"
+
+# Name of the HPE Agentless Management Service (AMS) (required)
+AMS_package: "AMS-2.51.4.1-cp057801.exe"
+ # AMS_package: "AMS-Gen11-3.40.0.0-cp056870.exe"
+
+# Name of the HPE iLO Channel Interface Driver (required by AMS)
+iLO_CHIF_package: "iLO5-CHIF-cp055144.exe"
+ # iLO_CHIF_package: "iLO6-CHIF-cp057240.exe"
+
+# Name of the HPE Integrated Smart Update Tools (iSUT)
+iSUT_package: "iSUT-4.6.0.0-cp058255.exe"
+
+#------------------------ Kickstart file customization ----------------------------------------------------------------------
+
+# Password for the default built-in `administrator` account 
+# 'administrator_password' is encrypted using Ansible vault in vars/Windows_sensitive_vars_encrypted.yml
+
+# Microsoft Windows Server activation key
+# 'windows_key' is encrypted using Ansible vault in vars/Windows_sensitive_vars_encrypted.yml
+
+# Timezone
+# See https://docs.microsoft.com/en-us/windows-hardware/manufacture/desktop/default-time-zones?view=windows-11#time-zones
+timezone: "W. Europe Standard Time"
+
+registered_owner: "Jullienl"
+registered_organization: "HPE"
+
+# Language pack, keyboard and time/currency format
+# See https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-8.1-and-8/hh825682(v=win.10)#default-keyboards
+# en-US - fr-FR - de-DE - es-ES, etc.
+input_local: "en-US" # specifies the input language
+system_locale: "en-US" # specifies the default language to use for non-Unicode programs.
+ui_language: "en-US" # specifies the language that will be used as the default system language to display user interface
+user_locale: "en-US" # specifies the per-user settings used for formatting dates, times, currency, and numbers
+
+# Windows version
+Image_index: 4
+# Index can be found using: dism /Get-WimInfo /WimFile:F:\sources\install.wim (with F: the drive on which the ISO is mounted)
+# Index 1: "Windows Server 2022 Standard"
+# Index 2: "Windows Server 2022 Standard (Desktop Experience)"
+# Index 3: "Windows Server 2022 Datacenter"
+# Index 4: "Windows Server 2022 Datacenter (Desktop Experience)"
+
+# Do not show Server Manager at logon
+no_server_manager_at_logon: true
+
+# Enable Remote Desktop
+remote_desktop: true
+
+# If true, create a NIC bonding using the first two connected NICs to set the network settings
+# If false, no NIC bonding is created. The first connected NIC found is used to set the network settings
+enable_nic_bonding: true

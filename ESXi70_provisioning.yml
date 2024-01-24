@@ -1,24 +1,29 @@
 ---
 # Performing automated ESXi 7.0 U3 installation on HPE Compute Ops Managmeent server(s) using an auto-generated ISO file with customized kickstart.
 #
-# Command that can be used to run this playbook:
-#    $ ansible-playbook -i hosts ESXi70_provisioning.yml --ask-vault-password --ask-become-pass
-#>
+#  Command that can be used to run this playbook:
+#   
+#   $ ansible-playbook -i hosts_ESX ESXi70_provisioning.yml --ask-vault-password --ask-become-pass
+#
+#  Note: Make sure to provide the list of servers to be provisioned with their details in the inventory file 'hosts_ESX'
+#
+#----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
- # Adding a DNS record for the server that will be provisioned in the defined DNS server
 
-#-------------------------------------- DNS record --------------------------------------------------------------------------------------------------------------------
+# Adding a DNS record for the server that will be provisioned in the defined DNS server
 
-- name: Creating a DNS record for the bare metal ESXi server
-  hosts: ESX
+#-------------------------------------- DNS record (WinRM Mode) -------------------------------------------------------------------------------------------------------
+
+- name: DNS record for the bare metal ESXi server
+  hosts: All
   gather_facts: no
   vars:
     ansible_forks: 5
   vars_files:
     - vars/Windows_DNS_vars_encrypted.yml
   tasks:
-    - name: Adding '{{ inventory_hostname }}' with '{{ os_ip_address }}' on '{{ dns_server }}' in '{{ domain }}' DNS domain
+    - name: Add '{{ inventory_hostname }}' with '{{ os_ip_address }}' on '{{ dns_server }}' in '{{ domain }}' DNS domain
       community.windows.win_dns_record:
         name: "{{ inventory_hostname }}"
         type: "A"
@@ -27,19 +32,20 @@
         state: present
       delegate_to: "{{ dns_server }}"
 
+#-------------------------------------- Bare Metal Provisioning -------------------------------------------------------------------------------------------------------
 
-- name: Performing automated ESXi 7.0 U3 installation on HPE Compute Ops Managmeent server(s) using an auto-generated ISO file with customized kickstart.
-  hosts: ESX
+- name: Automated ESXi 7.0 U3 installation on HPE Compute Ops Managmeent server(s) using an auto-generated ISO file with customized kickstart.
+  hosts: All
   gather_facts: no
   vars_files:
-    - vars/ESXi7.0.u3_vars.yml
-    - vars/GLCP_US_West_credentials_encrypted.yml    
+    - vars/GLP_HPE_Mougins_EU_Central_credentials_encrypted.yml    
     - vars/VMware_vCenter_vars_encrypted.yml
+    - vars/ESXi7.0.u3_vars.yml
   vars:
     inventory_fqdn: "{{ inventory_hostname | lower }}.{{ domain }}"
-    # ansible_python_interpreter: /usr/bin/python3
     ansible_host_key_checking: false
     validate_certs: false
+    user: "{{ lookup('env', 'USER') }}"
     ssh_known_hosts_file: "{{ lookup('env','HOME') + '/.ssh/known_hosts' }}"
     ansible_ssh_public_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
     ansible_forks: 5
@@ -73,6 +79,12 @@
     import_tasks: files/Get_resource_API_versions.yml
 
 
+#--------------------------------------Capture Job Templates Resource Uri-----------------------------------------------------------------------------------------------
+  
+  - name: Capture Job Templates ResourceUri
+    import_tasks: files/Get_job_templates_resourceuri.yml
+
+
 #--------------------------------------Capture server information -----------------------------------------------------------------------------------------------------
 
   - name: Capture server '{{ serial_number }}' information
@@ -91,17 +103,19 @@
       msg: "Server '{{ serial_number }}' does not exist!"
     when: server.json.count == 0
 
-  - name: Capture server '{{ serial_number }}' id, uri, connection status and iLO IP
+  - name: Capture server '{{ serial_number }}' generation, id, uri, connection status and iLO IP
     set_fact:
+      server_generation:  "{{ server | json_query('json.items[0].serverGeneration') }}"
       server_id:  "{{ server | json_query('json.items[0].id') }}"
-      server_uri:  "{{ server | json_query('json.items[0].resourceUri') }}"
+      server_resourceUri:  "{{ server | json_query('json.items[0].resourceUri') }}"
       server_connected_status:  "{{ server | json_query('json.items[0].state.connected') }}"
       server_ilo_ip:  "{{ server | json_query('json.items[0].hardware.bmc.ip') }}"
 
   - debug: 
       msg:
+        - "Generation: {{ server_generation }}"
         - "ID: {{ server_id }}"
-        - "URI: {{ server_uri }}"
+        - "URI: {{ server_resourceUri }}"
         - "Connection status: {{ server_connected_status }}"
         - "iLO IP: {{ server_ilo_ip }}"
 
@@ -140,6 +154,35 @@
     delegate_to: localhost
     
 
+#--------------------------------------Check BIOS/Workload profile settings -------------------------------------------------------------------------------------------
+
+  # BIOS/Workload profiles are predefined by HPE, so there's no need to create/update them, just check that they exist. 
+
+  - name: Check if workload profile '{{ workload_profile_name }}' exists
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars:
+      filter: "category eq 'BIOS' and name eq '{{ workload_profile_name }}'"
+    register: bios_server_setting
+    delegate_to: localhost
+
+  # - debug: var=bios_server_setting
+
+  - name: Exit if workload profile '{{ workload_profile_name }}' does not exist
+    fail:
+      msg: "Workload profile '{{ workload_profile_name }}' does not exist!"
+    when: bios_server_setting.json.count == 0
+
+  - name: Set a variable for the resourceUri of workload profile '{{ workload_profile_name }}'
+    set_fact: 
+      bios_server_setting_resourceuri: "{{ bios_server_setting | json_query('json.items[0].resourceUri') }}"   
+    
+  # - debug: var=bios_server_setting_resourceuri
+
+
 #--------------------------------------Create internal storage settings -----------------------------------------------------------------------------------------------
 
   - name: Wait until PCI devices information is available then capture the server '{{ serial_number }}' raw inventory information 
@@ -149,7 +192,8 @@
       headers:
         Authorization: "Bearer {{ access_token }}"
     register: server_raw_inventory
-    until: (server_raw_inventory.json.pciDevices | length>0)
+    # until: (server_raw_inventory.json.pciDevices | length>0)
+    until: server_raw_inventory.json.pciDevices is defined and server_raw_inventory.json.pciDevices is not none
     retries: 30
     delay: 60
     delegate_to: localhost
@@ -161,15 +205,15 @@
       NS204i_data: "{{ matched_item }}"
     vars:
         matched_item: "{{ item }}"
-    loop: "{{ server_raw_inventory.json.pciDevices }}"
+    loop: "{{ server_raw_inventory.json.storageInventory | dict2items }}"
     loop_control:
       label: never
-    when: item.Name is search('NS204i') 
+    when: item.value.Name is search('NS204i')
 
   # - debug: var=NS204i_data
 
   - debug:
-     msg: "NS204i found in server '{{ serial_number }}'! NVMe RAID1 volume will be used as the landing volume for the installation of ESXi!"
+     msg: "NS204i found in server '{{ serial_number }}'! NVMe RAID1 volume will be used as the target volume for the installation of ESXi!"
     when: NS204i_data is defined
   
   - debug:
@@ -227,9 +271,12 @@
 
   - name: Set a controller type variable for kickstart creation when there is no NS204i but an SR/MR controller is present.
     set_fact:
-      Controller_type: "SR/MR controller"
+      Controller_type: "{{ storage_controller_name }}"
     when: NS204i_data is undefined and storage_controller_data is defined
 
+  - debug: 
+      msg: "Controller type found that will be used by autounattend.xml: {{ Controller_type }}" 
+    
   - name: Check if server settings '{{ raid_type }}' already exist
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
@@ -315,35 +362,6 @@
     when:  NS204i_data is undefined
 
 
-#--------------------------------------Check BIOS/Workload profile settings -------------------------------------------------------------------------------------------
-
-  # BIOS/Workload profiles are predefined by HPE, so there's no need to create/update them, just check that they exist. 
-
-  - name: Check if workload profile '{{ workload_profile_name }}' exists
-    uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
-      method: GET
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    vars:
-      filter: "category eq 'BIOS' and name eq '{{ workload_profile_name }}'"
-    register: bios_server_setting
-    delegate_to: localhost
-
-  # - debug: var=bios_server_setting
-
-  - name: Exit if workload profile '{{ workload_profile_name }}' does not exist
-    fail:
-      msg: "Workload profile '{{ workload_profile_name }}' does not exist!"
-    when: bios_server_setting.json.count == 0
-
-  - name: Set a variable for the resourceUri of workload profile '{{ workload_profile_name }}'
-    set_fact: 
-      bios_server_setting_resourceuri: "{{ bios_server_setting | json_query('json.items[0].resourceUri') }}"   
-    
-  # - debug: var=bios_server_setting_resourceuri
-
-
 #--------------------------------------Create temporary server group with server settings -----------------------------------------------------------------------------
 
   # Create a temporary group name from hostname + _server_group
@@ -381,19 +399,18 @@
       body:
         name: "{{ temporary_server_group_name }}"
         description: "Temporary server group for ESXi installation on server '{{ inventory_hostname }}'"
-        autoFwUpdateOnAdd: 'false'
         serverSettingsUris: 
           - "{{ bios_server_setting_resourceuri }}"     
         serverPolicies:
           onServerAdd:
-            firmwareUpdate: 'false'
-            biosApplySettings: 'true'
-            storageConfiguration: 'false'
-            storageVolumeDeletion: 'false'
+            firmwareUpdate: false
+            biosApplySettings: true
+            storageConfiguration: false
+            storageVolumeDeletion: false
             storageVolumeName: ""
-            osInstall: 'false'
+            osInstall: false
           onSettingsApply:
-            firmwareDowngrade: 'false'
+            firmwareDowngrade: false
         autoAddServerTags:
     register: server_group_result
     when: NS204i_data is defined and temporary_server_group.json.count == 0
@@ -421,19 +438,18 @@
       body:
         name: "{{ temporary_server_group_name }}"
         description: "Temporary server group for ESXi installation on server '{{ inventory_hostname }}'"
-        autoFwUpdateOnAdd: 'false'
         serverSettingsUris: 
           - "{{ bios_server_setting_resourceuri }}"   
         serverPolicies:
           onServerAdd:
-            firmwareUpdate: 'false'
-            biosApplySettings: 'true'
-            storageConfiguration: 'false'
-            storageVolumeDeletion: 'false'
+            firmwareUpdate: false
+            biosApplySettings: true
+            storageConfiguration: false
+            storageVolumeDeletion: false
             storageVolumeName: ""
-            osInstall: 'false'
+            osInstall: false
           onSettingsApply:
-            firmwareDowngrade: 'false'
+            firmwareDowngrade: false
         autoAddServerTags:
     vars: 
       group_id: "{{ temporary_server_group  | json_query('json.items[0].id') }}"
@@ -465,20 +481,19 @@
       body:
         name: "{{ temporary_server_group_name }}"
         description: "Temporary server group for ESXi installation on server '{{ inventory_hostname }}'"
-        autoFwUpdateOnAdd: 'false'
         serverSettingsUris: 
           - "{{ bios_server_setting_resourceuri }}"   
           - "{{ internal_storage_server_setting_resourceuri }}"       
         serverPolicies:
           onServerAdd:
-            firmwareUpdate: 'false'
-            biosApplySettings: 'true'
-            storageConfiguration: 'true'
-            storageVolumeDeletion: 'true'
+            firmwareUpdate: false
+            biosApplySettings: true
+            storageConfiguration: true
+            storageVolumeDeletion: true
             storageVolumeName: "OS_boot_volume"
-            osInstall: 'false'
+            osInstall: false
           onSettingsApply:
-            firmwareDowngrade: 'false'
+            firmwareDowngrade: false
         autoAddServerTags:
     register: server_group_result
     when: NS204i_data is undefined and temporary_server_group.json.count == 0
@@ -506,20 +521,19 @@
       body:
         name: "{{ temporary_server_group_name }}"
         description: "Temporary server group for ESXi installation on server '{{ inventory_hostname }}'"
-        autoFwUpdateOnAdd: 'false'
         serverSettingsUris: 
           - "{{ bios_server_setting_resourceuri }}"   
           - "{{ internal_storage_server_setting_resourceuri }}"           
         serverPolicies:
           onServerAdd:
-            firmwareUpdate: 'false'
-            biosApplySettings: 'true'
-            storageConfiguration: 'true'
-            storageVolumeDeletion: 'true'
+            firmwareUpdate: false
+            biosApplySettings: true
+            storageConfiguration: true
+            storageVolumeDeletion: true
             storageVolumeName: "OS_boot_volume"
-            osInstall: 'false'
+            osInstall: false
           onSettingsApply:
-            firmwareDowngrade: 'false'
+            firmwareDowngrade: false
         autoAddServerTags:
     vars: 
       group_id: "{{ temporary_server_group  | json_query('json.items[0].id') }}"
@@ -617,7 +631,7 @@
         Authorization: "Bearer {{ access_token }}"
     vars: 
       filter: "associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"      
-      query: "json.items[?contains(message,'Automatic configuration of server is complete') || contains(message,'configuration failed')]"
+      query: "json.items[? name=='Server automatic configuration' && (contains(message,'Automatic configuration of server is complete') || contains(message,'failed'))]"
     register: server_activities
     until: server_activities | json_query(query) 
     retries: 30
@@ -628,7 +642,7 @@
     fail:
       msg: "The configuration of server '{{ serial_number }}' failed to complete! Refer to the individual server activity entries in GLCP UI for details."
     vars:
-      query: "json.items[?contains(message,'configuration failed')]"
+      query: "json.items[? name=='Server automatic configuration' && contains(message,'failed')]"
     when: server_activities | json_query(query) 
 
  # Capture the size of the volume created once the server configuration is complete only when NS204i is not found
@@ -678,15 +692,22 @@
     delegate_to: localhost
 
   - name: Create the directory '{{ src_iso_directory }}' to host the ISO file on '{{ lookup("pipe","hostname") }}'
-    become: yes
     file:
       path: "{{ src_iso_directory }}"
       state: directory
     when: ISO_Present.stat.exists == False
     delegate_to: localhost
 
+  - name: Check if ESXi ISO '{{ src_iso_url }}/{{ src_iso_file }}' exists  
+    uri:
+      url: "{{ src_iso_url }}/{{ src_iso_file }}"
+      method: HEAD
+      status_code: 200 # The HTTP status code for a successful request.
+      validate_certs: false
+    when: ISO_Present.stat.exists == False
+    delegate_to: localhost
+
   - name: Download file '{{ src_iso_file }}' to '{{ lookup("pipe","hostname") }}' in '{{ src_iso_directory }}' if not present
-    become: yes
     get_url:
       url: "{{ src_iso_url }}/{{ src_iso_file }}"
       dest: "{{ src_iso_directory }}"
@@ -694,66 +715,65 @@
     when: ISO_Present.stat.exists == False
     delegate_to: localhost
 
-  - name: Check if HPE ESXi Custom ISO file extraction is necessary in '{{ staging_directory }}/baremetal/{{ inventory_hostname }}' on '{{ lookup("pipe","hostname") }}'
-    stat:
-      path: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}"
-    register: ISO_Extracted
-    delegate_to: localhost
-
-  # - debug: var=ISO_Extracted
-
   - name: Create '/mnt/{{ inventory_hostname }}' on '{{lookup("pipe","hostname")}}' if it does not exist
     become: yes
-    ansible.builtin.file:
+    file:
       path: /mnt/{{ inventory_hostname }}
       state: directory
       mode: "0755"
     delegate_to: localhost
 
   - name: Create '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/' on '{{lookup("pipe","hostname")}}' if it does not exist
-    become: yes
-    ansible.builtin.file:
+    file:
       path: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}"
       state: directory
-      mode: "0755"
     delegate_to: localhost
 
-  - name: Mount HPE ESXi Custom ISO '{{ src_iso_directory }}/{{ src_iso_file }}' to '/mnt/{{ inventory_hostname }}/' and copying ISO files to '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/' on '{{lookup("pipe","hostname")}}'
+  - name: Mount ESXi ISO '{{ src_iso_directory }}/{{ src_iso_file }}' to '/mnt/{{ inventory_hostname }}/' 
     become: yes
-    shell: |
+    shell: 
       mount -o loop -t iso9660 --read-only {{ src_iso_directory }}/{{ src_iso_file }} /mnt/{{ inventory_hostname }}/
-      cp -r /mnt/{{ inventory_hostname }}/. {{ staging_directory }}/baremetal/{{ inventory_hostname }}/
+    delegate_to: localhost
+
+  - name: Copy ISO files to '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/' on '{{lookup("pipe","hostname")}}' 
+    shell: |
+      rsync -a /mnt/{{ inventory_hostname }}/. {{ staging_directory }}/baremetal/{{ inventory_hostname }}/
+    delegate_to: localhost
+
+  - name: Set permissions to allow the user running the Ansible playbook to delete the folder '{{ staging_directory }}/baremetal/{{ inventory_hostname }}'
+    become: yes
+    file:
+      path: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}"
+      mode: ug+w
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      recurse: yes
+      state: directory
+    delegate_to: localhost
+
+  - name: Unmount directory '/mnt/{{ inventory_hostname }}'
+    become: yes
+    shell: 
       umount /mnt/{{ inventory_hostname }}
-    # when: ISO_Extracted.stat.exists == False
     delegate_to: localhost
 
   - name: Modify UEFI bootloader for kickstart installation from CDROM
-    become: yes
-    shell: |
+    shell: 
       sed -i 's/kernelopt=cdromBoot runweasel/kernelopt=runweasel ks=cdrom:\/KS.CFG/' {{ staging_directory }}/baremetal/{{ inventory_hostname }}/efi/boot/boot.cfg
     delegate_to: localhost
 
   # Creation of the KS.CFG kickstart file
 
-  - name: Create kickstart file 
-    become: yes
+  - name: Create kickstart file in '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/' on '{{lookup("pipe","hostname")}}' with variable substitution
     template:
       src: files/{{ esxi_build }}/{{ kickstart }}
       dest: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/KS.CFG"
     delegate_to: localhost
 
-  - name: Prepare KS.CFG kickstart file to make the new ISO in '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/KS.CFG'
-    become: yes
-    file:
-      path: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/KS.CFG"
-      state: file
-      mode: "0755"
-    delegate_to: localhost
-
   # Creation of the new ESXi ISO image with unattended installation
 
   - name: Create customized bootable ISO in '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/'
-    become: yes
+    # become: yes
     shell: >
       mkisofs
       -relaxed-filenames
@@ -774,7 +794,7 @@
       mode: "0755"
     delegate_to: localhost
 
-  - name: Move created ISO to the nginx default html folder 'http://{{ lookup("pipe","hostname") }}/isos'
+  - name: Move created ISO to the nginx default html folder. ISO URL='http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}.iso'
     become: yes
     shell: |
       mv {{ staging_directory }}/baremetal/{{ inventory_hostname }}.iso /usr/share/nginx/html/isos/
@@ -881,26 +901,6 @@
 
   # Server group modification when NS204i is found => no local storage configuration definition
   
-  - name: Capture all job templates
-    uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ job_templates_API_version }}/job-templates"
-      method: GET
-      status_code: 200
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    register: job_templates
-    delegate_to: localhost
-
-  # - debug: var=job_templates
-
-  - name: Capture jobTemplateUri of GroupOSInstallation
-    set_fact:
-      job_template_resourceuri: "{{ (job_templates | json_query(query))[0] }}"
-    vars:
-      query: "json.items[?name=='GroupOSInstallation'].resourceUri"
-
-  # - debug: var=job_template_resourceuri
-
   - name: Update temporary group '{{ temporary_server_group_name }}' to add OS image installation settings with NS204i
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ temporary_group_id }}"
@@ -913,20 +913,19 @@
       body:
         name: "{{ temporary_server_group_name }}"
         description: "Temporary server group for ESXi installation on server '{{ inventory_hostname }}'"
-        autoFwUpdateOnAdd: 'false'
         serverSettingsUris: 
           - "{{ bios_server_setting_resourceuri }}"   
           - "{{ OS_image_server_setting_resourceuri }}"
         serverPolicies:
           onServerAdd:
-            firmwareUpdate: 'false'
-            biosApplySettings: 'true'
-            storageConfiguration: 'false'
-            storageVolumeDeletion: 'false'
+            firmwareUpdate: false
+            biosApplySettings: true
+            storageConfiguration: false
+            storageVolumeDeletion: false
             storageVolumeName: ""
-            osInstall: 'false'
+            osInstall: true
           onSettingsApply:
-            firmwareDowngrade: 'false'
+            firmwareDowngrade: false
         autoAddServerTags:
     register: server_group_result
     when:  NS204i_data is defined 
@@ -936,7 +935,9 @@
     debug: var=server_group_result.msg
     when:  NS204i_data is defined 
 
-  - name: Update group '{{ temporary_server_group_name }}' to add OS image installation settings with storage controller (without NS204i)
+  # Server group modification when NS204i is not found => set local storage configuration definition
+
+  - name: Update temporary group '{{ temporary_server_group_name }}' to add OS image installation settings with storage controller (without NS204i)
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ temporary_group_id }}"
       method: PATCH
@@ -948,21 +949,20 @@
       body:
         name: "{{ temporary_server_group_name }}"
         description: "Temporary server group for ESXi installation on server '{{ inventory_hostname }}'"
-        autoFwUpdateOnAdd: 'false'
         serverSettingsUris: 
           - "{{ bios_server_setting_resourceuri }}"   
           - "{{ internal_storage_server_setting_resourceuri }}"       
           - "{{ OS_image_server_setting_resourceuri }}"
         serverPolicies:
           onServerAdd:
-            firmwareUpdate: 'false'
-            biosApplySettings: 'true'
-            storageConfiguration: 'true'
-            storageVolumeDeletion: 'true'
+            firmwareUpdate: false
+            biosApplySettings: true
+            storageConfiguration: true
+            storageVolumeDeletion: true
             storageVolumeName: "OS_boot_volume"
-            osInstall: 'false'
+            osInstall: true
           onSettingsApply:
-            firmwareDowngrade: 'false'
+            firmwareDowngrade: false
         autoAddServerTags:
     register: server_group_result
     when:  NS204i_data is undefined 
@@ -983,12 +983,12 @@
       body_format: json
       body:
         resourceUri: "{{ temporary_group_resourceuri }}"
-        jobTemplateUri: "{{ job_template_resourceuri }}"
+        jobTemplateUri: "{{ GroupOSInstallation_job_template_resourceUri }}"
         data:
           devices:
             - "{{ server_id }}"
-          parallel: 'true'
-          stopOnFailure: 'false'
+          parallel: true
+          stopOnFailure: true
     register: group_os_installation_result
     delegate_to: localhost
 
@@ -1008,7 +1008,7 @@
         Authorization: "Bearer {{ access_token }}"
     vars: 
       filter: "associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"      
-      query: "json.items[?contains(message,'Operating system image installation task marked as complete')]"
+      query: "json.items[?name=='Server OS Installation' && contains(message,'Operating system image installation task marked as complete')]"
     register: server_activities
     until: server_activities | json_query(query) 
     retries: 60
@@ -1092,14 +1092,12 @@
   # Backup kickstart file for troubleshooting purposes
 
   - name: Create a kickstart backup directory if it does not exist
-    become: yes
     file:
       path: "{{ staging_directory }}/kickstarts_backup/ESXi"
       state: directory
     delegate_to: localhost
 
   - name: Create a backup of the kickstart file named '{{ inventory_hostname }}_ks.cfg' in '{{ staging_directory }}/kickstarts_backup/ESXi' folder
-    become: yes
     shell: |
       cp -f {{ staging_directory }}/baremetal/{{ inventory_hostname }}/KS.CFG {{ staging_directory }}/kickstarts_backup/ESXi/{{ inventory_hostname }}_ks.cfg
     delegate_to: localhost
@@ -1118,6 +1116,10 @@
 
   # vCenter and ESXi configuration
 
+  - name: Set fact for the first host in inventory
+    set_fact:
+      is_first_host: "{{ play_hosts[0] == inventory_hostname }}"
+
   - name: Check if ESXi cluster '{{ cluster_name }}' exists in vCenter '{{ vcenter_hostname }}'
     community.vmware.vmware_cluster_info:
       hostname: '{{ vcenter_hostname }}'
@@ -1128,6 +1130,7 @@
       validate_certs: false
     register: cluster_facts
     delegate_to: localhost
+    when: is_first_host
 
   # - debug: var=cluster_facts
 
@@ -1140,9 +1143,14 @@
       cluster_name: "{{ cluster_name }}"
       state: present
       validate_certs: false
-    when: cluster_facts.clusters is not defined or cluster_name not in cluster_facts.clusters
-    ignore_errors: yes # added as sometimes a failure is thrown saying "the name xyz already exists" when hosts are provisionned in parallel
+    when: is_first_host and (cluster_facts.clusters is not defined or cluster_name not in cluster_facts.clusters)
+    # ignore_errors: yes # added as sometimes a failure is thrown saying "the name xyz already exists" when hosts are provisionned in parallel
     delegate_to: localhost
+  
+  - name: Pause for 10 seconds for the cluster to be ready
+    ansible.builtin.pause:
+      seconds: 10
+    when: cluster_facts.clusters is not defined or cluster_name not in cluster_facts.clusters
 
   - name: Enable HA without admission control on '{{ cluster_name }}' cluster
     community.vmware.vmware_cluster_ha:
@@ -1154,6 +1162,7 @@
       enable: true
       validate_certs: false
     delegate_to: localhost
+    when: is_first_host
 
   - name: Enable DRS with VM distribution across hosts for availability on '{{ cluster_name }}' cluster
     community.vmware.vmware_cluster_drs:
@@ -1167,9 +1176,15 @@
         'TryBalanceVmsPerHost': '1'
       validate_certs: false
     delegate_to: localhost
+    when: is_first_host
 
+  - name: Pause for 10 seconds for the cluster to be ready
+    ansible.builtin.pause:
+      seconds: 10
+    when: cluster_facts.clusters is not defined or cluster_name not in cluster_facts.clusters
+        
   - name: Add ESXi host '{{ inventory_fqdn }}' to '{{ cluster_name }}' cluster 
-    vmware_host:
+    community.vmware.vmware_host:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
@@ -1218,6 +1233,24 @@
       esxi_hostname: "{{ inventory_fqdn }}"
       switch: "vSwitch0"
       portgroup: "vMotion"
+      validate_certs: false
+    delegate_to: localhost
+
+  - name: Pause for 10 seconds to give time for the vswitch0 configuration
+    ansible.builtin.pause:
+      seconds: 10
+
+  - name: Re-add ESXi host '{{ inventory_fqdn }}' to '{{ cluster_name }}' cluster (sometimes the host disconnects for an unknown reason)
+    vmware_host:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      datacenter_name: "{{ datacenter_name }}"
+      cluster_name: "{{ cluster_name }}"
+      esxi_hostname: "{{ inventory_fqdn }}"
+      esxi_username: "root"
+      esxi_password: "{{ root_password }}"
+      state: present
       validate_certs: false
     delegate_to: localhost
 
@@ -1304,6 +1337,7 @@
         Authorization: "Bearer {{ access_token }}"
     register: firmwarebundles
     delegate_to: localhost
+    when: is_first_host
 
   # - debug: var=firmwarebundles
 
@@ -1314,15 +1348,15 @@
       Gen10_10p_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
     vars:
       query: "json.items[?releaseVersion=='{{ Gen10_10p_firmware_bundle_name }}'].id"
-    when: (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+    when: is_first_host and (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
 
   - name:  Exit if Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}' does not exist
     fail:
       msg: "Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}' does not exist!"
-    when: (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0) and Gen10_10p_firmware_bundle_ID is not defined
+    when: is_first_host and (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0) and Gen10_10p_firmware_bundle_ID is not defined
 
   - debug: var=Gen10_10p_firmware_bundle_ID
-    when: (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0)
+    when: is_first_host and (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0)
     
   # Gen10 associated patch
 
@@ -1331,15 +1365,15 @@
       Gen10_10p_patch_firmware_ID: "{{ (firmwarebundles | json_query(query) )[0] }}"
     vars:
       query: "json.items[?releaseVersion=='{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}'].id"
-    when: (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+    when: is_first_host and (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
 
   - name: Exit if Gen10 associated patch '{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}' does not exist
     fail:
       msg: "Gen10 associated patch '{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}' does not exist!"
-    when: (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0) and Gen10_10p_patch_firmware_ID is not defined
+    when: is_first_host and (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0) and Gen10_10p_patch_firmware_ID is not defined
 
   - debug: var=Gen10_10p_patch_firmware_ID
-    when: (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0)
+    when: is_first_host and (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0)
 
   # Gen11 firmware bundle
   
@@ -1348,65 +1382,80 @@
       Gen11_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
     vars:
       query: "json.items[?releaseVersion=='{{ Gen11_firmware_bundle_name }}'].id"
-    when: (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+    when: is_first_host and (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
 
   - name: Exit if Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}' does not exist
     fail:
       msg: "Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}' does not exist!"
-    when: (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0) and Gen11_firmware_bundle_ID is not defined
+    when: is_first_host and (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0) and Gen11_firmware_bundle_ID is not defined
 
   - debug: var=Gen11_firmware_bundle_ID
-    when:  (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0)
+    when: is_first_host and (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0)
 
   # Gen11 associated patch
   
   - debug: var=Gen11_patch_name_associated_with_firmware_bundle
-    when: (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0)
+    when: is_first_host and (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0)
 
   - name: Set variable for '{{ Gen11_patch_name_associated_with_firmware_bundle }}' associated patch for Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}'
     set_fact:
       Gen11_patch_firmware_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
     vars:
       query: "json.items[?releaseVersion=='{{ Gen11_patch_name_associated_with_firmware_bundle }}'].id"
-    when:  (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+    when: is_first_host and (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
 
   - name: Exit if Gen11 associated patch '{{ Gen11_patch_name_associated_with_firmware_bundle }}' does not exist
     fail:
       msg: "Gen11 associated patch '{{ Gen11_patch_name_associated_with_firmware_bundle }}' does not exist!"
-    when:  (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) and Gen11_patch_firmware_ID is not defined
+    when: is_first_host and (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) and Gen11_patch_firmware_ID is not defined
 
   - debug: var=Gen11_patch_firmware_ID
-    when: (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) 
+    when: is_first_host and (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) 
 
   # Setting final SPP variables if a fw patch exists
 
   - name: Set the final variable value for the Gen10 firmware bundle ID
     set_fact:
       Gen10_10p_firmware_bundle_ID: "{{ Gen10_10p_patch_firmware_ID }}"
-    when: Gen10_10p_patch_firmware_ID is defined
+    when: is_first_host and Gen10_10p_patch_firmware_ID is defined
 
   - name: Set the final variable value for the Gen11 firmware bundle ID
     set_fact:
       Gen11_firmware_bundle_ID: "{{ Gen11_patch_firmware_ID }}"
-    when: Gen11_patch_firmware_ID is defined
+    when: is_first_host and Gen11_patch_firmware_ID is defined
 
   # Failure if firmware bundles set are not found
 
   - name: Fail if the firmware baselines for Gen10/Gen10+ and Gen11 servers could not be found.
     fail:
       msg: 'The firmware bundles for Gen10/Gen10+ and Gen11 servers could not be found, check your firmware baseline variables.' 
-    when: Gen10_10p_firmware_bundle_ID is not defined and Gen11_firmware_bundle_ID is not defined
+    when: is_first_host and Gen10_10p_firmware_bundle_ID is not defined and Gen11_firmware_bundle_ID is not defined
 
   - name: Fail if the firmware baseline for Gen10/Gen10+ servers could not be found.
     fail:
       msg: 'The firmware bundle for Gen10/Gen10+ servers could not be found, check your firmware baseline variables.' 
-    when: Gen10_10p_firmware_bundle_ID is not defined 
+    when: is_first_host and Gen10_10p_firmware_bundle_ID is not defined 
 
   - name: Fail if the firmware baseline for Gen11 servers could not be found.
     fail:
       msg: 'The firmware bundle for Gen11 servers could not be found, check your firmware baseline variables.' 
-    when: Gen11_firmware_bundle_ID is not defined 
-  
+    when: is_first_host and Gen11_firmware_bundle_ID is not defined 
+ 
+  # Set firmware bundle id for the server generation
+
+  - name: Set firmware bundle id for Gen10/Gen10+ server
+    set_fact: 
+      bundle_id: "{{ Gen10_10p_firmware_bundle_ID }}"
+    when: is_first_host and server_generation == "GEN_10"
+ 
+  - name: Set firmware bundle id for Gen11 server
+    set_fact: 
+      bundle_id: "{{ Gen11_firmware_bundle_ID }}"
+    when: is_first_host and server_generation == "GEN_11"
+
+  - debug: var=bundle_id
+    when: is_first_host
+
  # Create the firmware server setting 
 
   - name: Check if the firmware server setting '{{ firmware_server_setting_name }}' exists
@@ -1418,7 +1467,8 @@
     vars:
       filter: "name eq '{{ firmware_server_setting_name }}'"
     register: firmware_server_setting
-    delegate_to: localhost
+    delegate_to: localhost   
+    when: is_first_host
 
   # - debug: var=firmware_server_setting
 
@@ -1442,17 +1492,17 @@
           GEN11:
             id: "{{ Gen11_firmware_bundle_ID }}"
     register: firmware_server_setting_result
-    when: firmware_server_setting.json.count == 0
+    when: is_first_host and firmware_server_setting.json.count == 0
     delegate_to: localhost
 
   - name: Display response of the firmware server setting '{{ firmware_server_setting_name }}' creation request
     debug: var=firmware_server_setting_result.msg
-    when: firmware_server_setting.json.count == 0
+    when: is_first_host and firmware_server_setting.json.count == 0
 
   - name: Set variable for the resourceuri of the firmware server setting '{{ firmware_server_setting_name }}' just created
     set_fact: 
       firmware_server_setting_resourceuri: "{{ firmware_server_setting_result.json.resourceUri }}"
-    when: firmware_server_setting.json.count == 0
+    when: is_first_host and firmware_server_setting.json.count == 0
 
   - name: Update the firmware server setting '{{ firmware_server_setting_name }}' 
     uri:
@@ -1476,19 +1526,20 @@
     vars: 
       firmware_server_setting_id: "{{ firmware_server_setting | json_query('json.items[0].id')  }}"
     register: firmware_server_setting_result
-    when: firmware_server_setting.json.count == 1
+    when: is_first_host and firmware_server_setting.json.count == 1
     delegate_to: localhost
 
   - name: Display response of the firmware server setting '{{ firmware_server_setting_name }}' update task
     debug: var=firmware_server_setting_result.msg
-    when: firmware_server_setting.json.count == 1
+    when: is_first_host and firmware_server_setting.json.count == 1
     
   - name: Set variable for the resourceuri of the firmware server setting '{{ firmware_server_setting_name }}' just updated
     set_fact: 
       firmware_server_setting_resourceuri: "{{ firmware_server_setting | json_query('json.items[0].resourceUri') }}"
-    when: firmware_server_setting.json.count == 1
+    when: is_first_host and firmware_server_setting.json.count == 1
 
   - debug: var=firmware_server_setting_resourceuri
+    when: is_first_host
 
 
 #--------------------------------------Firmware update preparation: Create a definitive server group or update if existing --------------------------------------------
@@ -1505,6 +1556,7 @@
       filter: "name eq '{{ server_group_name }}'"      
     register: definitive_server_group
     delegate_to: localhost
+    when: is_first_host
 
   # - debug: var=definitive_server_group
 
@@ -1522,34 +1574,33 @@
       body:
         name: "{{ server_group_name }}"
         description: "Server group for ESXi servers"
-        autoFwUpdateOnAdd: 'true'
         serverSettingsUris: 
           - "{{ bios_server_setting_resourceuri }}"     
           - "{{ firmware_server_setting_resourceuri }}"     
         serverPolicies:
           onServerAdd:
-            firmwareUpdate: 'true'
-            biosApplySettings: 'false'
-            storageConfiguration: 'false'
-            storageVolumeDeletion: 'false'
+            firmwareUpdate: false
+            biosApplySettings: false
+            storageConfiguration: false
+            storageVolumeDeletion: false
             storageVolumeName: ""
-            osInstall: 'false'
+            osInstall: false
           onSettingsApply:
             firmwareDowngrade: "{{ firmware_downgrade_policy }}"
         autoAddServerTags:
     register: definitive_server_group_result
-    when: definitive_server_group.json.count == 0
+    when: is_first_host and definitive_server_group.json.count == 0
     delegate_to: localhost
 
   - name: Display response of the definitive group '{{ server_group_name }}' creation request
     debug: var=definitive_server_group_result.msg
-    when:  definitive_server_group.json.count == 0
+    when: is_first_host and definitive_server_group.json.count == 0
 
   - name: Set variables for the id and the resourceUri of the definitive group '{{ server_group_name }}' just created
     set_fact:
       definitive_group_id: "{{ definitive_server_group_result.json.id }}" 
       definitive_group_resourceuri: "{{ definitive_server_group_result.json.resourceUri }}"
-    when:  definitive_server_group.json.count == 0
+    when: is_first_host and definitive_server_group.json.count == 0
 
   # Update the definitive server group if the group exists
     
@@ -1565,54 +1616,45 @@
       body:
         name: "{{ server_group_name }}"
         description: "Server group for ESXi server"
-        autoFwUpdateOnAdd: 'true'
         serverSettingsUris: 
           - "{{ bios_server_setting_resourceuri }}"   
           - "{{ firmware_server_setting_resourceuri }}"     
         serverPolicies:
           onServerAdd:
-            firmwareUpdate: 'true'
-            biosApplySettings: 'false'
-            storageConfiguration: 'false'
-            storageVolumeDeletion: 'false'
+            firmwareUpdate: false
+            biosApplySettings: false
+            storageConfiguration: false
+            storageVolumeDeletion: false
             storageVolumeName: ""
-            osInstall: 'false'
+            osInstall: false
           onSettingsApply:
             firmwareDowngrade: "{{ firmware_downgrade_policy }}"
         autoAddServerTags:
     vars: 
       group_id: "{{ definitive_server_group  | json_query('json.items[0].id') }}"
     register: definitive_server_group_result
-    when: definitive_server_group.json.count == 1
+    when: is_first_host and definitive_server_group.json.count == 1
     delegate_to: localhost
 
   - name: Display response of the group '{{ server_group_name }}' update request
     debug: var=definitive_server_group_result.msg
-    when: definitive_server_group.json.count == 1
+    when: is_first_host and definitive_server_group.json.count == 1
 
   - name: Set variables for the id and the resourceUri of the existing definitive group '{{ server_group_name }}' just updated
     set_fact:
       definitive_group_id: "{{ definitive_server_group | json_query('json.items[0].id') }}" 
       definitive_group_resourceuri: "{{ definitive_server_group | json_query('json.items[0].resourceUri') }}"
-    when:  definitive_server_group.json.count == 1
+    when: is_first_host and definitive_server_group.json.count == 1
 
   - debug: var=definitive_group_id  
+    when: is_first_host
 
   - debug: var=definitive_group_resourceuri
+    when: is_first_host
 
 
 #--------------------------------------Firmware update preparation: Put server in maintenance mode --------------------------------------------------------------------
   
-  # Capture the start time of the firmware update
-  - name: Gather subset facts on localhost
-    setup:
-      gather_subset: [all]
-    delegate_to: localhost
-
-  - name: Capture the start time (will be used later to filter COM activities and get the runtime of the playbook)
-    set_fact:
-      firmware_update_start_time: "{{ ansible_date_time.iso8601 }}"
-
   - name: Place ESXi host '{{ inventory_fqdn }}' into maintenance mode
     community.vmware.vmware_maintenancemode:
       hostname: "{{ vcenter_hostname }}"
@@ -1626,8 +1668,37 @@
     delegate_to: localhost
 
 
-#--------------------------------------Start firmware update by adding server to definitive server group --------------------------------------------------------------
+#--------------------------------------Adding server to definitive server group and starting firmware update ----------------------------------------------------------
       
+  # Capture the start time of the firmware update
+  - name: Gather subset facts on localhost
+    setup:
+      gather_subset: [all]
+    delegate_to: localhost
+
+  - name: Capture the start time of the firmware update (will be used later to filter COM activities, etc.)
+    set_fact:
+      firmware_update_start_time: "{{ ansible_date_time.iso8601 }}"
+
+  - name: Display the start time of the firmware update
+    debug: 
+      msg: "{{ firmware_update_start_time }}"
+
+  - name: Get definitive group '{{ server_group_name }}' information
+    uri:
+      url:  "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars: 
+      filter: "name eq '{{ server_group_name }}'"      
+    register: definitive_server_group
+    delegate_to: localhost
+
+  - name: Set variable for existing definitive group '{{ server_group_name }}' id
+    set_fact:
+      definitive_group_id: "{{ definitive_server_group | json_query('json.items[0].id') }}" 
+
   # Check if the server is already member of the definitive server group if it does exist
 
   - name: Check if server '{{ serial_number }}' is already member of definitive server group '{{ server_group_name }}' 
@@ -1637,25 +1708,7 @@
       query: "json.items[0].devices[?serial=='{{ serial_number }}']"
     when: definitive_server_group.json.count == 1
       
-  # - debug: var=server_found_in_definitive_group  
-
-  # Remove the server from the definitive server group if it's already part of it (which shouldn't be the case, unless the playbook has failed and been rerun)
-
-  - name: Remove server '{{ serial_number }}' from definitive server group '{{ server_group_name }}' if it is already a member
-    uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ definitive_group_id }}/devices/{{ server_id }}"
-      method: DELETE
-      status_code: 204
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    when: server_found_in_definitive_group is defined and server_found_in_definitive_group | length != 0
-    register: group_unassignment_result
-    delegate_to: localhost
-
-  - name: Wait for deletion to complete
-    pause:
-      seconds: 15
-    when: server_found_in_definitive_group is defined and server_found_in_definitive_group | length != 0
+  # - debug: var=server_found_in_definitive_group
     
   # Add server to the definitive server group 
 
@@ -1671,17 +1724,121 @@
         devices:
           - serverId: "{{ server_id }}"
     register: group_assignment_result
+    when: server_found_in_definitive_group is not defined or server_found_in_definitive_group | length == 0
     delegate_to: localhost
 
   - name: Display response of the group assignment task
     debug: var=group_assignment_result.msg
+    when: server_found_in_definitive_group is not defined or server_found_in_definitive_group | length == 0
 
-
-#--------------------------------------Wait for the server firmware update to complete --------------------------------------------------------------------------------
+  - name: Wait for assignment to truly complete
+    pause:
+      seconds: 15
+    when: server_found_in_definitive_group is not defined or server_found_in_definitive_group | length == 0
   
-  # Monitor the server firmware update status
+  # Start an HPE drivers, software and firmware update job
 
-  - name: Wait for the firmware update of server '{{ serial_number }}' to complete 
+  # To run a firmware update in parallel on each host and save time, it is necessary to use the group firmware update job
+  # This job will only be executed on the first host in the Ansible inventory
+
+  # Get the list of devices in the definitive server group with the first host only
+
+  - name: Get definitive group '{{ server_group_name }}' information (first host only)
+    uri:
+      url:  "{{ ConnectivityEndpoint }}{{ definitive_group_resourceuri  }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: definitive_server_group
+    delegate_to: localhost
+    when: is_first_host
+
+  - name: Set fact for the list of server IDs member of the definitive server group (first host only)
+    set_fact:
+      server_ids: "{{ definitive_server_group.json.devices  | map(attribute='id') | list  }}"
+    when: is_first_host
+
+  - name: Display the server IDs found (first host only)
+    debug: var=server_ids
+    when: is_first_host
+
+  # If updating HPE drivers, software and firmware takes a long time, it's safer to ask for a new COM token now
+
+  - name: Create a new HPE Compute Ops Management session to avoid token expiration during the firmware update job
+    import_tasks: files/Create_COM_session.yml
+
+  # Start a group firmware update job with the first host only
+
+  - name: Start a group firmware update job using the defined firmware baseline (first host only)
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ jobs_API_version }}/jobs"
+      method: POST
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        resourceUri: "{{ definitive_group_resourceuri }}"
+        jobTemplateUri: "{{ GroupFirmwareUpdate_job_template_resourceUri }}"
+        data:
+          devices: "{{ server_ids }}"
+          parallel: true
+          stopOnFailure: false
+          installSWDrivers: "{{ install_SWDrivers_policy }}"
+          downgrade: "{{ firmware_downgrade_policy }}"
+          powerOff: false
+    register: group_firmware_update_job
+    delegate_to: localhost
+    when: is_first_host
+
+  - name: Display response of the group firmware update job (first host only)
+    debug: var=group_firmware_update_job.msg
+    when: is_first_host
+
+
+#--------------------------------------Wait until the update of the HPE server drivers, software and firmware is complete. --------------------------------------------
+ 
+  - name: Capture the resourceUri of the group firmware update job (first host only)
+    set_fact:
+      group_firmware_update_job_resourceUri: "{{ group_firmware_update_job.json.resourceUri }}"
+    when: is_first_host
+
+  - name: Display the group firmware update job resource uri (first host only)
+    debug: var=group_firmware_update_job_resourceUri
+    when: is_first_host
+ 
+  - name: Wait for the group firmware update job to complete (first host only)
+    uri:
+      url: "{{ ConnectivityEndpoint }}{{ group_firmware_update_job_resourceUri }}"
+      method: GET
+      return_content: yes
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    retries: 600
+    delay: 60
+    until: >
+      (group_firmware_update_job_status.json.state == "COMPLETE" or 
+      group_firmware_update_job_status.json.state == "ERROR")
+    register: group_firmware_update_job_status
+    ignore_errors: yes
+    changed_when: false
+    delegate_to: localhost
+    when: is_first_host
+
+  # - debug: var=group_firmware_update_job_status
+
+  - name: Display the group firmware update job result (first host only)
+    debug: 
+      msg:
+        - "State: {{ group_firmware_update_job_status.json.state }}"
+        - "ResultCode: {{ group_firmware_update_job_status.json.resultCode }}"
+        - "Status: {{ group_firmware_update_job_status.json.status }}"
+    when: is_first_host
+
+  # Display the server firmware update activity status
+
+  - name: Get the latest activity of server '{{ serial_number }}'
     uri:
       url:  "{{ ConnectivityEndpoint }}/compute-ops/{{ activities_API_version }}/activities?filter={{ filter | urlencode  }}"  
       method: GET
@@ -1689,16 +1846,41 @@
         Authorization: "Bearer {{ access_token }}"
     vars: 
       filter: "associatedServerId eq '{{ server_id }}' and createdAt gt {{ firmware_update_start_time }}"      
-      query: "json.items[?contains(message,'complete') || contains(message,'Firmware update failed')]"
-    register: server_activities
-    until: server_activities | json_query(query) 
-    retries: 1000
-    delay: 60
+    register: Server_activity_status
     delegate_to: localhost
 
+  # - debug: var=Server_activity_status
+
+  - name: Extract items containing 'Firmware update'  
+    set_fact:
+      firmware_update_items: "{{ (Server_activity_status | json_query(query))[0] }}"
+    vars:
+      query: "json.items[? contains(name, 'Firmware update') && contains(groupDisplayName, '{{ server_group_name }}')]"
+
+  # - debug: var=firmware_update_items
+
+  - name: Display the firmware update activity status when successful 
+    vars:
+      msg: |
+          Message: {{ firmware_update_items.message }}
+    debug:
+      msg: "{{ msg.split('\n') }}"
+    when: firmware_update_items.message is search('Firmware update successful', ignorecase=True)
+
+  - name: Display the firmware update activity status with recommanded actions when failed
+    vars:
+      msg: |
+          Message: {{ firmware_update_items.message }}
+
+          Recommended action:
+          {{ firmware_update_items.recommendedAction  | regex_replace('\\n', '\n') | regex_replace('\n\n', '\n') }}
+    debug:
+      msg: "{{ msg.split('\n') }}"
+    when: firmware_update_items.message is search('Firmware update failed', ignorecase=True)
+    
   # Capture last firmware update information
 
-  - name: Capture server '{{ serial_number }}' information   
+  - name: Capture server information   
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ serial_number }}'"
       method: GET
@@ -1706,19 +1888,17 @@
         Authorization: "Bearer {{ access_token }}"
     register: server
     delegate_to: localhost
+  
+  - name: Capture last firmware update information 
+    set_fact:
+      last_firmware_update: "{{ server | json_query('json.items[0].lastFirmwareUpdate') }}"
 
-  - name: Display last firmware update information
+  # - debug: var=last_firmware_update.attemptedAt
+
+  - name: Display server last firmware update information if up-to-date
     debug: 
-      msg: "{{ server | json_query('json.items[0].lastFirmwareUpdate') }}"  
-
-  - name: Exit if configuration of server '{{ serial_number }}' failed to complete
-    fail:
-      msg: 
-        - "The configuration of server '{{ serial_number }}' failed to complete! Refer to the individual server activity entries in GLCP UI for details."
-        - "The server will remain in maintenance mode!"
-    vars:
-      query: "json.items[?contains(message,'Firmware update failed')]"
-    when: server_activities | json_query(query) 
+      msg: "{{ last_firmware_update }}"  
+    when: last_firmware_update.attemptedAt > firmware_update_start_time
 
 
 #--------------------------------------Exit ESXi server from maintenance mode -----------------------------------------------------------------------------------------
@@ -1761,12 +1941,33 @@
     set_fact:
       runtime: "{{ ((ansible_date_time.iso8601[:19] | to_datetime('%Y-%m-%dT%H:%M:%S')) - (start_time[:19] | to_datetime('%Y-%m-%dT%H:%M:%S'))) }}"
 
-  # Display ESXi server installation completion message
+  # Display server installation completed message
 
-  - name: Displaying install completion message
+  - name: Status of the OS installation with the firmware update with HPE drivers and software
     debug:
       msg:
-        - "{{ inventory_hostname }}.{{domain}} Installation completed !"
-        - "ESXi is configured and running. It has been added to the vCenter cluster '{{ cluster_name }}'"
-        - "To connect to the new host from Ansible control node, use: ssh root@{{ inventory_hostname }}.{{domain}}"
-        - "The provisioning task took {{ runtime }}"
+        - "{{ inventory_hostname }}.{{domain}} installation and firmware update completed successfully!"
+        - "OS is configured and running with the HPE drivers and software and added to the vCenter cluster '{{ cluster_name }}'"
+        - "To SSH to the new host from Ansible control node, use: ssh root@{{ inventory_hostname }}.{{domain}}"
+        - "The provisioning task took {{ runtime }}."
+    when: (firmware_update_items.message is search('Firmware update successful', ignorecase=True)) and (install_SWDrivers_policy|bool == True)
+
+  - name: Status of the OS installation with the firmware update without HPE drivers and software
+    debug:
+      msg:
+        - "{{ inventory_hostname }}.{{domain}} installation and firmware update completed successfully!"
+        - "OS is configured and running and added to the vCenter cluster '{{ cluster_name }}'"
+        - "To SSH to the new host from Ansible control node, use: ssh root@{{ inventory_hostname }}.{{domain}}"
+        - "The provisioning task took {{ runtime }}."
+    when: (firmware_update_items.message is search('Firmware update successful', ignorecase=True)) and (install_SWDrivers_policy|bool == False)    
+
+  - name: Status of the OS installation with firmware update failure
+    debug:
+      msg:
+        - "{{ inventory_hostname }}.{{domain}} installation completed but the firmware update operation failed to complete!" 
+        - "OS is configured and running and added to the vCenter cluster '{{ cluster_name }}'"
+        - "Refer to the individual server activity entries in the HPE Compute Ops Management UI for more details."
+        - "To SSH to the new host from Ansible control node, use: ssh root@{{ inventory_hostname }}.{{domain}}"
+        - "The provisioning task took {{ runtime }}."
+    when: (firmware_update_items.message is search('Firmware update failed', ignorecase=True)) or (group_firmware_update_job_status.json.resultCode is none)
+

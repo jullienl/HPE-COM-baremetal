@@ -1,0 +1,1333 @@
+$ ansible-playbook -i hosts_WIN WIN2022_provisioning.yml --vault-password-file ~/secrets/vault_pass.txt  --become-password-file ~/secrets/become_pass.txt 
+
+PLAY [Automated Windows Server 2022 installation on HPE Compute Ops Managmeent server(s) using an auto-generated ISO file with customized unattend file] ************************************************************************************************************************************
+
+TASK [Gather subset facts on localhost] *****************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Capture the start time (will be used later to filter COM activities and get the runtime of the playbook)] *****************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "start_time": "2024-01-24T16:30:56Z"
+}
+ok: [WIN-2] => {
+    "start_time": "2024-01-24T16:30:56Z"
+}
+
+TASK [Create HPE Compute Ops Management session] ********************************************************************************************************************************************************************************************************************************************
+ok: [WIN-2 -> localhost]
+ok: [WIN-1 -> localhost]
+
+TASK [Set variable access_token for the bearer token] ***************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Capture resource API versions from the COM API reference] *****************************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Set a variable for the COM API reference content] *************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Set a variable for items property of the COM API reference content] *******************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Set variables for each API version] ***************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => (item=Variable set: webhooks_API_version = v1beta1)
+ok: [WIN-2] => (item=Variable set: webhooks_API_version = v1beta1)
+ok: [WIN-1] => (item=Variable set: user_preferences_API_version = v1beta1)
+ok: [WIN-2] => (item=Variable set: user_preferences_API_version = v1beta1)
+ok: [WIN-1] => (item=Variable set: servers_API_version = v1beta2)
+ok: [WIN-2] => (item=Variable set: servers_API_version = v1beta2)
+ok: [WIN-1] => (item=Variable set: server_settings_API_version = v1beta1)
+ok: [WIN-2] => (item=Variable set: server_settings_API_version = v1beta1)
+ok: [WIN-1] => (item=Variable set: schedules_API_version = v1beta2)
+ok: [WIN-2] => (item=Variable set: schedules_API_version = v1beta2)
+ok: [WIN-1] => (item=Variable set: reports_API_version = v1beta1)
+ok: [WIN-2] => (item=Variable set: reports_API_version = v1beta1)
+ok: [WIN-1] => (item=Variable set: reports_API_version = v1beta2)
+ok: [WIN-2] => (item=Variable set: reports_API_version = v1beta2)
+ok: [WIN-1] => (item=Variable set: metrics_configurations_API_version = v1beta1)
+ok: [WIN-2] => (item=Variable set: metrics_configurations_API_version = v1beta1)
+ok: [WIN-1] => (item=Variable set: jobs_API_version = v1beta2)
+ok: [WIN-2] => (item=Variable set: jobs_API_version = v1beta2)
+ok: [WIN-1] => (item=Variable set: jobs_API_version = v1beta3)
+ok: [WIN-2] => (item=Variable set: jobs_API_version = v1beta3)
+ok: [WIN-1] => (item=Variable set: job_templates_API_version = v1beta2)
+ok: [WIN-2] => (item=Variable set: job_templates_API_version = v1beta2)
+ok: [WIN-1] => (item=Variable set: groups_API_version = v1beta2)
+ok: [WIN-2] => (item=Variable set: groups_API_version = v1beta2)
+ok: [WIN-1] => (item=Variable set: firmware_bundles_API_version = v1beta2)
+ok: [WIN-2] => (item=Variable set: firmware_bundles_API_version = v1beta2)
+ok: [WIN-1] => (item=Variable set: filters_API_version = v1beta1)
+ok: [WIN-2] => (item=Variable set: filters_API_version = v1beta1)
+ok: [WIN-1] => (item=Variable set: external_services_API_version = v1beta1)
+ok: [WIN-2] => (item=Variable set: external_services_API_version = v1beta1)
+ok: [WIN-1] => (item=Variable set: activities_API_version = v1beta2)
+ok: [WIN-2] => (item=Variable set: activities_API_version = v1beta2)
+
+TASK [Capture all job templates] ************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Set a variable for all job templates items] *******************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Set variables for each job templates] *************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => (item=Variable set: ApplianceReconnect_job_template_resourceUri = /compute-ops/v1beta2/job-templates/0e818877-5a9a-4ea9-8978-8391270fbaba)
+ok: [WIN-2] => (item=Variable set: ApplianceReconnect_job_template_resourceUri = /compute-ops/v1beta2/job-templates/0e818877-5a9a-4ea9-8978-8391270fbaba)
+ok: [WIN-1] => (item=Variable set: ApplySettingsTemplate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
+ok: [WIN-2] => (item=Variable set: ApplySettingsTemplate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
+ok: [WIN-1] => (item=Variable set: ColdBoot_job_template_resourceUri = /compute-ops/v1beta2/job-templates/aacfb3e0-6575-4d4f-a711-1ee1ae768407)
+ok: [WIN-2] => (item=Variable set: ColdBoot_job_template_resourceUri = /compute-ops/v1beta2/job-templates/aacfb3e0-6575-4d4f-a711-1ee1ae768407)
+ok: [WIN-1] => (item=Variable set: CopyServerProfileTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
+ok: [WIN-2] => (item=Variable set: CopyServerProfileTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
+ok: [WIN-1] => (item=Variable set: CreateOneviewComplianceReport_job_template_resourceUri = /compute-ops/v1beta2/job-templates/aae145a1-79a2-4516-b191-c98039c96542)
+ok: [WIN-2] => (item=Variable set: CreateOneviewComplianceReport_job_template_resourceUri = /compute-ops/v1beta2/job-templates/aae145a1-79a2-4516-b191-c98039c96542)
+ok: [WIN-1] => (item=Variable set: DataRoundupReportOrchestrator_job_template_resourceUri = /compute-ops/v1beta2/job-templates/b0001d36-6490-48ac-93af-a87adfb997ed)
+ok: [WIN-1] => (item=Variable set: FirmwareUpdate_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/fd54a96c-cabc-42e3-aee3-374a2d009dba)
+ok: [WIN-2] => (item=Variable set: DataRoundupReportOrchestrator_job_template_resourceUri = /compute-ops/v1beta2/job-templates/b0001d36-6490-48ac-93af-a87adfb997ed)
+ok: [WIN-1] => (item=Variable set: GetExpandedSPT_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d17898e6-6907-491e-8430-7c2da795d2e5)
+ok: [WIN-2] => (item=Variable set: FirmwareUpdate_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/fd54a96c-cabc-42e3-aee3-374a2d009dba)
+ok: [WIN-1] => (item=Variable set: GetFullServerInventory_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d6595f1b-84e6-4587-ade5-656e2a5ea20d)
+ok: [WIN-2] => (item=Variable set: GetExpandedSPT_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d17898e6-6907-491e-8430-7c2da795d2e5)
+ok: [WIN-1] => (item=Variable set: GetOneviewServerInventory_job_template_resourceUri = /compute-ops/v1beta2/job-templates/a0124cb1-00f1-46b7-818f-a9eb5f60591f)
+ok: [WIN-2] => (item=Variable set: GetFullServerInventory_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d6595f1b-84e6-4587-ade5-656e2a5ea20d)
+ok: [WIN-1] => (item=Variable set: GetOneViewSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/fc16aa48-c73c-4463-9112-e061383ebfa9)
+ok: [WIN-2] => (item=Variable set: GetOneviewServerInventory_job_template_resourceUri = /compute-ops/v1beta2/job-templates/a0124cb1-00f1-46b7-818f-a9eb5f60591f)
+ok: [WIN-1] => (item=Variable set: GetPowerMeterData_job_template_resourceUri = /compute-ops/v1beta2/job-templates/50fa7d05-5941-4e8e-90c3-5995f1d600a8)
+ok: [WIN-2] => (item=Variable set: GetOneViewSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/fc16aa48-c73c-4463-9112-e061383ebfa9)
+ok: [WIN-1] => (item=Variable set: GetSettingsForTemplate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/6cd671db-ce6b-45ce-894e-7b5ae23e0399)
+ok: [WIN-2] => (item=Variable set: GetPowerMeterData_job_template_resourceUri = /compute-ops/v1beta2/job-templates/50fa7d05-5941-4e8e-90c3-5995f1d600a8)
+ok: [WIN-1] => (item=Variable set: GetSSOUrl_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2c7de503-77af-4340-b68d-7a26e5359b8e)
+ok: [WIN-2] => (item=Variable set: GetSettingsForTemplate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/6cd671db-ce6b-45ce-894e-7b5ae23e0399)
+ok: [WIN-1] => (item=Variable set: GroupApplyOneviewSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/a229a162-b43f-45b0-b7bb-692df77b9746)
+ok: [WIN-2] => (item=Variable set: GetSSOUrl_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2c7de503-77af-4340-b68d-7a26e5359b8e)
+ok: [WIN-1] => (item=Variable set: GroupApplyServerSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/beff07ce-f36d-4699-9ac3-f872dcd63133)
+ok: [WIN-2] => (item=Variable set: GroupApplyOneviewSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/a229a162-b43f-45b0-b7bb-692df77b9746)
+ok: [WIN-1] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/db3620d4-19a4-4b54-9804-83f8f59d48a4)
+ok: [WIN-2] => (item=Variable set: GroupApplyServerSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/beff07ce-f36d-4699-9ac3-f872dcd63133)
+ok: [WIN-1] => (item=Variable set: GroupFirmwareCompliance_job_template_resourceUri = /compute-ops/v1beta2/job-templates/23b8ba2a-6c46-4223-b028-919382c7dcac)
+ok: [WIN-2] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/db3620d4-19a4-4b54-9804-83f8f59d48a4)
+ok: [WIN-1] => (item=Variable set: GroupFirmwareUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
+ok: [WIN-2] => (item=Variable set: GroupFirmwareCompliance_job_template_resourceUri = /compute-ops/v1beta2/job-templates/23b8ba2a-6c46-4223-b028-919382c7dcac)
+ok: [WIN-1] => (item=Variable set: GroupGetIloSecurityParams_job_template_resourceUri = /compute-ops/v1beta2/job-templates/08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
+ok: [WIN-2] => (item=Variable set: GroupFirmwareUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
+ok: [WIN-1] => (item=Variable set: GroupOSInstallation_job_template_resourceUri = /compute-ops/v1beta2/job-templates/e2952628-2629-4088-93db-91742304ef0c)
+ok: [WIN-2] => (item=Variable set: GroupGetIloSecurityParams_job_template_resourceUri = /compute-ops/v1beta2/job-templates/08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
+ok: [WIN-1] => (item=Variable set: GroupServerInventoryReport_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
+ok: [WIN-2] => (item=Variable set: GroupOSInstallation_job_template_resourceUri = /compute-ops/v1beta2/job-templates/e2952628-2629-4088-93db-91742304ef0c)
+ok: [WIN-1] => (item=Variable set: GroupStorageVolumeConfiguration_job_template_resourceUri = /compute-ops/v1beta2/job-templates/c708eb57-235d-4ea8-9e21-8ceea2438773)
+ok: [WIN-2] => (item=Variable set: GroupServerInventoryReport_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
+ok: [WIN-1] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/94caa4ef-9ff8-4805-9e97-18a09e673b66)
+ok: [WIN-2] => (item=Variable set: GroupStorageVolumeConfiguration_job_template_resourceUri = /compute-ops/v1beta2/job-templates/c708eb57-235d-4ea8-9e21-8ceea2438773)
+ok: [WIN-1] => (item=Variable set: iLOSecurity_job_template_resourceUri = /compute-ops/v1beta2/job-templates/e1d69e76-38cc-4079-9192-a380baea2973)
+ok: [WIN-2] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/94caa4ef-9ff8-4805-9e97-18a09e673b66)
+ok: [WIN-1] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/abfda355-6e58-4c00-be0a-af35dbd70398)
+ok: [WIN-2] => (item=Variable set: iLOSecurity_job_template_resourceUri = /compute-ops/v1beta2/job-templates/e1d69e76-38cc-4079-9192-a380baea2973)
+ok: [WIN-1] => (item=Variable set: PowerOff_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
+ok: [WIN-2] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/abfda355-6e58-4c00-be0a-af35dbd70398)
+ok: [WIN-1] => (item=Variable set: PowerOn_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/0cbb2377-1834-488d-840c-d5bf788c34fb)
+ok: [WIN-2] => (item=Variable set: PowerOff_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
+ok: [WIN-1] => (item=Variable set: Restart_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/30110551-cad6-4069-95b8-dbce9bbd8525)
+ok: [WIN-2] => (item=Variable set: PowerOn_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/0cbb2377-1834-488d-840c-d5bf788c34fb)
+ok: [WIN-1] => (item=Variable set: ServerNetworkConnectivity_job_template_resourceUri = /compute-ops/v1beta2/job-templates/b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
+ok: [WIN-2] => (item=Variable set: Restart_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/30110551-cad6-4069-95b8-dbce9bbd8525)
+ok: [WIN-1] => (item=Variable set: SetIloSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/cf4f929b-d44a-4a90-93a9-820955458fd4)
+ok: [WIN-2] => (item=Variable set: ServerNetworkConnectivity_job_template_resourceUri = /compute-ops/v1beta2/job-templates/b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
+ok: [WIN-1] => (item=Variable set: SppUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2626e682-7bd4-40e3-b93a-745133deecd2)
+ok: [WIN-2] => (item=Variable set: SetIloSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/cf4f929b-d44a-4a90-93a9-820955458fd4)
+ok: [WIN-2] => (item=Variable set: SppUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2626e682-7bd4-40e3-b93a-745133deecd2)
+
+TASK [Capture server 'CZ2311004H' information] **********************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Exit if server 'CZ2311004H' does not exist] *******************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Capture server 'CZ2311004H' generation, id, uri, connection status and iLO IP] ********************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "msg": [
+        "Generation: GEN_10",
+        "ID: P28948-B21+CZ2311004H",
+        "URI: /compute-ops/v1beta2/servers/P28948-B21+CZ2311004H",
+        "Connection status: True",
+        "iLO IP: 192.168.0.21"
+    ]
+}
+ok: [WIN-2] => {
+    "msg": [
+        "Generation: GEN_10",
+        "ID: P28948-B21+CZ2311004G",
+        "URI: /compute-ops/v1beta2/servers/P28948-B21+CZ2311004G",
+        "Connection status: True",
+        "iLO IP: 192.168.0.20"
+    ]
+}
+
+TASK [Exit if server 'CZ2311004H' is not connected to COM] **********************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Wait until the server 'CZ2311004H' raw inventory information is available (necessary when the server has recently been added to COM) then capture the data] ***************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Wait until the complete discovery of server 'CZ2311004H' is complete (necessary when the server has recently been added to COM).] *****************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Check if workload profile 'Virtualization - Power Efficient' exists] ******************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Exit if workload profile 'Virtualization - Power Efficient' does not exist] ***********************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Set a variable for the resourceUri of workload profile 'Virtualization - Power Efficient'] ********************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Wait until PCI devices information is available then capture the server 'CZ2311004H' raw inventory information] ***********************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Capture the presence of a NS204i NVMe boot controller in server 'CZ2311004H'] *********************************************************************************************************************************************************************************************************
+ok: [WIN-1] => (item=never)
+skipping: [WIN-1] => (item=never) 
+skipping: [WIN-2] => (item=never) 
+skipping: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "msg": "NS204i found in server 'CZ2311004H'! NVMe RAID1 volume will be used as the target volume for the installation of Windows!"
+}
+skipping: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2] => {
+    "msg": "No NS204i found in server 'CZ2311004G'! Let's check if a storage controller with drives is available..."
+}
+
+TASK [Capture size of the NS204i RAID1 volume if any] ***************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => (item=never)
+skipping: [WIN-1] => (item=never) 
+skipping: [WIN-2] => (item=never) 
+skipping: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-2]
+ok: [WIN-1] => {
+    "msg": "Size of NS204i volume: 447.1 GB"
+}
+
+TASK [Capture storage RAID controller information when an HPE MR or SR controller is used with available drives] ****************************************************************************************************************************************************************************
+skipping: [WIN-1] => (item=never) 
+skipping: [WIN-1] => (item=never) 
+skipping: [WIN-1]
+ok: [WIN-2] => (item=never)
+
+TASK [Set a variable for the name of the storage RAID controller found] *********************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2] => {
+    "msg": "Storage RAID controller found: 'HPE MR416i-a Gen10+' with '4' drives"
+}
+
+TASK [Exit when no NS204i and no SR/MR controller is found] *********************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Set a controller type variable for kickstart creation when a NS204i is present] *******************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Set a controller type variable for kickstart creation when there is no NS204i but an SR/MR controller is present.] ********************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "msg": "Controller type found that will be used by autounattend.xml: NS204i"
+}
+ok: [WIN-2] => {
+    "msg": "Controller type found that will be used by autounattend.xml: HPE MR416i-a Gen10+"
+}
+
+TASK [Check if server settings 'RAID1' already exist] ***************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2 -> localhost]
+
+TASK [Create internal storage configuration using 'RAID1' with a volume size of '-1' GB for the OS boot volume when it does not exist] ******************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Result of the 'RAID1' creation task] **************************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Set a variable for the resourceUri of the internal storage configuration 'RAID1' just created] ****************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Update internal storage configuration using 'RAID1' with a volume size of '-1' GB for the OS boot volume] *****************************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2 -> localhost]
+
+TASK [Result of the 'RAID1' update task] ****************************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2] => {
+    "internal_storage_server_setting_result.msg": "OK (462 bytes)"
+}
+
+TASK [Set a variable for the resourceUri of the internal storage configuration 'RAID1' just updated] ****************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2] => {
+    "internal_storage_server_setting_resourceuri": "/compute-ops/v1beta1/server-settings/378bd822-db05-419b-abd2-e63ce2ad10bf"
+}
+
+TASK [Create server group name 'WIN-1_server_group' variable] *******************************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Check if group 'WIN-1_server_group' already exists] ***********************************************************************************************************************************************************************************************************************************
+ok: [WIN-2 -> localhost]
+ok: [WIN-1 -> localhost]
+
+TASK [Create temporary group 'WIN-1_server_group' with no local storage configuration definition (if it does not exist)] ********************************************************************************************************************************************************************
+skipping: [WIN-2]
+ok: [WIN-1 -> localhost]
+
+TASK [Display response of the temporary group 'WIN-1_server_group' creation request] ********************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "server_group_result.msg": "OK (1048 bytes)"
+}
+skipping: [WIN-2]
+
+TASK [Set variables for the id and the resourceUri of temporary group 'WIN-1_server_group' just created] ************************************************************************************************************************************************************************************
+ok: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Update temporary group 'WIN-1_server_group' with no local storage configuration definition (if it does exist)] ************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Display response of the temporary group 'WIN-1_server_group' update request] **********************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Set variables for the id and the resourceUri of temporary group 'WIN-1_server_group' just updated] ************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Create temporary group 'WIN-1_server_group' with local storage configuration definition (if it does not exist)] ***********************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2 -> localhost]
+
+TASK [Display response of the temporary group 'WIN-1_server_group' creation request] ********************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2] => {
+    "server_group_result.msg": "OK (1136 bytes)"
+}
+
+TASK [Set variables for the id and the resourceUri of temporary group 'WIN-1_server_group' just created] ************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2]
+
+TASK [Update temporary group 'WIN-1_server_group' with local storage configuration definition (if it does exist)] ***************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Display response of the temporary group 'WIN-1_server_group' update request] **********************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Set variables for the id and the resourceUri of temporary group 'WIN-1_server_group' just updated] ************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "temporary_group_id": "e547b476-9318-4230-ac03-cd136c48bc74"
+}
+ok: [WIN-2] => {
+    "temporary_group_id": "09ca30aa-35ba-4c8d-aee3-ed506d059b5a"
+}
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "temporary_group_resourceuri": "/compute-ops/v1beta2/groups/e547b476-9318-4230-ac03-cd136c48bc74"
+}
+ok: [WIN-2] => {
+    "temporary_group_resourceuri": "/compute-ops/v1beta2/groups/09ca30aa-35ba-4c8d-aee3-ed506d059b5a"
+}
+
+TASK [Check if server 'CZ2311004H' is already member of a server group] *********************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "server_info_from_ui_doorway.json.group_": ""
+}
+ok: [WIN-2] => {
+    "server_info_from_ui_doorway.json.group_": ""
+}
+
+TASK [Capture the id of the server group of which the server 'CZ2311004H' is a member (if applicable)] **************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Remove server 'CZ2311004H' from the server group of which it is currently a member] ***************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Wait for deletion to complete] ********************************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+
+TASK [Assign server 'CZ2311004H' to temporary group 'WIN-1_server_group'] *******************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Display response of the group assignment task] ****************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "group_assignment_result.msg": "OK (517 bytes)"
+}
+ok: [WIN-2] => {
+    "group_assignment_result.msg": "OK (518 bytes)"
+}
+
+TASK [Wait for the configuration of server 'CZ2311004H' to complete] ************************************************************************************************************************************************************************************************************************
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the configuration of server 'CZ2311004H' to complete (30 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the configuration of server 'CZ2311004G' to complete (30 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the configuration of server 'CZ2311004G' to complete (29 retries left).
+ok: [WIN-1 -> localhost]
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the configuration of server 'CZ2311004G' to complete (28 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the configuration of server 'CZ2311004G' to complete (27 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the configuration of server 'CZ2311004G' to complete (26 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the configuration of server 'CZ2311004G' to complete (25 retries left).
+ok: [WIN-2 -> localhost]
+
+TASK [Exit if configuration of server 'CZ2311004H' failed to complete] **********************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Capture server 'CZ2311004H' raw inventory information] ********************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2 -> localhost]
+
+TASK [Capture storage RAID controller information when an HPE MR or SR controller is used with available drives] ****************************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2] => (item=never)
+
+TASK [Capture the size of the OS volume configured on the {{ storage_controller_name }}] ****************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "boot_drive_bytes_size": "480036519936"
+}
+ok: [WIN-2] => {
+    "boot_drive_bytes_size": "599584145408"
+}
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2] => {
+    "msg": "Size of RAID volume: 558.4 GB"
+}
+
+TASK [Check if WinPE image ISO file 'WinPEx64.iso' exists in '/home/labrat/ISOs/windowsisosrc' on 'ansible.lj.lab'] *************************************************************************************************************************************************************************
+ok: [WIN-2 -> localhost]
+ok: [WIN-1 -> localhost]
+
+TASK [Create the directory '/home/labrat/ISOs/windowsisosrc' to host the WinPE ISO file on 'ansible.lj.lab'] ********************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Check if WinPE image ISO 'https://liogw.lj.lab/deployment/WinPEx64.iso' exists] *******************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Download file 'WinPEx64.iso' to 'ansible.lj.lab' in '/home/labrat/ISOs/windowsisosrc' if not present] *********************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Create '/mnt/WIN-1-WinPE' on 'ansible.lj.lab'] ****************************************************************************************************************************************************************************************************************************************
+ok: [WIN-2 -> localhost]
+ok: [WIN-1 -> localhost]
+
+TASK [Create '/home/labrat/staging/baremetal/WIN-1-WinPE/' on 'ansible.lj.lab' if it does not exist] ****************************************************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Mount WinPE ISO '/home/labrat/ISOs/windowsisosrc/WinPEx64.iso' to '/mnt/WIN-1-WinPE/'] ************************************************************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Copy WinPE files to '/home/labrat/staging/baremetal/WIN-1-WinPE/' on 'ansible.lj.lab'] ************************************************************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Unmount directory '/mnt/WIN-1-WinPE'] *************************************************************************************************************************************************************************************************************************************************
+changed: [WIN-2 -> localhost]
+changed: [WIN-1 -> localhost]
+
+TASK [Create autounattend.xml file with customized values in '/home/labrat/staging/baremetal/WIN-1-WinPE/'] *********************************************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Copying HPE AMS package file to WIN-1] ************************************************************************************************************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Copying HPE iLO CHIF driver package file to WIN-1] ************************************************************************************************************************************************************************************************************************************
+changed: [WIN-2 -> localhost]
+changed: [WIN-1 -> localhost]
+
+TASK [Create 'Pre_installation_script.ps1' in WinPE root to start the OS installation] ******************************************************************************************************************************************************************************************************
+changed: [WIN-2 -> localhost]
+changed: [WIN-1 -> localhost]
+
+TASK [Add `Pre_installation_script.ps1` to the boot.wim image] ******************************************************************************************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Remove `Pre_installation_script.ps1` from WinPE root] *********************************************************************************************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Create 'Run_Pre_installation_script.cmd' in WinPE root to run the PowerShell scripts and then start the unattend installation of Windows server] **************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Add `Run_Pre_installation_script.cmd` to the boot.wim image] **************************************************************************************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Remove `Run_Pre_installation_script.cmd` from WinPE root] *****************************************************************************************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Inject 'efisys_noprompt.bin' to 'efi/microsoft/boot/' to avoid the Press any key to boot from CD message during the WinPE boot] *******************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Set permissions to allow the user running the Ansible playbook to delete the folder '/home/labrat/staging/baremetal/WIN-1-WinPE'] *****************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Creating customized bootable WinPE ISO in "/home/labrat/staging/baremetal/WIN-1-WinPE/"] **********************************************************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Create '/usr/share/nginx/html/isos/' on 'ansible.lj.lab' if it does not exist] ********************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Move created WinPE ISO to the nginx default html folder. ISO URL='http://ansible.lj.lab/isos/WIN-1-WinPE.iso'] ************************************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Update SELinux security contexts so that Nginx is allowed to serve content from the '/usr/share/nginx/html/isos/' directory.] *********************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Check if the operating system image server setting 'OS_Image_WIN2022_for_WIN-1' exists] ***********************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Create an operating system image server setting 'OS_Image_WIN2022_for_WIN-1' if it does not exist] ************************************************************************************************************************************************************************************
+ok: [WIN-2 -> localhost]
+ok: [WIN-1 -> localhost]
+
+TASK [Result of the 'OS_Image_WIN2022_for_WIN-1' creation task] *****************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "OS_image_server_setting_result.msg": "OK (482 bytes)"
+}
+ok: [WIN-2] => {
+    "OS_image_server_setting_result.msg": "OK (482 bytes)"
+}
+
+TASK [Set variables for the id and the resourceUri of the OS Image configuration 'OS_Image_WIN2022_for_WIN-1' just created] *****************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Update the operating system image server setting 'OS_Image_WIN2022_for_WIN-1' if it does not exist] ***********************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Result of the 'OS_Image_WIN2022_for_WIN-1' update task] *******************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Set variables for the id and the resourceUri of the OS Image configuration 'OS_Image_WIN2022_for_WIN-1' just updated] *****************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "OS_image_server_setting_resourceuri": "/compute-ops/v1beta1/server-settings/8280fe8c-1645-443d-a876-acdc6c841b5c"
+}
+ok: [WIN-2] => {
+    "OS_image_server_setting_resourceuri": "/compute-ops/v1beta1/server-settings/1ffadaa8-3d4e-4672-80f1-e57162453b37"
+}
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "OS_image_server_setting_id": "8280fe8c-1645-443d-a876-acdc6c841b5c"
+}
+ok: [WIN-2] => {
+    "OS_image_server_setting_id": "1ffadaa8-3d4e-4672-80f1-e57162453b37"
+}
+
+TASK [Update temporary group 'WIN-1_server_group' to add OS image installation settings with NS204i] ****************************************************************************************************************************************************************************************
+skipping: [WIN-2]
+ok: [WIN-1 -> localhost]
+
+TASK [Display response of the group 'WIN-1_server_group' update request with NS204i] ********************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "server_group_result.msg": "OK (1627 bytes)"
+}
+skipping: [WIN-2]
+
+TASK [Update temporary group 'WIN-1_server_group' to add OS image installation settings with storage controller (without NS204i)] ***********************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2 -> localhost]
+
+TASK [Display response of the group 'WIN-1_server_group' update request with storage controller] ********************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+ok: [WIN-2] => {
+    "server_group_result.msg": "OK (1715 bytes)"
+}
+
+TASK [Start OS image installation in group 'WIN-1_server_group'] ****************************************************************************************************************************************************************************************************************************
+ok: [WIN-2 -> localhost]
+ok: [WIN-1 -> localhost]
+
+TASK [Display response of the OS image installation request in group 'WIN-1_server_group'] **************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "group_os_installation_result.msg": "OK (958 bytes)"
+}
+ok: [WIN-2] => {
+    "group_os_installation_result.msg": "OK (958 bytes)"
+}
+
+TASK [Wait for the OS image installation of server 'CZ2311004H' to complete] ****************************************************************************************************************************************************************************************************************
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (60 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (60 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (59 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (59 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (58 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (58 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (57 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (57 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (56 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (56 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (55 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (55 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (54 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (54 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (53 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (53 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (52 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (52 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (51 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (51 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (50 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (50 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (49 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (49 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (48 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (48 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (47 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (47 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (46 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (46 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (45 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (45 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (44 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (44 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (43 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (43 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (42 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (42 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (41 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (41 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (40 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (40 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (39 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (39 retries left).
+ok: [WIN-1 -> localhost]
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (38 retries left).
+FAILED - RETRYING: [WIN-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (37 retries left).
+ok: [WIN-2 -> localhost]
+
+TASK [Exit if operating system image installation task of server 'CZ2311004H' failed to complete] *******************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Unassign server 'CZ2311004H' from temporary group 'WIN-1_server_group'] ***************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Wait for deletion to complete] ********************************************************************************************************************************************************************************************************************************************************
+Pausing for 15 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [WIN-1]
+
+TASK [Display response of the temporary group unassignment task] ****************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "group_unassignment_result.msg": "OK (0 bytes)"
+}
+ok: [WIN-2] => {
+    "group_unassignment_result.msg": "OK (0 bytes)"
+}
+
+TASK [Delete temporary group 'WIN-1_server_group'] ******************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Display response of the temporary group deletion task] ********************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "server_group_deletion_result.msg": "OK (0 bytes)"
+}
+ok: [WIN-2] => {
+    "server_group_deletion_result.msg": "OK (0 bytes)"
+}
+
+TASK [Delete operating system image server setting 'OS_Image_WIN2022_for_WIN-1'] ************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Display response of the operating system image server setting deletion task] **********************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "OS_image_server_setting_deletion_result.msg": "OK (0 bytes)"
+}
+ok: [WIN-2] => {
+    "OS_image_server_setting_deletion_result.msg": "OK (0 bytes)"
+}
+
+TASK [Create a kickstart backup directory if it does not exist] *****************************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Create a backup of the unattend file named 'WIN-1_unattend.xml' in '/home/labrat/staging/kickstarts_backup/WIN' folder] ***************************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Delete all related files from staging location and nginx web server folder] ***********************************************************************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+PLAY [DNS record for the bare metal Windows server] *****************************************************************************************************************************************************************************************************************************************
+
+TASK [Add 'WIN-1' with '192.168.3.178' on 'dc.lj.lab' in 'lj.lab' DNS domain] ***************************************************************************************************************************************************************************************************************
+changed: [WIN-2 -> dc.lj.lab]
+changed: [WIN-1 -> dc.lj.lab]
+
+PLAY [Installing SUT on the server for online installation of HPE drivers and software] *****************************************************************************************************************************************************************************************************
+
+TASK [Collecting product_id found in install.xml file of the HPE Integrated Smart Update Tools (HPE SUT) package] ***************************************************************************************************************************************************************************
+changed: [WIN-1 -> localhost]
+changed: [WIN-2 -> localhost]
+
+TASK [Copy HPE SUT package 'iSUT-4.6.0.0-cp058255.exe' to 'WIN-1'] **************************************************************************************************************************************************************************************************************************
+changed: [WIN-1]
+changed: [WIN-2]
+
+TASK [Install HPE SUT on 'WIN-1'] ***********************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Wait for HPE SUT to be installed] *****************************************************************************************************************************************************************************************************************************************************
+changed: [WIN-1]
+changed: [WIN-2]
+
+TASK [Initiate HPE SUT service] *************************************************************************************************************************************************************************************************************************************************************
+changed: [WIN-1]
+changed: [WIN-2]
+
+TASK [Rebooting the server as required after installing HPE SUT] ****************************************************************************************************************************************************************************************************************************
+changed: [WIN-1]
+changed: [WIN-2]
+
+TASK [Wait for HPE SUT service to be in the 'Running' state] ********************************************************************************************************************************************************************************************************************************
+FAILED - RETRYING: [WIN-1]: Wait for HPE SUT service to be in the 'Running' state (10 retries left).
+FAILED - RETRYING: [WIN-2]: Wait for HPE SUT service to be in the 'Running' state (10 retries left).
+FAILED - RETRYING: [WIN-1]: Wait for HPE SUT service to be in the 'Running' state (9 retries left).
+FAILED - RETRYING: [WIN-2]: Wait for HPE SUT service to be in the 'Running' state (9 retries left).
+FAILED - RETRYING: [WIN-1]: Wait for HPE SUT service to be in the 'Running' state (8 retries left).
+FAILED - RETRYING: [WIN-2]: Wait for HPE SUT service to be in the 'Running' state (8 retries left).
+changed: [WIN-1]
+changed: [WIN-2]
+
+TASK [Fail if HPE SUT Service status is not running] ****************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Check HPE AMS service status] *********************************************************************************************************************************************************************************************************************************************************
+changed: [WIN-2]
+changed: [WIN-1]
+
+TASK [Display the HPE AMS Service status] ***************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "msg": "Running"
+}
+ok: [WIN-2] => {
+    "msg": "Running"
+}
+
+TASK [Fail if HPE AMS Service status is not running] ****************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Joining domain lj.lab] ****************************************************************************************************************************************************************************************************************************************************************
+changed: [WIN-2]
+changed: [WIN-1]
+
+TASK [Set fact for the first host in inventory] *********************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Collect firmware bundles] *************************************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-2]
+ok: [WIN-1 -> localhost]
+
+TASK [Set variable for Gen10 firmware bundle '2023.09.00.00'] *******************************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Exit if Gen10 firmware bundle '2023.09.00.00' does not exist] *************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "Gen10_10p_firmware_bundle_ID": "275a59f78916400a761e4bf8c6958934"
+}
+skipping: [WIN-2]
+
+TASK [Set variable for '2023.09.00.01' associated patch for Gen10 firmware bundle '2023.09.00.00'] ******************************************************************************************************************************************************************************************
+ok: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Exit if Gen10 associated patch '2023.09.00.01' does not exist] ************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "Gen10_10p_patch_firmware_ID": "e3cfbf02d95c27e4aa5a4f824c032053"
+}
+skipping: [WIN-2]
+
+TASK [Set variable for Gen11 firmware bundle '2023.04.00.00'] *******************************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Exit if Gen11 firmware bundle '2023.04.00.00' does not exist] *************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "Gen11_firmware_bundle_ID": "3e52bf7808fe5dbcbeac021e2bd06e32"
+}
+skipping: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Set variable for '' associated patch for Gen11 firmware bundle '2023.04.00.00'] *******************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Exit if Gen11 associated patch '' does not exist] *************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Set the final variable value for the Gen10 firmware bundle ID] ************************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Set the final variable value for the Gen11 firmware bundle ID] ************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Fail if the firmware baselines for Gen10/Gen10+ and Gen11 servers could not be found.] ************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Fail if the firmware baseline for Gen10/Gen10+ servers could not be found.] ***********************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Fail if the firmware baseline for Gen11 servers could not be found.] ******************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Set firmware bundle id for Gen10/Gen10+ server] ***************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Set firmware bundle id for Gen11 server] **********************************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "bundle_id": "e3cfbf02d95c27e4aa5a4f824c032053"
+}
+skipping: [WIN-2]
+
+TASK [Check if the firmware server setting 'Windows Server firmware baseline' exists] *******************************************************************************************************************************************************************************************************
+skipping: [WIN-2]
+ok: [WIN-1 -> localhost]
+
+TASK [Create the firmware server setting 'Windows Server firmware baseline'] ****************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Display response of the firmware server setting 'Windows Server firmware baseline' creation request] **********************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Set variable for the resourceuri of the firmware server setting 'Windows Server firmware baseline' just created] **********************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Update the firmware server setting 'Windows Server firmware baseline'] ****************************************************************************************************************************************************************************************************************
+skipping: [WIN-2]
+ok: [WIN-1 -> localhost]
+
+TASK [Display response of the firmware server setting 'Windows Server firmware baseline' update task] ***************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "firmware_server_setting_result.msg": "OK (533 bytes)"
+}
+skipping: [WIN-2]
+
+TASK [Set variable for the resourceuri of the firmware server setting 'Windows Server firmware baseline' just updated] **********************************************************************************************************************************************************************
+skipping: [WIN-2]
+ok: [WIN-1]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "firmware_server_setting_resourceuri": "/compute-ops/v1beta1/server-settings/b0a6ddaa-d6c1-48f0-af27-6e2315b6944c"
+}
+skipping: [WIN-2]
+
+TASK [Check if definitive group 'WIN_group' already exist] **********************************************************************************************************************************************************************************************************************************
+skipping: [WIN-2]
+ok: [WIN-1 -> localhost]
+
+TASK [Create definitive group 'WIN_group' if it does not exist] *****************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Display response of the definitive group 'WIN_group' creation request] ****************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Set variables for the id and the resourceUri of the definitive group 'WIN_group' just created] ****************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Update definitive group 'WIN_group' if it does exist] *********************************************************************************************************************************************************************************************************************************
+skipping: [WIN-2]
+ok: [WIN-1 -> localhost]
+
+TASK [Display response of the group 'WIN_group' update request] *****************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "definitive_server_group_result.msg": "OK (1076 bytes)"
+}
+skipping: [WIN-2]
+
+TASK [Set variables for the id and the resourceUri of the existing definitive group 'WIN_group' just updated] *******************************************************************************************************************************************************************************
+skipping: [WIN-2]
+ok: [WIN-1]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "definitive_group_id": "3652ee7d-362d-40dc-9b02-a6b2c7c5feba"
+}
+skipping: [WIN-2]
+
+TASK [debug] ********************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "definitive_group_resourceuri": "/compute-ops/v1beta2/groups/3652ee7d-362d-40dc-9b02-a6b2c7c5feba"
+}
+skipping: [WIN-2]
+
+TASK [Gather subset facts on localhost] *****************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-2 -> localhost]
+ok: [WIN-1 -> localhost]
+
+TASK [Capture the start time of the firmware update (will be used later to filter COM activities, etc.)] ************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Display the start time of the firmware update] ****************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "msg": "2024-01-24T17:13:16Z"
+}
+ok: [WIN-2] => {
+    "msg": "2024-01-24T17:13:16Z"
+}
+
+TASK [Get definitive group 'WIN_group' information] *****************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Set variable for existing definitive group 'WIN_group' id] ****************************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Check if server 'CZ2311004H' is already member of definitive server group 'WIN_group'] ************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Assign server 'CZ2311004H' to definitive server group 'WIN_group'] ********************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Display response of the group assignment task] ****************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "group_assignment_result.msg": "OK (518 bytes)"
+}
+ok: [WIN-2] => {
+    "group_assignment_result.msg": "OK (518 bytes)"
+}
+
+TASK [Wait for assignment to truly complete] ************************************************************************************************************************************************************************************************************************************************
+Pausing for 15 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [WIN-1]
+
+TASK [Get definitive group 'WIN_group' information (first host only)] ***********************************************************************************************************************************************************************************************************************
+skipping: [WIN-2]
+ok: [WIN-1 -> localhost]
+
+TASK [Set fact for the list of server IDs member of the definitive server group (first host only)] ******************************************************************************************************************************************************************************************
+ok: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Display the server IDs found (first host only)] ***************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "server_ids": [
+        "P28948-B21+CZ2311004G",
+        "P28948-B21+CZ2311004H"
+    ]
+}
+skipping: [WIN-2]
+
+TASK [Create HPE Compute Ops Management session] ********************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Set variable access_token for the bearer token] ***************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Start a group firmware update job using the defined firmware baseline (first host only)] **********************************************************************************************************************************************************************************************
+skipping: [WIN-2]
+ok: [WIN-1 -> localhost]
+
+TASK [Display response of the group firmware update job (first host only)] ******************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "group_firmware_update_job.msg": "OK (1124 bytes)"
+}
+skipping: [WIN-2]
+
+TASK [Capture the resourceUri of the group firmware update job (first host only)] ***********************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Display the group firmware update job resource uri (first host only)] *****************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "group_firmware_update_job_resourceUri": "/compute-ops/v1beta3/jobs/47e87c1e-13e7-44bf-8dde-46bbe0b8d8a7"
+}
+skipping: [WIN-2]
+
+TASK [Wait for the group firmware update job to complete (first host only)] *****************************************************************************************************************************************************************************************************************
+skipping: [WIN-2]
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (600 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (599 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (598 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (597 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (596 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (595 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (594 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (593 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (592 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (591 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (590 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (589 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (588 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (587 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (586 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (585 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (584 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (583 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (582 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (581 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (580 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (579 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (578 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (577 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (576 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (575 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (574 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (573 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (572 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (571 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (570 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (569 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (568 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (567 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (566 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (565 retries left).
+FAILED - RETRYING: [WIN-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (564 retries left).
+ok: [WIN-1 -> localhost]
+
+TASK [Display the group firmware update job result (first host only)] ***********************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "msg": [
+        "State: COMPLETE",
+        "ResultCode: SUCCESS",
+        "Status: Complete"
+    ]
+}
+skipping: [WIN-2]
+
+TASK [Get the latest activity of server 'CZ2311004H'] ***************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Extract items containing 'Firmware update'] *******************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Display the firmware update activity status when successful] **************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "msg": [
+        "Message: Firmware update successful",
+        ""
+    ]
+}
+ok: [WIN-2] => {
+    "msg": [
+        "Message: Firmware update successful",
+        ""
+    ]
+}
+
+TASK [Display the firmware update activity status with recommanded actions when failed] *****************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Capture server information] ***********************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Capture last firmware update information] *********************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Display server last firmware update information if up-to-date] ************************************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "msg": {
+        "attemptedAt": "2024-01-24T17:15:20.586065+00:00",
+        "attemptedBaselineUri": "/v1/firmware-bundles/e3cfbf02d95c27e4aa5a4f824c032053",
+        "firmwareInventoryUpdates": [
+            {
+                "name": "Integrated Smart Update Tools for Windows x64",
+                "status": "OK",
+                "version": "4.5.0.0"
+            },
+            {
+                "name": "HPE MegaRAID Storage Administrator StorCLI for Windows 64-bit (",
+                "status": "OK",
+                "version": "7.2417.0.0"
+            },
+            {
+                "name": "HPE Storage Fibre Channel Adapter Kit for the x64 Emulex Storpo",
+                "status": "OK",
+                "version": "14.2.537.0"
+            },
+            {
+                "name": "Intel i350 Driver for Windows Server 2022",
+                "status": "OK",
+                "version": "13.0.13.0"
+            },
+            {
+                "name": "Matrox G200eH3 Video Controller Driver for Microsoft Windows 64",
+                "status": "OK",
+                "version": "9.15.1.248"
+            },
+            {
+                "name": "HPE MegaRAID Storage Administrator for Windows 64-bit (HPE MRSA",
+                "status": "OK",
+                "version": "8.4.16.0"
+            },
+            {
+                "name": "HPE MR416i-p, MR416i-o, MR216i-o, MR408i-o, MR216i-p Gen10 Plus",
+                "status": "OK",
+                "version": "7.724.2.0"
+            },
+            {
+                "name": "Identifiers for Intel Xeon Scalable Processors (Third Generatio",
+                "status": "OK",
+                "version": "10.1.19006.8299"
+            },
+            {
+                "name": "iLO 5 Automatic Server Recovery Driver for Microsoft Windows Se",
+                "status": "OK",
+                "version": "4.7.1.0"
+            },
+            {
+                "name": "HPE Lights-Out Online Configuration Utility for Windows x64 Edi",
+                "status": "OK",
+                "version": "6.0.0.0"
+            },
+            {
+                "name": "HPE Emulex Fibre Channel Smart SAN Enablement Kit for Host Bus ",
+                "status": "OK",
+                "version": "1.0.0.1"
+            }
+        ],
+        "status": "OK"
+    }
+}
+ok: [WIN-2] => {
+    "msg": {
+        "attemptedAt": "2024-01-24T17:15:20.643718+00:00",
+        "attemptedBaselineUri": "/v1/firmware-bundles/e3cfbf02d95c27e4aa5a4f824c032053",
+        "firmwareInventoryUpdates": [
+            {
+                "name": "Integrated Smart Update Tools for Windows x64",
+                "status": "OK",
+                "version": "4.5.0.0"
+            },
+            {
+                "name": "HPE MegaRAID Storage Administrator StorCLI for Windows 64-bit (",
+                "status": "OK",
+                "version": "7.2417.0.0"
+            },
+            {
+                "name": "HPE Storage Fibre Channel Adapter Kit for the x64 Emulex Storpo",
+                "status": "OK",
+                "version": "14.2.537.0"
+            },
+            {
+                "name": "Intel i350 Driver for Windows Server 2022",
+                "status": "OK",
+                "version": "13.0.13.0"
+            },
+            {
+                "name": "Matrox G200eH3 Video Controller Driver for Microsoft Windows 64",
+                "status": "OK",
+                "version": "9.15.1.248"
+            },
+            {
+                "name": "HPE MegaRAID Storage Administrator for Windows 64-bit (HPE MRSA",
+                "status": "OK",
+                "version": "8.4.16.0"
+            },
+            {
+                "name": "HPE MR416i-p, MR416i-o, MR216i-o, MR408i-o, MR216i-p Gen10 Plus",
+                "status": "OK",
+                "version": "7.724.2.0"
+            },
+            {
+                "name": "Identifiers for Intel Xeon Scalable Processors (Third Generatio",
+                "status": "OK",
+                "version": "10.1.19006.8299"
+            },
+            {
+                "name": "iLO 5 Automatic Server Recovery Driver for Microsoft Windows Se",
+                "status": "OK",
+                "version": "4.7.1.0"
+            },
+            {
+                "name": "HPE Lights-Out Online Configuration Utility for Windows x64 Edi",
+                "status": "OK",
+                "version": "6.0.0.0"
+            },
+            {
+                "name": "HPE Emulex Fibre Channel Smart SAN Enablement Kit for Host Bus ",
+                "status": "OK",
+                "version": "1.0.0.1"
+            }
+        ],
+        "status": "OK"
+    }
+}
+
+TASK [Force update of current timestamp] ****************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1 -> localhost]
+ok: [WIN-2 -> localhost]
+
+TASK [Get runtime] **************************************************************************************************************************************************************************************************************************************************************************
+ok: [WIN-1]
+ok: [WIN-2]
+
+TASK [Status of the OS installation with the firmware update with HPE drivers and software] *************************************************************************************************************************************************************************************************
+ok: [WIN-1] => {
+    "msg": [
+        "WIN-1.lj.lab installation and firmware update completed successfully!",
+        "OS is configured and running with the HPE drivers and software.",
+        "The provisioning task took 1:20:44."
+    ]
+}
+ok: [WIN-2] => {
+    "msg": [
+        "WIN-2.lj.lab installation and firmware update completed successfully!",
+        "OS is configured and running with the HPE drivers and software.",
+        "The provisioning task took 1:20:44."
+    ]
+}
+
+TASK [Status of the OS installation with the firmware update without HPE drivers and software] **********************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+TASK [Status of the OS installation with firmware update failure] ***************************************************************************************************************************************************************************************************************************
+skipping: [WIN-1]
+skipping: [WIN-2]
+
+PLAY RECAP **********************************************************************************************************************************************************************************************************************************************************************************
+WIN-1                      : ok=143  changed=29   unreachable=0    failed=0    skipped=67   rescued=0    ignored=0   
+WIN-2                      : ok=120  changed=29   unreachable=0    failed=0    skipped=87   rescued=0    ignored=0   

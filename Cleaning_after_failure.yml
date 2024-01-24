@@ -1,0 +1,36 @@
+---
+# Playbook that can be used after a failure of one of the provisioning playbook to clean up the staging folder and the ssh known_hosts file.
+# 
+# ansible-playbook Cleaning_after_failure.yml -K
+#
+#----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+- name: Deleting all files from staging folder and remove all hosts except localhost from SSH known_hosts on the Ansible control node
+  hosts: localhost      
+  # become: yes
+  vars:
+    home: "{{ lookup('env','HOME') }}"
+    staging_directory: "{{ home }}/staging"
+
+  tasks: 
+
+    - name: Delete all files from staging directory 
+      shell: 
+         /bin/rm -rf {{ staging_directory }}/baremetal/* 
+  
+    - name: Remove all hosts except localhost from known_hosts
+      ansible.builtin.lineinfile:
+        path: ~/.ssh/known_hosts
+        state: absent
+        regex: '^(?!localhost)\S+.*'
+
+
+  
+
+   
+
+
+
+  
