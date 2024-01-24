@@ -4,58 +4,103 @@ rootpw --iscrypted {{encrypted_root_password}}
 
 %include /tmp/DiskConfig
 
+
+# Network configuration 
+
 network --device=vmnic0 --bootproto=static --addvmportgroup=1 --ip={{os_ip_address}} --netmask={{netmask}} --gateway={{gateway}} --nameserver={{nameserver}} --hostname={{inventory_hostname}}   
 reboot   
 
-%pre --interpreter=busybox
+%pre --interpreter=busybox 
 
+# Redirect output to a log file 
+LOGFILE="/tmp/Pre_install.log"
+
+# Storage configuration - Drive selection and clearing existing partitions using drive size and storage controller type
 
 # Finding boot volume for the OS installation
 # Using minimum size difference between the server resource size and the list of disks to identify the correct one
 SIZEinBytes={{boot_drive_bytes_size}}
 CONTROLLER="{{Controller_type}}"
 
-if [ "$CONTROLLER" == "NS204i" ]; then
-    echo "The controller is a 'NS204i'"
+echo "SIZEinBytes=$SIZEinBytes" >> "${LOGFILE}" 2>&1
+
+SIZEinGigaBytes=$(($SIZEinBytes >> 30))
+
+echo "SIZEinGB=$SIZEinGigaBytes" >> "${LOGFILE}" 2>&1
+
+echo "CONTROLLER=$CONTROLLER" >> "${LOGFILE}" 2>&1
+
+if echo "$CONTROLLER" | grep -q "NS204i"; then
+    # echo "The controller is an 'NS204i'" >> "${LOGFILE}" 2>&1
     INDEX="t*"
 fi
 
-if [ "$CONTROLLER" == "SR/MR controller" ]; then
-    echo "The controller is a 'SR/MR controller'"
+if echo "$CONTROLLER" | grep -q "SR"; then
+    # echo "The controller is an 'SR controller'" >> "${LOGFILE}" 2>&1
     INDEX="n*"
-fi
+fi 
 
-SIZEinGB=$((SIZEinBytes / (1024 * 1024 * 1024)))
+if echo "$CONTROLLER" | grep -q "MR"; then
+    echo "The controller is an 'MR controller'" >> "${LOGFILE}" 2>&1
+    INDEX="n*"
+fi 
 
-MINDELTA=100
+echo "INDEX=$INDEX" >> "${LOGFILE}" 2>&1
+
+
+# Minimum delta between COM value and volume found in bytes
+MINDELTA=1000000  # 1MB
 DRIVESIZE=""
 
-for DISK in `ls /vmfs/devices/disks/$INDEX | grep -v ":"`; do
+for DISK in $(ls /vmfs/devices/disks/$INDEX | grep -v ":"); do
+    echo "" >> "${LOGFILE}" 2>&1
     VML=$(echo $DISK | awk '{ print substr ($0, 21 ) }')
     VSIZE=$(localcli storage core device list -d $VML  | sed -n 5p |  awk '{ print substr ($0, 10 ) }')
+    echo "VML = $VML" >> "${LOGFILE}" 2>&1
+    # echo "VSIZE = $VSIZE" >> "${LOGFILE}" 2>&1
+
+    VSIZEinBytes=$(($VSIZE * 1024 * 1024))
+    echo "VSIZEinBytes = $VSIZEinBytes" >> "${LOGFILE}" 2>&1
+    
     # If $VSIZE is not null and not equal to zero
     if [[ -n $VSIZE && $VSIZE -ne 0 ]]; then
-        DETAIL=$(esxcli storage core device list -d $VML)
+
         GB=$(($VSIZE/1024))
-        echo "Size = $GB GB"
-        DELTA=$(( $GB - $SIZEinGB ))
-        if [ "$DELTA" -lt 0 ]; then
+        echo "VSIZEinGB = $GB" >> "${LOGFILE}" 2>&1
+
+        DELTA=$(( $VSIZEinBytes - $SIZEinBytes ))
+        echo "DELTA = $DELTA" >> "${LOGFILE}" 2>&1
+
+        if [[ $DELTA -lt 0 ]]; then
+            echo "" >> "${LOGFILE}" 2>&1
             DELTA=$((-DELTA))
+            echo "DELTA is less than 0=$DELTA" >> "${LOGFILE}" 2>&1
         fi
-        if [ $DELTA -lt $MINDELTA ]; then
+
+        if [[ $DELTA -lt $MINDELTA ]]; then
             MINDELTA=$DELTA
-            DRIVE=$DISK
+            echo "DELTA is less than MINDELTA-$MINDELTA" >> "${LOGFILE}" 2>&1
+            TARGET_DISK=$DISK
             DRIVESIZE=$GB
         fi
-        echo "Diff is $DELTA GB with `echo $DEV | awk '{ print substr ($0, 12 ) }'` $GB GB"
-        echo "Matching Drive: $DRIVESIZE GB"
+
+        echo "Diff is $DELTA with `echo $DEV | awk '{ print substr ($0, 12 ) }'` $GB GB" >> "${LOGFILE}" 2>&1
+        echo "Matching Drive: $DRIVESIZE GB" >> "${LOGFILE}" 2>&1
     fi
 done
 
-echo "BOOTDRIVE is $DRIVE with $DRIVESIZE GB"
-echo "clearpart --drives=$DRIVE --overwritevmfs">/tmp/DiskConfig
-echo "install --disk=$DRIVE --overwritevmfs --novmfsondisk">>/tmp/DiskConfig
+echo "Target disk is $TARGET_DISK with $DRIVESIZE GB" >> "${LOGFILE}" 2>&1
+
+# Clearing partitions on target disk found
+echo "clearpart --drives=$TARGET_DISK --overwritevmfs" >/tmp/DiskConfig
+
+# Starting the ESXi installation on the target disk found
+echo "install --disk=$TARGET_DISK --overwritevmfs --novmfsondisk" >>/tmp/DiskConfig
    
+
+###############################################################################
+# Post-Installation Scripts
+###############################################################################
 
 %firstboot --interpreter=busybox
 

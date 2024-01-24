@@ -1,0 +1,40 @@
+
+# Playbook to capture the ressourceuri attribute of all job-templates in COM
+#
+# The playbook generates a variable for each job template using the following template: <job_template_name>_job_template_resourceUri
+#
+# Example: 
+#  - For GroupFirmwareUpdate, the generated variable name is 'GroupFirmwareUpdate_job_template_resourceUri'
+#  - For PowerOn.New, the generated variable name is 'PowerOn_New_job_template_resourceUri'
+#
+# Each variable value is equal to the resourceUri attribute of the corresponding job template (e.g. /compute-ops/v1beta2/job-templates/d17898e6-6907-491e-8430-7c2da795d2e5). 
+
+
+
+---
+  - name: Capture all job templates
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ job_templates_API_version }}/job-templates"
+      method: GET
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: job_templates_response
+    delegate_to: localhost
+
+  # - debug: var=job_templates
+
+  - name: Set a variable for all job templates items 
+    set_fact:
+      job_templates: "{{ job_templates_response | json_query(query) | sort(attribute='name') }}"
+    vars:
+      query: "json.items"
+
+  - name: Set variables for each job templates
+    set_fact:
+      "{{ (item.name | replace('-', '_') | replace('.', '_')  ) + '_job_template_resourceUri' }}": "{{ item.resourceUri }}"
+    loop: "{{ job_templates }}"
+    loop_control:
+      label: "Variable set: {{ (item.name | replace('-', '_') | replace('.', '_')  ) + '_job_template_resourceUri' }} = {{ item.resourceUri }}"
+
+

@@ -22,8 +22,10 @@ datacenter_name: "Mougins"
 #------------------------ kickstart file customization ----------------------------------------------------------------------
 
 # Password for root
-# To create an encrypted passord, you can use the following command:
-#    python3 -c 'import crypt,getpass;pw=getpass.getpass();print(crypt.crypt(pw) if (pw==getpass.getpass("Confirm: ")) else exit())'
+# To create an encrypted passord, you can use the following command for SHA512: 
+# > openssl passwd -6 
+# or
+# > python3 -c 'import crypt,getpass;pw=getpass.getpass();print(crypt.crypt(pw) if (pw==getpass.getpass("Confirm: ")) else exit())'
 encrypted_root_password: "$6$jsCkM/q1rcozIdi8$b1uUXnQmzv59.CKN01w2wdfEGnigRdfK2T.EpJznpyKDXR4uYrajcUZQHrkSrlt1Hwviyc2AWqR409f.i.I741"
 
 
@@ -53,33 +55,41 @@ firmware_server_setting_name: "ESXi firmware baseline"
 
 # Firmware baselines to be defined in the firmware server setting of the definitive server group 
 #  Note: it is mandatory to define at least one firmware baseline for Gen10/Gen10+ servers and one for Gen11 servers.
-Gen10_10p_firmware_bundle_name: "2023.09.00.00"  
-Gen10_10p_patch_name_associated_with_firmware_bundle: "2023.09.00.01" 
-Gen11_firmware_bundle_name: "2023.10.00.00" 
-Gen11_patch_name_associated_with_firmware_bundle: "" 
+Gen10_10p_firmware_bundle_name: "2023.09.00.00"  # "2023.03.00.00"
+Gen10_10p_patch_name_associated_with_firmware_bundle: "2023.09.00.01" # "2023.03.00.03"
+Gen11_firmware_bundle_name: "2023.10.00.00" # "2023.04.00.00"
+Gen11_patch_name_associated_with_firmware_bundle: "" #"2023.04.00.04"
 
 # Downgrade components policy to match baseline (boolean)
 # If "true", any component version higher than the baseline will be downgraded to match the baseline. 
-firmware_downgrade_policy: "true"
+firmware_downgrade_policy: true
 
+# Install HPE drivers and software policy in the definitive server group 
+# If "true", firmware updates will include HPE drivers and software. 
+install_SWDrivers_policy: false
 
 #------------------------ ISO settings -------------------------------------------------------------------------------------
 
-# OS vendor ISO file information
+# URL where the ISO image can be found
 src_iso_url: "https://liogw.lj.lab/deployment/esxi80u2"
+# ISO file name
 src_iso_file: "VMware-ESXi-8.0.2-22380479-HPE-802.0.0.11.4.0.14-Sep2023.iso"
 
-
-# Directory on the Ansible control node where the source ISO will be copied:
+# Directory on the Ansible control node where the source ISO will be copied (will be created if not already present). 
+# Note: You must define a directory in your user home directory using {{ lookup('env','HOME') }}. 
 src_iso_directory: "{{ lookup('env','HOME') }}/ISOs/esxiisosrc"
 
-# Directory on the Ansible control node to stage all files to build and generate the new ISO image with the custom kickstart:
+# Directory on the Ansible control node to stage all files to build and generate the new ISO image with the custom kickstart (will be created if not already present).
+# Note: You must define a directory in your user home directory using {{ lookup('env','HOME') }}. 
 staging_directory: "{{ lookup('env','HOME') }}/staging"
 
-# Folder located in <Ansible_project_dir>/files to store the boot.cfg file
-# Use the template name: ESXi_<build>. <build> is found in boot.cfg in the root of src_iso_file iso
+
+#------------------------ Kickstart file --------------------------------------------------------------------------------
+
+# Folder located in /files to store the kickstart file
+# Recommended to use the template name: ESXi_<build>. (<build> can be found in boot.cfg at the root of the iso)
 esxi_build: "ESXi_22380479"
 
-# Name of the kickstart file available in files/ESXi_<build>
+# Name of the kickstart file 
 kickstart: "ks-esxi8.0u2.sh"
 

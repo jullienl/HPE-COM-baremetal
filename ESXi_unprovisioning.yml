@@ -1,28 +1,30 @@
+---
 #   Playbook for server unprovisioning:
 #     - Put the ESXi server into maintenance mode
-#     - Remove the server from
-#     - Remove the server from COM server group
+#     - Remove the server from vCenter
+#     - Remove the server from any COM server group
 #     - Power off the server
 #     - Remove the host SSH key from .ssh/known_hosts on the Ansible control node
 #     - Remove the DNS record
 #
 #   Commands that can be used to run this playbook:
-#     $ ansible-playbook -i "ESX-2," ESXi_unprovisioning.yml --ask-vault-password 
+#
+#     $ ansible-playbook -i "CZ2311004G," ESXi_unprovisioning.yml --ask-vault-password 
 #     or
-#     $ ansible-playbook -i "ESX-1,ESX-2" ESXi_unprovisioning.yml --ask-vault-password 
-#     or
-#     $ ansible-playbook -i hosts ESXi_unprovisioning.yml --ask-vault-password 
+#     $ ansible-playbook -i "CZ2311004G,CZ2311004H" ESXi_unprovisioning.yml --ask-vault-password 
+#
+#----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
----
+
+
 - name: Deleting provisioned compute module(s)
   hosts: all
   gather_facts: no
   vars_files:
     - vars/ESXi7.0.u3_vars.yml
-    - vars/GLCP_US_West_credentials_encrypted.yml    
+    - vars/GLP_HPE_Mougins_EU_Central_credentials_encrypted.yml    
     - vars/VMware_vCenter_vars_encrypted.yml
   vars:
-    inventory_fqdn: "{{ inventory_hostname | lower }}.{{ domain }}"
     ansible_forks: 5
 
   tasks: 
@@ -49,17 +51,17 @@
     import_tasks: files/Create_COM_session.yml
 
 
-#--------------------------------------Capture COM resource API versions ----------------------- -----------------------------------------------------------------------------
+#--------------------------------------Capture COM resource API versions ----------------------------------------------------------------------------------------------
 
   - name: Capture Resource API versions
     import_tasks: files/Get_resource_API_versions.yml
 
 
-#--------------------------------------Capture server information --------------------------------------------------------------------------------------------------------
+#--------------------------------------Capture server information -----------------------------------------------------------------------------------------------------
 
   - name: Capture server '{{ inventory_hostname }}' information
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers?filter=contains(host/hostname,'{{ inventory_hostname }}')"
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ inventory_hostname }}'"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -73,15 +75,17 @@
       msg: "Server '{{ inventory_hostname }}' does not exist!"
     when: server.json.count == 0
 
-  - name: Capture server '{{ inventory_hostname }}' uri
+  - name: Capture server '{{ inventory_hostname }}' facts
     set_fact:
       server_id:  "{{ server | json_query('json.items[0].id') }}"
+      server_name:  "{{ server | json_query('json.items[0].name') | lower }}"
       server_uri:  "{{ server | json_query('json.items[0].resourceUri') }}"
       server_connected_status:  "{{ server | json_query('json.items[0].state.connected') }}"
       server_ilo_ip:  "{{ server | json_query('json.items[0].hardware.bmc.ip') }}"
 
   # - debug: var=server_id
   - debug: var=server_uri
+  - debug: var=server_name
   # - debug: var=server_connected_status
   # - debug: var=server_ilo_ip
 
@@ -104,25 +108,55 @@
   # - debug: var=server_raw_inventory
 
 
-#--------------------------------------Put server in maintenance mode --------------------------------------------------------------------------------------------------------
+#--------------------------------------Put ESXi in maintenance mode ---------------------------------------------------------------------------------------------------
 
-  - name: Taking "{{ inventory_fqdn }}" to maintenance mode
+  - name: Check if ESXi host exists in cluster '{{ cluster_name }}' in vCenter '{{ vcenter_hostname }}'
+    community.vmware.vmware_cluster_info:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      cluster_name: "{{ cluster_name }}"
+      validate_certs: false
+    register: cluster_facts
+    delegate_to: localhost
+
+  # - debug: var=cluster_facts
+
+  - name: Capture the presence of '{{ server_name }}' in cluster '{{ cluster_name }}' 
+    set_fact:
+      Host_presence:  "{{ (cluster_facts | json_query(query))}}"
+    vars:
+      query:  "clusters.\"{{ cluster_name }}\".hosts[?name=='{{ server_name }}']"
+
+  # - debug: var=Host_presence
+
+  - debug:
+      msg: "{{ server_name }} is part of the cluster '{{ cluster_name }}' in vCenter '{{ vcenter_hostname }}'"
+    when: (Host_presence|length > 0)
+
+  - debug:
+      msg: "{{ server_name }} is not part of the cluster '{{ cluster_name }}' in vCenter '{{ vcenter_hostname }}'"
+    when: (Host_presence|length == 0)
+
+  - name: Take '{{ server_name }}' to maintenance mode if present
     vmware_maintenancemode:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
-      esxi_hostname: "{{ inventory_fqdn }}"
+      esxi_hostname: "{{ server_name }}"
       timeout: 3600
       state: present
       validate_certs: false
     delegate_to: localhost
+    when: (Host_presence|length > 0)
 
-  # - name: Removing vmkernel mk1 port from "{{ vcenter_switch_name }}" distributed Switch
+
+  # - name: Remove vmkernel mk1 port from '{{ vcenter_switch_name }}' distributed Switch
   #   community.vmware.vmware_vmkernel:
   #     hostname: "{{ vcenter_hostname }}"
   #     username: "{{ vcenter_username }}"
   #     password: "{{ vcenter_password }}"
-  #     esxi_hostname: "{{ inventory_fqdn }}"
+  #     esxi_hostname: "{{ server_name }}"
   #     dvswitch_name: "{{ vcenter_switch_name }}"
   #     portgroup_name: "{{ dportgroup_name }}"
   #     state: absent
@@ -130,47 +164,50 @@
   #     validate_certs: False
   #   delegate_to: localhost
   
-  # - name: Gathering facts about vmnics 
+  # - name: Gather facts about vmnics 
   #   community.vmware.vmware_host_vmnic_info:
   #     hostname: '{{ vcenter_hostname }}'
   #     username: '{{ vcenter_username }}'
   #     password: '{{ vcenter_password }}'
-  #     esxi_hostname: "{{ inventory_fqdn }}"
+  #     esxi_hostname: "{{ server_name }}"
   #     validate_certs: false
   #   delegate_to: localhost
   #   register: host_vmnics
 
   # #- debug: var=host_vmnics
 
-  # - name: Capturing available vmnics for the distributed switch creation
+  # - name: Capture available vmnics for the distributed switch creation
   #   set_fact:
-  #     vmnics: "{{ host_vmnics.hosts_vmnics_info | json_query('\"' + inventory_fqdn + '\".dvswitch') }}"
+  #     vmnics: "{{ host_vmnics.hosts_vmnics_info | json_query('\"' + server_name + '\".dvswitch') }}"
 
-  # - name: Removing host from "{{ vcenter_switch_name }}" distributed Switch
+  # - name: Remove host from '{{ vcenter_switch_name }}' distributed Switch
   #   vmware_dvs_host:
   #     hostname: "{{ vcenter_hostname }}"
   #     username: "{{ vcenter_username }}"
   #     password: "{{ vcenter_password }}"
-  #     esxi_hostname: "{{ inventory_fqdn }}"
+  #     esxi_hostname: "{{ server_name }}"
   #     switch_name: "{{ vcenter_switch_name }}"
   #     vmnics: "{{ vmnics |  json_query('\"' + vcenter_switch_name + '\"')   }} " 
   #     state: absent
   #     validate_certs: False
   #   delegate_to: localhost
 
-  - name: Removing ESXi host "{{ inventory_hostname }}" from vCenter "{{ vcenter_hostname }}"
+  - name: Remove ESXi host '{{ server_name }}' from vCenter '{{ vcenter_hostname }}'
     vmware_host:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
       datacenter_name: "{{ datacenter_name }}"
       cluster_name: "{{ cluster_name }}"
-      esxi_hostname: "{{ inventory_fqdn }}"
+      esxi_hostname: "{{ server_name }}"
       state: absent
       validate_certs: false
     delegate_to: localhost
+    when: (Host_presence|length > 0)
 
 
+#--------------------------------------Remove the server from server group --------------------------------------------------------------------------------------------
+  
   - name: Check if server '{{ inventory_hostname }}' is already member of a server group 
     uri:
       url: "{{ ConnectivityEndpoint }}/ui-doorway/compute/v2/servers/{{ server_id }}"
@@ -187,13 +224,10 @@
     set_fact:
       server_group_id_found: "{{ server_info_from_ui_doorway.json.group_.id }}"
       server_group_name_found: "{{ server_info_from_ui_doorway.json.group_.name }}"
-    when: server_info_from_ui_doorway.json.group_ is not none
+    when: server_info_from_ui_doorway.json.group_ is defined and server_info_from_ui_doorway.json.group_ is not none
 
   - debug: var=server_group_name_found
     when: server_info_from_ui_doorway.json.group_ is not none
-
-
-#--------------------------------------Remove the server from server group --------------------------------------------------------------------------------------------------------
 
   - name: Remove server '{{ inventory_hostname }}' from the server group of which it is currently a member
     uri:
@@ -202,17 +236,17 @@
       status_code: 204
       headers:
         Authorization: "Bearer {{ access_token }}"
-    when: server_info_from_ui_doorway.json.group_ is not none
     register: group_unassignment_result
     delegate_to: localhost
+    when: server_info_from_ui_doorway.json.group_ is defined and server_info_from_ui_doorway.json.group_ is not none
 
   - name: Wait for deletion to complete
     pause:
       seconds: 15
-    when: server_info_from_ui_doorway.json.group_ is not none
+    when: server_info_from_ui_doorway.json.group_ is defined and server_info_from_ui_doorway.json.group_ is not none
 
 
-#--------------------------------------Power off the server --------------------------------------------------------------------------------------------------------
+#--------------------------------------Power off the server -----------------------------------------------------------------------------------------------------------
 
   - name: Capture all job templates
     uri:
@@ -232,10 +266,9 @@
     vars:
       query: "json.items[?name=='PowerOff.New'].resourceUri"
 
-
   - debug: var=job_template_resourceuri
 
-  - name: Power off server {{ inventory_hostname }} 
+  - name: Power off server '{{ inventory_hostname }}' 
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops/{{ jobs_API_version }}/jobs"
       method: POST
@@ -253,20 +286,30 @@
   # - debug: var=power_off_status
 
 
-#--------------------------------------Remove SSH key from Ansible control node --------------------------------------------------------------------------------------------------------
+#--------------------------------------Remove SSH key from Ansible control node ---------------------------------------------------------------------------------------
 
+  - name: Extract hostname from FQDN '{{ server_name }}'
+    set_fact:
+      hostname: "{{ server_name.split('.')[0] }}"
 
-  - name: Removing {{ inventory_hostname }} SSH key from known_hosts file on Ansible control node
+  - name: Remove '{{ hostname }}' SSH key from known_hosts file on Ansible control node
     known_hosts:
-      name: '{{ inventory_hostname }}'
+      name: '{{ hostname }}'
+      path: ~/.ssh/known_hosts
+      state: absent
+    delegate_to: localhost
+
+  - name: Remove '{{ server_name }}' SSH key from known_hosts file on Ansible control node
+    known_hosts:
+      name: '{{ server_name }}'
       path: ~/.ssh/known_hosts
       state: absent
     delegate_to: localhost
 
 
-#-------------------------------------- Delete DNS record ----------------------------------------------
+#-------------------------------------- Delete DNS record (WinRM mode) ------------------------------------------------------------------------------------------------
 
-- name: Removing the DNS record from DNS server
+- name: Remove the DNS record from DNS server
   hosts: all
   gather_facts: no
   vars:
@@ -274,9 +317,10 @@
   vars_files:
     - vars/Windows_DNS_vars_encrypted.yml
   tasks:
-    - name: Removing "{{ inventory_hostname }}" from "{{ dns_server }}" 
+
+    - name: Remove "{{ hostname }}" from "{{ dns_server }}" 
       community.windows.win_dns_record:
-        name: "{{ inventory_hostname }}"
+        name: "{{ hostname }}"
         type: "A"
         zone: "{{ domain }}"
         state: absent

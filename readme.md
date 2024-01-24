@@ -28,95 +28,151 @@ Here are some benefits of automatic bare metal provisioning:
 - **Integration with DevOps practices**: Automated bare metal provisioning integrates well with other DevOps practices, such as infrastructure as code (IaC) and configuration management. It enables organizations to manage infrastructure as code, version control server configurations, and easily replicate environments, thus facilitating collaboration and improving overall agility.
 
 
+# Demo videos
+
+For a concise understanding of the possibilities offered by this bare metal provisioning project with HPE Compute Ops Management and Ansible, you can watch the following videos:
+
+**Efficient Bare Metal Provisioning for Windows Server with HPE Compute Ops Management and Ansible**:  
+
+[![Efficient Bare Metal Provisioning for Windows Server with HPE Compute Ops Management and Ansible](https://img.youtube.com/vi/A6RD6nIAFmw/0.jpg)](https://www.youtube.com/watch?v=A6RD6nIAFmw)
+
+
+**Efficient Bare Metal Provisioning for RHEL 9.3 with HPE Compute Ops Management and Ansible**: 
+
+[![Efficient Bare Metal Provisioning for RHEL 9.3 with HPE Compute Ops Management and Ansible](https://img.youtube.com/vi/6_o8yB4cvag/0.jpg)](https://www.youtube.com/watch?v=6_o8yB4cvag)
+
+
+**Efficient Bare Metal Provisioning for ESXi with HPE Compute Ops Management and Ansible**: 
+
+[![Efficient Bare Metal Provisioning for ESXi with HPE Compute Ops Management and Ansible](https://img.youtube.com/vi/_ySgROdd_Bw/0.jpg)](https://www.youtube.com/watch?v=_ySgROdd_Bw)
+
+
 ## Supported operating systems
 
 For automating the provisioning of operating systems, three main playbooks are available, one for each type of operating system:
 - VMware ESXi 7 and 8
-- Red Hat Enterprise Linux and equivalent (soon to come)
-- Windows Server 2022 and equivalent (soon to comne)
+- Red Hat Enterprise Linux and equivalent 
+- Windows Server 2022 and equivalent
 
-Note that UEFI secure boot is not supported, but can be enabled at a later date once the operating system has been installed.
+> **Note**: UEFI secure boot is not supported, but can be enabled at a later date once the operating system has been installed.
+
+> **Note**: iLO Security in FIPS or CAC mode is not supported.
 
 ## Supported storage configuration
 
 The operating system boot volume is only supported when configured with internal local storage using either an HPE NS204i-x NVMe Boot Controller or HPE MegaRAID (MR) or SmartRaid (SR) Storage Controller.
 
- > **Note**: Internal storage policies are used to create the RAID configuration for the OS volume. This requires storage controllers with firmware that support DMTF Redfish storage APIs. Refer to the [storage controller firmware requirements](https://internal.support.hpe.com/hpesc/docDisplay?docId=a00115739en_us&docLocale=en_US&page=GUID-91880D5C-C0CD-421F-B5E7-C474CD9BA017.html) 
+ > **Note**: Internal storage policies are used to create the RAID configuration for the OS volume. This requires storage controllers with firmware that support DMTF Redfish storage APIs. Refer to the [storage controller firmware requirements](https://internal.support.hpe.com/hpesc/docDisplay?docId=a00115739en_us&docLocale=en_US&page=GUID-91880D5C-C0CD-421F-B5E7-C474CD9BA017.html) (access requires authentication with your HPE GreenLake account)
 
 Booting from a SAN (Storage Area Network) is currently not supported by this project.
 
-### Storage Controller selection: 
+### Storage Controller selection 
 
-During the installation process, the selection of the disk to install the operating system is determined by the following conditions:
+To avoid data loss or other issues, the playbooks include some logic to ensure that the target disk for OS installation is correctly identified. To do this, the size of the volume detected by Compute Ops Management and presented by the internal local storage (NS204i or MR or SR controller) is used to make this selection. In addition, when multiple controllers are detected, disk selection is determined by the following conditions:
 
 1. If an HPE NS204i-x NVMe Boot Controller is detected, the automatic RAID1 volume associated with it will be used for installing the OS.
 2. If there is no HPE NS204i-x NVMe Boot Controller found, the first available HPE MegaRAID (MR) or SmartRaid (SR) Storage Controller with disks will be utilized for the OS installation.
 
+
 ### OS boot volume RAID type and size
 
-When an HPE NS204i-x NVMe Boot Controller is used, a mirror between the two NVMe drives is automatically created (RAID1) for the operating system boot volume using the entire disk. 
+- When an HPE NS204i-x NVMe Boot Controller is used, a mirror (RAID1) between the two NVMe drives is by design automatically created and the whole disk is used to create the operating system volume. In this case, the playbooks in this project simply skip the task of creating the operating system boot volume, as it is automatically managed by the NS204i. 
 
-With MR/SR Storage controller, you can define the operating system boot volume settings in the OS variable file located in /vars:
-- RAID level (RAID0, RAID1 or RAID5) using the variable `raid_type`
-- The size of volume (a number >0 or -1, where -1 indicates to use the entire disk) using the variable `volume_size_in_GB`
+- With MR/SR Storage controller, the creation of the operating system boot volume is managed by the playbooks of this project and in this case, you can define the volume settings in the OS variable file located in /vars using:
+  - `raid_type`: Defines the RAID level (RAID0, RAID1 or RAID5) 
+  - `volume_size_in_GB`: Defines the OS volume size. It must be a number greater than 0 or equal to -1 to indicate that the entire disk should be used.
 
-During the installation process, it is possible to present SAN volumes to the servers (such as vmfs datastore volumes/cluster volumes, etc.), as the installation process looks for the internal logical drive to install the operating system, and will under no circumstances install the OS, nor destroy the data on the presented SAN volumes.
+During the installation process, it is possible to present SAN volumes to the servers (such as vmfs datastore volumes/cluster volumes, etc.), as the installation process looks for the internal logical drive to install the operating system, and will not install the OS, nor destroy the data on the presented SAN volumes.
 
+### Network configuration
+
+- For ESXi, the network configuration during the OS installation starts by using the first available nic (vmnic0). Once the OS is installed, additional tasks take place to add the second nic (vmnic1) to the standard vSwitch0.
+
+- For RHEL, the kickstart file plays a crucial role during OS installation. It contains a script that is executed during the installation process. The configuration for NIC bonding is controlled by the `enable_nic_bonding` variable, which can be found in `vars/<Linux_OS>_vars.yml`.
+
+- For Windows Server, a `Post_installation_script.ps1` script located in `c:\Windows\Setup\Scripts` is executed when the OS installation is complete. This PowerShell script among other things, sets IP parameters and NIC teaming. The configuration for NIC teaming is controlled by the `enable_nic_bonding` variable, which can be found in `group_vars/<WINxxxx>/Windows_vars.yml`.
+
+With Linux and Windows:
+  - When `enable_nic_bonding` is set to `true`, NIC teaming will be established using the first two connected NICs. However, if only one NIC is connected, the bond will be created with just that single NIC.
+
+  - When `enable_nic_bonding` is set to `false`, no NIC teaming will be created. In this case, the network settings will be configured on the first connected NIC that is detected.
 
 ## Process flow
 
-The following diagrams describe the overall process flow that is used for ESXi:
+The following diagrams describe the overall process flows:
 
-**Provisioning**:   
+**RHEL Provisioning**:  
 
-![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/f30c7618-0ac3-486f-804e-73fce2a8df07)
-
-
-**Unprovsioning**:   
-
-![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/decc72b3-4a79-429d-b888-e98032aa5ef6)
-
-
-A more detailed process flow is avalable at https://miro.com/app/board/uXjVNZ9eH-w=/?share_link_id=812370641566 
-
+![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/0cf77db0-dc3a-4fa7-a82b-2734e25a2dd9)
+ 
+**Windows Server Provisioning**:  
+ 
+![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/a7c2d4e5-c564-455a-b784-ba05de4a13b8)
+ 
+**RHEL and Windows Server Unprovisioning**:   
+ 
+![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/4b53cb2e-57d4-48f4-a912-7dd577b363ea)
+ 
+**ESXi Provisioning**:   
+  
+![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/9a31b6f4-2583-4688-a828-a468619ef221)
+   
+**ESXi Unprovisioning**:   
+   
+![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/20234a57-95c1-4563-b399-b16ef2f259c1)
 
 
 ## Pre-requisites
 
 - An Ansible control node running Ansible:
-  - With an access to the internet to access the HPE GreenLake platform and to the management network where the servers to be provisioned reside.
-
+  - With internet connectivity to interface with the HPE GreenLake platform and must also be connected to the management network where the servers will be deployed.
   - With a storage volume large enough to host a copy of the ISO files, and the temporary extraction of an ISO and the new generated ISO with the customized kickstart for each server being provisioned 
 
     > **Note**: 1TB+ is recommended if you plan to provision several servers in parallel. 
 
   - At the right date and time to support the various time-dependent playbook operations. 
 
-- A web server containing ISO images of the different operating systems to be provisioned. 
+- A web server containing ISO images of the various operating systems to be provisioned. For Windows provisioning, a custom WinPE image must be created and supplied. See below for more details.
 
-- A network location containing an installation source for each Linux version to be provisioned. 
+- For Linux provisioning, a network location (http/https) containing an installation source for each Linux version to be provisioned. 
 
-  > To reduce the process of creating Red Hat (and community Enterprise Linux: CentOS, Alma Linux, Rocky Linux) customized ISO images, this projet uses BOOT ISO images (~700MB) instead of traditional DVD ISOs (~8GB). The BOOT ISO does not contain any installable packages. It is therefore necessary to set up an installation source that stores a copy of the DVD ISO image contents, so that the BOOT ISO image installer can access the software packages and start the installation.
+  > **Note**: The installation source URL which points to the extracted contents of the DVD ISO image is defined by the variable `<OS>_repo_url` in `<OS>_vars.yml` in the `vars` folder. 
 
-  > To learn how to prepare an installation source using HTTP/HTTPS, see [Creating an installation source using HTTP or HTTPS](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/performing_a_standard_rhel_8_installation/prepare-installation-source_installing-rhel#creating-an-installation-source-on-http_prepare-installation-source)
+  > **Note**: To reduce the process of creating Red Hat (and community Enterprise Linux: CentOS, Alma Linux, Rocky Linux) customized ISO images, this projet uses BOOT ISO images (~700MB) instead of traditional DVD ISOs (~8GB). The BOOT ISO does not contain any installable packages. It is therefore necessary to set up an installation source that stores a copy of the DVD ISO image contents, so that the BOOT ISO image installer can access the software packages and start the installation.
 
-  > The installation source URL which points to the extracted contents of the DVD ISO image is defined by the variable `<OS>_repo_url` in /vars.  
+  > **Note**: To learn how to prepare an installation source using HTTP/HTTPS, see [Creating an installation source using HTTP or HTTPS](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/performing_a_standard_rhel_8_installation/prepare-installation-source_installing-rhel#creating-an-installation-source-on-http_prepare-installation-source)
+
+- For Windows provisioning, a network location containing the Windows Server ISO image must be provided as an UNC path (\\server\share).
+
+  > **Note**: The network location which points to the DVD ISO image is defined by the variable `src_iso_network_share` in `Windows_vars.yml` in the `group_vars` folder. The `src_iso_file_path` defines the Windows Server ISO image location in the network share.
   
-
 - HPE Compute Ops Management API Client Credentials with the Compute Ops Management Administrator role.
 
-  > **Note**: To learn more about how to set up the API client credentials, see https://support.hpe.com/hpesc/public/docDisplay?docId=a00120892en_us 
+  > **Note**: To learn more about how to set up the API client credentials, see [Configuring API client credentials](https://support.hpe.com/hpesc/public/docDisplay?docId=a00120892en_us&page=GUID-23E6EE78-AAB7-472C-8D16-7169938BE628.html) 
 
-  > **Note**: There is no need for a predefined server group in HPE Compute Ops Management. Each playbook is designed to handle the creation of a temporary server group, specifically for server BIOS, storage, and operating system configuration.
+  > **Note**: There is no need for any predefined server groups or server settings in HPE Compute Ops Management. Each playbook is written to handle the creation of temporary server groups and server settings for the server BIOS, storage, and operating system configuration.
 
-- To utilize the servers in HPE Compute Ops Management, certain steps need to be followed. Each server should be onboarded to the HPE GreenLake platform, properly licensed, and assigned to the COM application instance. Additionally, it is important to ensure that the iLO (Integrated Lights-Out) of each server is connected to the HPE GreenLake platform.
+- All HPE servers to be provsioned must be onboarded to the HPE GreenLake platform and their iLO must be correctly configured (with an IP address and connected to the cloud platform). 
 
-  > To learn more, see [Configuring Compute Ops Management direct management](https://support.hpe.com/hpesc/public/docDisplay?docId=sd00001293en_us&page=GUID-8F12FE6C-DC13-44DC-921B-041E8DC628DB.html)
+  > **Note**: To utilize the servers in HPE Compute Ops Management, certain steps need to be followed. Each server should be onboarded to the HPE GreenLake platform, properly licensed, and assigned to the COM application instance. Additionally, it is important to ensure that the iLO of each server is connected to the HPE GreenLake platform. To learn more, see [Configuring Compute Ops Management direct management](https://support.hpe.com/hpesc/public/docDisplay?docId=sd00001293en_us&page=GUID-8F12FE6C-DC13-44DC-921B-041E8DC628DB.html)
 
-- The `Hosts` inventory file needs to be updated. Each server should be listed in the corresponding inventory group along with its serial number and the IP address that should be assigned to the operating system.
+- The Ansible inventory files for each operating sustem (i.e. [hosts_ESX](https://github.com/jullienl/HPE-COM-baremetal/blob/main/hosts_ESX)) must be updated. Each server should be listed in the corresponding inventory file along with its serial number and the IP address that should be assigned to the operating system.
 
-- A Windows DNS server configured to be managed by Ansible. See below for more information.
+- A Windows DNS server configured to be managed by Ansible. See below for more details.
 
+  > **Note**: To ensure the smooth operation of this project, it is essential that a DNS record exists for each provisioned server. For this reason, each playbook includes a task to create a DNS record on the Windows DNS server defined in `vars` folder. 
+
+  > **Note**: For this project, I'm using a Windows DNS server because my lab is managed by Microsoft Active Directory. If you want to use a Linux DNS server instead, you will need to modify the "Creating a DNS record for the bare metal server" task in each playbook to be compatible with a Unix-like operating systems. You can use the [community.general.nsupdate](https://docs.ansible.com/ansible/latest/collections/community/general/nsupdate_module.html) module to perform dynamic DNS updates when using a Linux DNS server.
+
+  > **Note**: If in your environment, DNS records for servers to be provisioned are created in advance, you can remove the "Create DNS record for bare metal server" task from the playbooks.
+
+- For Windows server provisionning, a custom WinPE image is required.
+
+  > **Note**: When using a Windows Server ISO for installation, you cannot execute a script prior to the initiation of the setup process. Additionally, PowerShell is inaccessible during the Panther phase of the installation. Although you can trigger a script execution via the unattend file, this approach does not support the dynamic use of variables to populate other sections within the unattend file for particular requirements, such as specifying the disk on which to install. Therefore, the only viable method to pre-configure the unattend file with the appropriate target disk information is by utilizing Windows Preinstallation Environment (WinPE) to run the necessary PowerShell commands.
+
+  > **Note**: To create the WinPE image needed to provision the Windows host, refer to [WinPE_image_creation.md](https://github.com/jullienl/HPE-COM-baremetal/blob/main/files/WinPE_image_creation.md) in the `files` folder.
+
+> **Note**: This project utilizes the HPE iLO virtual media feature to mount ISO files for operating system installation. The capability known as "script/URL-based virtual media" is unique to the HPE iLO Advanced license. However, this specific license is not necessary when you are using HPE Compute Ops Management.
 
 
 ## Ansible control node information
@@ -130,11 +186,11 @@ A more detailed process flow is avalable at https://miro.com/app/board/uXjVNZ9eH
 
 ### Ansible control node configuration
 
-To configure the Ansible control node, see [Ansible_control_node_requirements.md](https://github.com/jullienl/HPE-COM-baremetal/blob/main/files/Ansible_control_node_requirements.md) in `/files`
+To configure the Ansible control node, see [Ansible_control_node_requirements.md](https://github.com/jullienl/HPE-COM-baremetal/blob/main/files/Ansible_control_node_requirements.md) in the `files` folder.
 
 By default, Ansible executes tasks on a maximum of 5 hosts in parallel. If you want to increase the parallelism and have the provisioning tasks executed on more hosts simultaneously, you can modify this value directly in the playbooks using the `ansible_forks` variable.
 
-  > It's important to note that while parallel execution can significantly improve performance, it also increases resource consumption on the Ansible control machine. Therefore, it's recommended to test and tune the value of `ansible_forks` based on your specific environment to find the optimal balance between performance and resource usage.
+  > **Note**: It's important to note that while parallel execution can significantly improve performance, it also increases resource consumption on the Ansible control machine. Therefore, it's recommended to test and tune the value of `ansible_forks` based on your specific environment to find the optimal balance between performance and resource usage.
 
 ## Windows DNS Server configuration
 
@@ -147,15 +203,19 @@ To configure WinRM, you can simply run [ConfigureRemotingForAnsible.ps1](https:/
 
 > **Note**: The purpose of this script is solely for training and development, and it is strongly advised against using it in a production environment since it enables both HTTP and HTTPS listeners with a self-signed certificate and enables Basic authentication that can be inherently insecure.
 
-To learn more about **Setting up Windows host**, see [https://docs.ansible.com/ansible/2.5/user_guide/windows_setup.html#winrm-setup](https://docs.ansible.com/ansible/2.5/user_guide/windows_setup.html#winrm-setup)
+> **Note**: To learn more about how Ansible can communicate with a Microsoft Windows host, see [Setting up a Windows Host](https://docs.ansible.com/ansible/2.5/user_guide/windows_setup.html#winrm-setup)
 
 ## Preparation to run the playbooks
 
-1. Clone or download this repository on your Ansible control node   
+1. Clone or download this repository on your Ansible control node.   
    
-2. Update all variables located in `/vars` 
+2. Update all variables located in `vars` and `group_vars` folders.
 
-3. Copy the operating system ISOs to a web server defined by the variables `src_iso_url` and `src_iso_file` 
+   > `group_vars` is a feature in Ansible that allows you to define variables that will be applied to groups of hosts. For instance, `group_vars/WIN2022` folder is specifically used for setting variables applicable to the Windows hosts that are part of the [WIN2022] group defined in the inventory file (i.e. `hosts`). So it's essential to retain the name of the `WIN2022` folder so that Ansible can correctly associate the variables within this folder with the hosts in the [WIN2022] group. When Ansible runs, it will look for a directory matching the group name inside `group_vars` and apply any variables it finds there to the hosts in that group.
+
+   > For ESXi and RHEL variables, the root password is encrypted in the kickstart using the variable `encrypted_root_password` to maintain the confidentiality of the root password. See the kickstart files for more information on how to encrypt your password from the Ansible control node.
+
+3. For ESXi and Linux, copy the operating system ISOs to a web server as defined in the variables `src_iso_url` and `src_iso_file`. For Windows, copy the WinPE image you created as described in [WinPE_image_creation.md](https://github.com/jullienl/HPE-COM-baremetal/blob/main/files/WinPE_image_creation.md) onto the web server and as defined in the variables `winpe_iso_url` and `winpe_iso_file`.
 
 4. Secure your HPE Compute Ops Management credentials, using Ansible vault to encrypt them. From the root of this Ansible project on the Ansible control node, run:   
     ```
@@ -168,62 +228,78 @@ To learn more about **Setting up Windows host**, see [https://docs.ansible.com/a
      ClientSecret: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
      ConnectivityEndpoint: "https://<connectivity_endpoint>-api.compute.cloud.hpe.com"
      ```
-    > **Note**: To learn more about Ansible vault, see https://docs.ansible.com/ansible/latest/user_guide/vault.html
+    > **Note**: To learn more, see [Protecting sensitive data with Ansible vault](https://docs.ansible.com/ansible/latest/user_guide/vault.html)
     
-    > **Note**: To access the HPE Compute Ops Management API, you need to create your client credentials on the HPE GreenLake platform. To learn more, see [https://support.hpe.com/hpesc/public/docDisplay?docId=a00120892en_us](https://support.hpe.com/hpesc/public/docDisplay?docId=a00120892en_us) 
-
+    > **Note**: To access the HPE Compute Ops Management API, you need to create your client credentials on the HPE GreenLake platform, see [Configuring API client credentials](https://support.hpe.com/hpesc/public/docDisplay?docId=a00120892en_us&page=GUID-23E6EE78-AAB7-472C-8D16-7169938BE628.html) 
 
 5. Secure your VMware vCenter credentials using:   
     ```
     ansible-vault create vars/VMware_vCenter_vars_encrypted.yml
     ```   
-    And copy/paste the content of `/vars/VMware_vCenter_vars_clear.yml` example in the editor using your own information.
+    And copy/paste the content of `vars/VMware_vCenter_vars_clear.yml` example in the editor using your data.
 
-6. Secure your Windows credentials, using:   
+6. Secure your Windows DNS credentials, using:   
     ```
     ansible-vault create vars/Windows_DNS_vars_encrypted.yml
     ```   
-    And copy/paste the content of `/vars/Windows_DNS_vars_clear.yml` example in the editor using your own information.
+    And copy/paste the content of `vars/Windows_DNS_vars_clear.yml` example in the editor using your data.
 
-7. Secure your WinRM variables for the Windows hosts, using:   
+7. Secure your sensitive variables for the Windows hosts in the `group_vars/WIN2022`, using:   
     ```
-    ansible-vault create vars/WinRM_vars_encrypted.yml
+    ansible-vault create group_vars/WIN2022/Windows_sensitive_vars_encrypted.yml
     ```   
-    And copy/paste the content of `/vars/WinRM_vars_clear.yml` example in the editor using your own information.
+    And copy/paste the content of `group_vars/WIN2022/Windows_sensitive_vars_clear.yml` example in the editor using your data.
+    
 
-8. Update the `hosts` Ansible inventory file with the list of servers to provision. 
+8. Update the different Ansible inventory files (`hosts_ESX`, `hosts_RHEL` and `hosts_WIN`) with the list of servers to provision. 
 
    Each server should be listed using a hostname in the corresponding inventory group along with its serial number and the IP address that should be assigned to the operating system.
    
-   You can use the `hosts` file example:
+   You can use the inventory files as examples, such as `hosts_ESX`:
       ```
-      [ESX]
-      ESX-1 os_ip_address=192.168.3.171 serial_number=CZJ3100GDB 
-      ESX-2 os_ip_address=192.168.3.172 serial_number=CZ2311004G 
-      ESX-3 os_ip_address=192.168.3.173 serial_number=CZ2311004H 
-      
-      [RHEL]
-      RHEL-1 os_ip_address=192.168.3.174 serial_number=CZJ4100GDF 
-      RHEL-2 os_ip_address=192.168.3.175 serial_number=CZJ3200ERF 
+      localhost ansible_python_interpreter=/usr/bin/python3 ansible_connection=local 
+
+      [All:vars]
+      ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+      [All]
+      ESX-1 os_ip_address=192.168.3.174 serial_number=CZ2311004H            
+      ESX-2 os_ip_address=192.168.3.175 serial_number=CZ2311004G            
+
       ```
 
-    > **Note**: Groups are defined by [...] like [ESX] in the example above. This group defines the list of ESX hosts that will be provisioned using the `ESXi_provisioning.yml` playbook. All hosts defined in this group will be provisioned in parallel by Ansible when the playbook is executed.
+   For Windows, it is necessary to use the group named [WIN2022] for WinRM to function correctly, as illustrated in `hosts_WIN` :
+      ```
+      localhost ansible_python_interpreter=/usr/bin/python3 ansible_connection=local 
+
+      [WIN2022:vars]
+      ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+      [WIN2022]
+      WIN-1 os_ip_address=192.168.3.178 serial_number=CZ2311004H       # DL360 Gen10 Plus (MR active - NS204i disabled)     [iLO: 192.168.0.20]
+      WIN-2 os_ip_address=192.168.3.179 serial_number=CZ2311004G       # DL360 Gen10 Plus (MR disabled - NS204i active)     [iLO: 192.168.0.21]
+
+      ```
+
+    > **Note**: This list must be built using the hostname, not the FQDN. FQDNs are defined in playbooks using the `domain` variable defined in the variable files. 
+    
+    > **Note**: Groups are defined by [...] like [All] and [WIN2022] in the examples above. These groups define the list of hosts that will be provisioned using the `<ESXi|RHEL|WIN>_provisioning.yml>` playbooks. All hosts defined in the group will be provisioned in parallel by Ansible when the playbook is executed.
 
 9. To provision all hosts present in the corresponding inventory group, run the following command to have Ansible prompt you for the vault and sudo passwords:    
    ```
-   ansible-playbook <ESXi|RHEL|WIN>_provisioning.yml> -i hosts --ask-vault-pass --ask-become-pass
+   ansible-playbook <ESXi|RHEL|WIN>_provisioning.yml> -i hosts_<OS> --ask-vault-pass --ask-become-pass
    ```
   
-   For example, running `ansible-playbook ESXi_provisioning.yml` will provision all servers listed above in the [ESX] inventory group, i.e. ESX-1, ESX-2 and ESX-3.
+   For example, running `ansible-playbook ESXi80_provisioning.yml -i hosts_ESX --ask-vault-pass --ask-become-pass` will provision all servers listed in `hosts_ESX` in the [All] inventory group, i.e. ESX-1 and ESX-2.
 
 
 ## Provisioning playbook output samples 
 
-Output samples generated by the provisioning playbooks can be found in `/files/output_samples`
+Output samples generated by the provisioning playbooks can be found in `files/output_samples`
 
 ## Unrovisioning playbook output samples 
 
-Output samples generated by the unprovisioning playbooks can be found in `/files/output_samples`
+Output samples generated by the unprovisioning playbooks can be found in `files/output_samples`
 
 ## Built and tested with
 
@@ -237,6 +313,8 @@ The resources in this repository have been tested with Ansible control node runn
 The provisioned OS tested successfully are:
   - VMware-ESXi-7.0.3-21930508-HPE-703.0.0.11.4.0.5-Sep2023.iso
   - VMware-ESXi-8.0.2-22380479-HPE-802.0.0.11.4.0.14-Sep2023.iso
+  - rhel-9.3-x86_64-boot.iso
+  - Windows Server 2022 using a custom WinPE image.
 
 
 ## License

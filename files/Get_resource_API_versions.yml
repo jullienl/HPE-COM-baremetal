@@ -1,7 +1,17 @@
+# Playbook to capture API versions of all COM resources
+#
+# The playbook generates a variable for each COM API resource using the following template: <resource_name>_API_version
+#
+# Example: 
+#  - For job-templates, the generated variable name is 'job_templates_API_version'
+#  - For server-settings, the generated variable name is 'server_settings_API_version'
+#
+# Each variable value is equal to the newest API version of the resource (e.g. v1beta3). 
+
 ---
 - name: Capture resource API versions from the COM API reference
   uri:
-    url: "https://developer.greenlake.hpe.com/_auth/sidebar/__alternative-sidebar__-data-hpe-hcss-doc-portal-docs-greenlake-services-compute-ops-sidebars.yaml"
+    url: "https://developer.greenlake.hpe.com/_auth/sidebar/__alternative-sidebar__-data-glcp-doc-portal-docs-greenlake-services-compute-ops-sidebars.yaml"
     method: GET
     return_content: true
   register: data

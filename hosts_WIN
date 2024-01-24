@@ -1,0 +1,15 @@
+localhost ansible_python_interpreter=/usr/bin/python3 ansible_connection=local 
+
+[WIN2022:vars]
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+[WIN2022]
+WIN-1 os_ip_address=192.168.3.178 serial_number=CZ2311004H       # DL360 Gen10 Plus (MR active - NS204i disabled)     [iLO: 192.168.0.20]
+WIN-2 os_ip_address=192.168.3.179 serial_number=CZ2311004G       # DL360 Gen10 Plus (MR disabled - NS204i active)     [iLO: 192.168.0.21]
+
+
+
+
+
+
+

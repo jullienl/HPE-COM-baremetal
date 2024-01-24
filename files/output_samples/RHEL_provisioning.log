@@ -1,0 +1,1279 @@
+$ ansible-playbook -i hosts_RHEL RHEL9.3_provisioning.yml --ask-vault-password --ask-become-pass
+
+PLAY [DNS record for the bare metal RHEL server] **************************************************************************************************************************************************************************************
+
+TASK [Add 'RHEL92-1' with '192.168.3.176' on 'dc.lj.lab' in 'lj.lab' DNS domain] ******************************************************************************************************************************************************
+changed: [RHEL92-2 -> dc.lj.lab]
+changed: [RHEL92-1 -> dc.lj.lab]
+
+PLAY [Automated RHEL 9.3 installation on HPE Compute Ops Managmeent server(s) using an auto-generated ISO file with customized kickstart.] ********************************************************************************************
+
+TASK [Gather subset facts on localhost] ***********************************************************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Capture the start time (will be used later to filter COM activities and get the runtime of the playbook)] ***********************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "start_time": "2024-01-24T11:20:45Z"
+}
+ok: [RHEL92-2] => {
+    "start_time": "2024-01-24T11:20:45Z"
+}
+
+TASK [Create HPE Compute Ops Management session] **************************************************************************************************************************************************************************************
+ok: [RHEL92-2 -> localhost]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Set variable access_token for the bearer token] *********************************************************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Capture resource API versions from the COM API reference] ***********************************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Set a variable for the COM API reference content] *******************************************************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Set a variable for items property of the COM API reference content] *************************************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Set variables for each API version] *********************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => (item=Variable set: webhooks_API_version = v1beta1)
+ok: [RHEL92-2] => (item=Variable set: webhooks_API_version = v1beta1)
+ok: [RHEL92-1] => (item=Variable set: user_preferences_API_version = v1beta1)
+ok: [RHEL92-2] => (item=Variable set: user_preferences_API_version = v1beta1)
+ok: [RHEL92-1] => (item=Variable set: servers_API_version = v1beta2)
+ok: [RHEL92-2] => (item=Variable set: servers_API_version = v1beta2)
+ok: [RHEL92-1] => (item=Variable set: server_settings_API_version = v1beta1)
+ok: [RHEL92-2] => (item=Variable set: server_settings_API_version = v1beta1)
+ok: [RHEL92-1] => (item=Variable set: schedules_API_version = v1beta2)
+ok: [RHEL92-2] => (item=Variable set: schedules_API_version = v1beta2)
+ok: [RHEL92-1] => (item=Variable set: reports_API_version = v1beta1)
+ok: [RHEL92-2] => (item=Variable set: reports_API_version = v1beta1)
+ok: [RHEL92-1] => (item=Variable set: reports_API_version = v1beta2)
+ok: [RHEL92-2] => (item=Variable set: reports_API_version = v1beta2)
+ok: [RHEL92-1] => (item=Variable set: metrics_configurations_API_version = v1beta1)
+ok: [RHEL92-2] => (item=Variable set: metrics_configurations_API_version = v1beta1)
+ok: [RHEL92-1] => (item=Variable set: jobs_API_version = v1beta2)
+ok: [RHEL92-2] => (item=Variable set: jobs_API_version = v1beta2)
+ok: [RHEL92-1] => (item=Variable set: jobs_API_version = v1beta3)
+ok: [RHEL92-2] => (item=Variable set: jobs_API_version = v1beta3)
+ok: [RHEL92-1] => (item=Variable set: job_templates_API_version = v1beta2)
+ok: [RHEL92-2] => (item=Variable set: job_templates_API_version = v1beta2)
+ok: [RHEL92-1] => (item=Variable set: groups_API_version = v1beta2)
+ok: [RHEL92-2] => (item=Variable set: groups_API_version = v1beta2)
+ok: [RHEL92-1] => (item=Variable set: firmware_bundles_API_version = v1beta2)
+ok: [RHEL92-2] => (item=Variable set: firmware_bundles_API_version = v1beta2)
+ok: [RHEL92-1] => (item=Variable set: filters_API_version = v1beta1)
+ok: [RHEL92-2] => (item=Variable set: filters_API_version = v1beta1)
+ok: [RHEL92-1] => (item=Variable set: external_services_API_version = v1beta1)
+ok: [RHEL92-2] => (item=Variable set: external_services_API_version = v1beta1)
+ok: [RHEL92-1] => (item=Variable set: activities_API_version = v1beta2)
+ok: [RHEL92-2] => (item=Variable set: activities_API_version = v1beta2)
+
+TASK [Capture all job templates] ******************************************************************************************************************************************************************************************************
+ok: [RHEL92-2 -> localhost]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Set a variable for all job templates items] *************************************************************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Set variables for each job templates] *******************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => (item=Variable set: ApplianceReconnect_job_template_resourceUri = /compute-ops/v1beta2/job-templates/0e818877-5a9a-4ea9-8978-8391270fbaba)
+ok: [RHEL92-2] => (item=Variable set: ApplianceReconnect_job_template_resourceUri = /compute-ops/v1beta2/job-templates/0e818877-5a9a-4ea9-8978-8391270fbaba)
+ok: [RHEL92-1] => (item=Variable set: ApplySettingsTemplate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
+ok: [RHEL92-2] => (item=Variable set: ApplySettingsTemplate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
+ok: [RHEL92-1] => (item=Variable set: ColdBoot_job_template_resourceUri = /compute-ops/v1beta2/job-templates/aacfb3e0-6575-4d4f-a711-1ee1ae768407)
+ok: [RHEL92-2] => (item=Variable set: ColdBoot_job_template_resourceUri = /compute-ops/v1beta2/job-templates/aacfb3e0-6575-4d4f-a711-1ee1ae768407)
+ok: [RHEL92-1] => (item=Variable set: CopyServerProfileTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
+ok: [RHEL92-2] => (item=Variable set: CopyServerProfileTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
+ok: [RHEL92-1] => (item=Variable set: CreateOneviewComplianceReport_job_template_resourceUri = /compute-ops/v1beta2/job-templates/aae145a1-79a2-4516-b191-c98039c96542)
+ok: [RHEL92-2] => (item=Variable set: CreateOneviewComplianceReport_job_template_resourceUri = /compute-ops/v1beta2/job-templates/aae145a1-79a2-4516-b191-c98039c96542)
+ok: [RHEL92-1] => (item=Variable set: DataRoundupReportOrchestrator_job_template_resourceUri = /compute-ops/v1beta2/job-templates/b0001d36-6490-48ac-93af-a87adfb997ed)
+ok: [RHEL92-2] => (item=Variable set: DataRoundupReportOrchestrator_job_template_resourceUri = /compute-ops/v1beta2/job-templates/b0001d36-6490-48ac-93af-a87adfb997ed)
+ok: [RHEL92-1] => (item=Variable set: FirmwareUpdate_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/fd54a96c-cabc-42e3-aee3-374a2d009dba)
+ok: [RHEL92-2] => (item=Variable set: FirmwareUpdate_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/fd54a96c-cabc-42e3-aee3-374a2d009dba)
+ok: [RHEL92-1] => (item=Variable set: GetExpandedSPT_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d17898e6-6907-491e-8430-7c2da795d2e5)
+ok: [RHEL92-2] => (item=Variable set: GetExpandedSPT_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d17898e6-6907-491e-8430-7c2da795d2e5)
+ok: [RHEL92-1] => (item=Variable set: GetFullServerInventory_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d6595f1b-84e6-4587-ade5-656e2a5ea20d)
+ok: [RHEL92-2] => (item=Variable set: GetFullServerInventory_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d6595f1b-84e6-4587-ade5-656e2a5ea20d)
+ok: [RHEL92-1] => (item=Variable set: GetOneviewServerInventory_job_template_resourceUri = /compute-ops/v1beta2/job-templates/a0124cb1-00f1-46b7-818f-a9eb5f60591f)
+ok: [RHEL92-2] => (item=Variable set: GetOneviewServerInventory_job_template_resourceUri = /compute-ops/v1beta2/job-templates/a0124cb1-00f1-46b7-818f-a9eb5f60591f)
+ok: [RHEL92-1] => (item=Variable set: GetOneViewSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/fc16aa48-c73c-4463-9112-e061383ebfa9)
+ok: [RHEL92-2] => (item=Variable set: GetOneViewSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/fc16aa48-c73c-4463-9112-e061383ebfa9)
+ok: [RHEL92-1] => (item=Variable set: GetPowerMeterData_job_template_resourceUri = /compute-ops/v1beta2/job-templates/50fa7d05-5941-4e8e-90c3-5995f1d600a8)
+ok: [RHEL92-2] => (item=Variable set: GetPowerMeterData_job_template_resourceUri = /compute-ops/v1beta2/job-templates/50fa7d05-5941-4e8e-90c3-5995f1d600a8)
+ok: [RHEL92-1] => (item=Variable set: GetSettingsForTemplate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/6cd671db-ce6b-45ce-894e-7b5ae23e0399)
+ok: [RHEL92-2] => (item=Variable set: GetSettingsForTemplate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/6cd671db-ce6b-45ce-894e-7b5ae23e0399)
+ok: [RHEL92-1] => (item=Variable set: GetSSOUrl_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2c7de503-77af-4340-b68d-7a26e5359b8e)
+ok: [RHEL92-2] => (item=Variable set: GetSSOUrl_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2c7de503-77af-4340-b68d-7a26e5359b8e)
+ok: [RHEL92-1] => (item=Variable set: GroupApplyOneviewSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/a229a162-b43f-45b0-b7bb-692df77b9746)
+ok: [RHEL92-2] => (item=Variable set: GroupApplyOneviewSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/a229a162-b43f-45b0-b7bb-692df77b9746)
+ok: [RHEL92-1] => (item=Variable set: GroupApplyServerSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/beff07ce-f36d-4699-9ac3-f872dcd63133)
+ok: [RHEL92-2] => (item=Variable set: GroupApplyServerSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/beff07ce-f36d-4699-9ac3-f872dcd63133)
+ok: [RHEL92-1] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/db3620d4-19a4-4b54-9804-83f8f59d48a4)
+ok: [RHEL92-2] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/db3620d4-19a4-4b54-9804-83f8f59d48a4)
+ok: [RHEL92-1] => (item=Variable set: GroupFirmwareCompliance_job_template_resourceUri = /compute-ops/v1beta2/job-templates/23b8ba2a-6c46-4223-b028-919382c7dcac)
+ok: [RHEL92-2] => (item=Variable set: GroupFirmwareCompliance_job_template_resourceUri = /compute-ops/v1beta2/job-templates/23b8ba2a-6c46-4223-b028-919382c7dcac)
+ok: [RHEL92-1] => (item=Variable set: GroupFirmwareUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
+ok: [RHEL92-2] => (item=Variable set: GroupFirmwareUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
+ok: [RHEL92-1] => (item=Variable set: GroupGetIloSecurityParams_job_template_resourceUri = /compute-ops/v1beta2/job-templates/08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
+ok: [RHEL92-2] => (item=Variable set: GroupGetIloSecurityParams_job_template_resourceUri = /compute-ops/v1beta2/job-templates/08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
+ok: [RHEL92-1] => (item=Variable set: GroupOSInstallation_job_template_resourceUri = /compute-ops/v1beta2/job-templates/e2952628-2629-4088-93db-91742304ef0c)
+ok: [RHEL92-1] => (item=Variable set: GroupServerInventoryReport_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
+ok: [RHEL92-2] => (item=Variable set: GroupOSInstallation_job_template_resourceUri = /compute-ops/v1beta2/job-templates/e2952628-2629-4088-93db-91742304ef0c)
+ok: [RHEL92-1] => (item=Variable set: GroupStorageVolumeConfiguration_job_template_resourceUri = /compute-ops/v1beta2/job-templates/c708eb57-235d-4ea8-9e21-8ceea2438773)
+ok: [RHEL92-2] => (item=Variable set: GroupServerInventoryReport_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
+ok: [RHEL92-1] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/94caa4ef-9ff8-4805-9e97-18a09e673b66)
+ok: [RHEL92-2] => (item=Variable set: GroupStorageVolumeConfiguration_job_template_resourceUri = /compute-ops/v1beta2/job-templates/c708eb57-235d-4ea8-9e21-8ceea2438773)
+ok: [RHEL92-1] => (item=Variable set: iLOSecurity_job_template_resourceUri = /compute-ops/v1beta2/job-templates/e1d69e76-38cc-4079-9192-a380baea2973)
+ok: [RHEL92-2] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/94caa4ef-9ff8-4805-9e97-18a09e673b66)
+ok: [RHEL92-1] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/abfda355-6e58-4c00-be0a-af35dbd70398)
+ok: [RHEL92-2] => (item=Variable set: iLOSecurity_job_template_resourceUri = /compute-ops/v1beta2/job-templates/e1d69e76-38cc-4079-9192-a380baea2973)
+ok: [RHEL92-2] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/abfda355-6e58-4c00-be0a-af35dbd70398)
+ok: [RHEL92-1] => (item=Variable set: PowerOff_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
+ok: [RHEL92-2] => (item=Variable set: PowerOff_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
+ok: [RHEL92-1] => (item=Variable set: PowerOn_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/0cbb2377-1834-488d-840c-d5bf788c34fb)
+ok: [RHEL92-1] => (item=Variable set: Restart_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/30110551-cad6-4069-95b8-dbce9bbd8525)
+ok: [RHEL92-2] => (item=Variable set: PowerOn_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/0cbb2377-1834-488d-840c-d5bf788c34fb)
+ok: [RHEL92-1] => (item=Variable set: ServerNetworkConnectivity_job_template_resourceUri = /compute-ops/v1beta2/job-templates/b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
+ok: [RHEL92-2] => (item=Variable set: Restart_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/30110551-cad6-4069-95b8-dbce9bbd8525)
+ok: [RHEL92-1] => (item=Variable set: SetIloSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/cf4f929b-d44a-4a90-93a9-820955458fd4)
+ok: [RHEL92-2] => (item=Variable set: ServerNetworkConnectivity_job_template_resourceUri = /compute-ops/v1beta2/job-templates/b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
+ok: [RHEL92-1] => (item=Variable set: SppUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2626e682-7bd4-40e3-b93a-745133deecd2)
+ok: [RHEL92-2] => (item=Variable set: SetIloSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/cf4f929b-d44a-4a90-93a9-820955458fd4)
+ok: [RHEL92-2] => (item=Variable set: SppUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2626e682-7bd4-40e3-b93a-745133deecd2)
+
+TASK [Capture server 'CZ2311004H' information] ****************************************************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Exit if server 'CZ2311004H' does not exist] *************************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Capture server 'CZ2311004H' generation, id, uri, connection status and iLO IP] **************************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "msg": [
+        "Generation: GEN_10",
+        "ID: P28948-B21+CZ2311004H",
+        "URI: /compute-ops/v1beta2/servers/P28948-B21+CZ2311004H",
+        "Connection status: True",
+        "iLO IP: 192.168.0.21"
+    ]
+}
+ok: [RHEL92-2] => {
+    "msg": [
+        "Generation: GEN_10",
+        "ID: P28948-B21+CZ2311004G",
+        "URI: /compute-ops/v1beta2/servers/P28948-B21+CZ2311004G",
+        "Connection status: True",
+        "iLO IP: 192.168.0.20"
+    ]
+}
+
+TASK [Exit if server 'CZ2311004H' is not connected to COM] ****************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Wait until the server 'CZ2311004H' raw inventory information is available (necessary when the server has recently been added to COM) then capture the data] *********************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Wait until the complete discovery of server 'CZ2311004H' is complete (necessary when the server has recently been added to COM).] ***********************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Check if workload profile 'Virtualization - Power Efficient' exists] ************************************************************************************************************************************************************
+ok: [RHEL92-2 -> localhost]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Exit if workload profile 'Virtualization - Power Efficient' does not exist] *****************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Set a variable for the resourceUri of workload profile 'Virtualization - Power Efficient'] **************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Wait until PCI devices information is available then capture the server 'CZ2311004H' raw inventory information] *****************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Capture the presence of a NS204i NVMe boot controller in server 'CZ2311004H'] ***************************************************************************************************************************************************
+ok: [RHEL92-1] => (item=never)
+skipping: [RHEL92-1] => (item=never) 
+skipping: [RHEL92-2] => (item=never) 
+skipping: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "msg": "NS204i found in server 'CZ2311004H'! NVMe RAID1 volume will be used as the target volume for the installation of RHEL!"
+}
+skipping: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2] => {
+    "msg": "No NS204i found in server 'CZ2311004G'! Let's check if a storage controller with drives is available..."
+}
+
+TASK [Capture size of the NS204i RAID1 volume if any] *********************************************************************************************************************************************************************************
+ok: [RHEL92-1] => (item=never)
+skipping: [RHEL92-1] => (item=never) 
+skipping: [RHEL92-2] => (item=never) 
+skipping: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+skipping: [RHEL92-2]
+ok: [RHEL92-1] => {
+    "msg": "Size of NS204i volume: 447.1 GB"
+}
+
+TASK [Capture storage RAID controller information when an HPE MR or SR controller is used with available drives] **********************************************************************************************************************
+skipping: [RHEL92-1] => (item=never) 
+skipping: [RHEL92-1] => (item=never) 
+skipping: [RHEL92-1]
+ok: [RHEL92-2] => (item=never)
+
+TASK [Set a variable for the name of the storage RAID controller found] ***************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2] => {
+    "msg": "Storage RAID controller found: 'HPE MR416i-a Gen10+' with '4' drives"
+}
+
+TASK [Exit when no NS204i and no SR/MR controller is found] ***************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Set a controller type variable for kickstart creation when a NS204i is present] *************************************************************************************************************************************************
+ok: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Set a controller type variable for kickstart creation when there is no NS204i but an SR/MR controller is present.] **************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "msg": "Controller type found that will be used by autounattend.xml: NS204i"
+}
+ok: [RHEL92-2] => {
+    "msg": "Controller type found that will be used by autounattend.xml: HPE MR416i-a Gen10+"
+}
+
+TASK [Check if server settings 'RAID1' already exist] *********************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Create internal storage configuration using 'RAID1' with a volume size of '-1' GB for the OS boot volume when it does not exist] ************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Result of the 'RAID1' creation task] ********************************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Set a variable for the resourceUri of the internal storage configuration 'RAID1' just created] **********************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Update internal storage configuration using 'RAID1' with a volume size of '-1' GB for the OS boot volume] ***********************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Result of the 'RAID1' update task] **********************************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2] => {
+    "internal_storage_server_setting_result.msg": "OK (462 bytes)"
+}
+
+TASK [Set a variable for the resourceUri of the internal storage configuration 'RAID1' just updated] **********************************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2] => {
+    "internal_storage_server_setting_resourceuri": "/compute-ops/v1beta1/server-settings/378bd822-db05-419b-abd2-e63ce2ad10bf"
+}
+
+TASK [Create server group name 'RHEL92-1_server_group' variable] **********************************************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Check if group 'RHEL92-1_server_group' already exists] **************************************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Create temporary group 'RHEL92-1_server_group' with no local storage configuration definition (if it does not exist)] ***********************************************************************************************************
+skipping: [RHEL92-2]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Display response of the temporary group 'RHEL92-1_server_group' creation request] ***********************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "server_group_result.msg": "OK (1044 bytes)"
+}
+skipping: [RHEL92-2]
+
+TASK [Set variables for the id and the resourceUri of temporary group 'RHEL92-1_server_group' just created] ***************************************************************************************************************************
+ok: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Update temporary group 'RHEL92-1_server_group' with no local storage configuration definition (if it does exist)] ***************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Display response of the temporary group 'RHEL92-1_server_group' update request] *************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Set variables for the id and the resourceUri of temporary group 'RHEL92-1_server_group' just updated] ***************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Create temporary group 'RHEL92-1_server_group' with local storage configuration definition (if it does not exist)] **************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Display response of the temporary group 'RHEL92-1_server_group' creation request] ***********************************************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2] => {
+    "server_group_result.msg": "OK (1132 bytes)"
+}
+
+TASK [Set variables for the id and the resourceUri of temporary group 'RHEL92-1_server_group' just created] ***************************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Update temporary group 'RHEL92-1_server_group' with local storage configuration definition (if it does exist)] ******************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Display response of the temporary group 'RHEL92-1_server_group' update request] *************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Set variables for the id and the resourceUri of temporary group 'RHEL92-1_server_group' just updated] ***************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "temporary_group_id": "47f37712-9c51-4451-94d7-27e5402d7a41"
+}
+ok: [RHEL92-2] => {
+    "temporary_group_id": "cdb03557-4784-42e8-aee5-753788825f4a"
+}
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "temporary_group_resourceuri": "/compute-ops/v1beta2/groups/47f37712-9c51-4451-94d7-27e5402d7a41"
+}
+ok: [RHEL92-2] => {
+    "temporary_group_resourceuri": "/compute-ops/v1beta2/groups/cdb03557-4784-42e8-aee5-753788825f4a"
+}
+
+TASK [Check if server 'CZ2311004H' is already member of a server group] ***************************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "server_info_from_ui_doorway.json.group_": ""
+}
+ok: [RHEL92-2] => {
+    "server_info_from_ui_doorway.json.group_": ""
+}
+
+TASK [Capture the id of the server group of which the server 'CZ2311004H' is a member (if applicable)] ********************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Remove server 'CZ2311004H' from the server group of which it is currently a member] *********************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Wait for deletion to complete] **************************************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+
+TASK [Assign server 'CZ2311004H' to temporary group 'RHEL92-1_server_group'] **********************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Display response of the group assignment task] **********************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "group_assignment_result.msg": "OK (518 bytes)"
+}
+ok: [RHEL92-2] => {
+    "group_assignment_result.msg": "OK (518 bytes)"
+}
+
+TASK [Wait for the configuration of server 'CZ2311004H' to complete] ******************************************************************************************************************************************************************
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the configuration of server 'CZ2311004H' to complete (30 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the configuration of server 'CZ2311004G' to complete (30 retries left).
+ok: [RHEL92-1 -> localhost]
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the configuration of server 'CZ2311004G' to complete (29 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the configuration of server 'CZ2311004G' to complete (28 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the configuration of server 'CZ2311004G' to complete (27 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the configuration of server 'CZ2311004G' to complete (26 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the configuration of server 'CZ2311004G' to complete (25 retries left).
+ok: [RHEL92-2 -> localhost]
+
+TASK [Exit if configuration of server 'CZ2311004H' failed to complete] ****************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Capture server 'CZ2311004H' raw inventory information] **************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Capture storage RAID controller information when an HPE MR or SR controller is used with available drives] **********************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2] => (item=never)
+
+TASK [Capture the size of the OS volume configured on the {{ storage_controller_name }}] **********************************************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "boot_drive_bytes_size": "480036519936"
+}
+ok: [RHEL92-2] => {
+    "boot_drive_bytes_size": "599584145408"
+}
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2] => {
+    "msg": "Size of RAID volume: 558.4 GB"
+}
+
+TASK [Check if RHEL Custom ISO file 'rhel-9.3-x86_64-boot.iso' exists in '/home/labrat/ISOs/rhelisosrc' on 'ansible.lj.lab'] **********************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Create the directory '/home/labrat/ISOs/rhelisosrc' to host the ISO file on 'ansible.lj.lab'] ***********************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Check if RHEL ISO 'https://liogw.lj.lab/deployment/rhel93-x64/rhel-9.3-x86_64-boot.iso' exists] *********************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Download file 'rhel-9.3-x86_64-boot.iso' to 'ansible.lj.lab' in '/home/labrat/ISOs/rhelisosrc' if not present] ******************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Collect ISO label (can be required for some booltloader modifications)] *********************************************************************************************************************************************************
+changed: [RHEL92-2 -> localhost]
+changed: [RHEL92-1 -> localhost]
+
+TASK [set_fact] ***********************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Create '/mnt/RHEL92-1' on 'ansible.lj.lab'] *************************************************************************************************************************************************************************************
+changed: [RHEL92-1 -> localhost]
+changed: [RHEL92-2 -> localhost]
+
+TASK [Create '/home/labrat/staging/baremetal/RHEL92-1/' on 'ansible.lj.lab' if it does not exist] *************************************************************************************************************************************
+changed: [RHEL92-1 -> localhost]
+changed: [RHEL92-2 -> localhost]
+
+TASK [Mount RHEL ISO '/home/labrat/ISOs/rhelisosrc/rhel-9.3-x86_64-boot.iso' to '/mnt/RHEL92-1/'] *************************************************************************************************************************************
+changed: [RHEL92-1 -> localhost]
+changed: [RHEL92-2 -> localhost]
+
+TASK [Copy ISO files to '/home/labrat/staging/baremetal/RHEL92-1/' on 'ansible.lj.lab'] ***********************************************************************************************************************************************
+changed: [RHEL92-1 -> localhost]
+changed: [RHEL92-2 -> localhost]
+
+TASK [Set permissions to allow the user running the Ansible playbook to delete the folder '/home/labrat/staging/baremetal/RHEL92-1'] **************************************************************************************************
+changed: [RHEL92-1 -> localhost]
+changed: [RHEL92-2 -> localhost]
+
+TASK [Unmount directory '/mnt/RHEL92-1'] **********************************************************************************************************************************************************************************************
+changed: [RHEL92-1 -> localhost]
+changed: [RHEL92-2 -> localhost]
+
+TASK [Modify UEFI bootloader for kickstart installation from CDROM] *******************************************************************************************************************************************************************
+changed: [RHEL92-1 -> localhost]
+changed: [RHEL92-2 -> localhost]
+
+TASK [Create kickstart file in '/home/labrat/staging/baremetal/RHEL92-1/' on 'ansible.lj.lab' with variable substitution] *************************************************************************************************************
+changed: [RHEL92-2 -> localhost]
+changed: [RHEL92-1 -> localhost]
+
+TASK [Create '/home/labrat/staging/baremetal/RHEL92-1/rpms/' on 'ansible.lj.lab' if it does not exist] ********************************************************************************************************************************
+changed: [RHEL92-2 -> localhost]
+changed: [RHEL92-1 -> localhost]
+
+TASK [Copying HPE AMS rpm file to '/home/labrat/staging/baremetal/RHEL92-1/rpms' on 'ansible.lj.lab'] *********************************************************************************************************************************
+changed: [RHEL92-2 -> localhost]
+changed: [RHEL92-1 -> localhost]
+
+TASK [Create customized bootable ISO in '/home/labrat/staging/baremetal/RHEL92-1/'] ***************************************************************************************************************************************************
+changed: [RHEL92-2 -> localhost]
+changed: [RHEL92-1 -> localhost]
+
+TASK [Implant MD5 checksum into the ISO to make it bootable] **************************************************************************************************************************************************************************
+changed: [RHEL92-2 -> localhost]
+changed: [RHEL92-1 -> localhost]
+
+TASK [Create '/usr/share/nginx/html/isos/' on 'ansible.lj.lab' if it does not exist] **************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Move created ISO to the nginx default html folder. ISO URL='http://ansible.lj.lab/isos/RHEL92-1.iso'] ***************************************************************************************************************************
+changed: [RHEL92-1 -> localhost]
+changed: [RHEL92-2 -> localhost]
+
+TASK [Update SELinux security contexts so that Nginx is allowed to serve content from the '/usr/share/nginx/html/isos/' directory.] ***************************************************************************************************
+changed: [RHEL92-2 -> localhost]
+changed: [RHEL92-1 -> localhost]
+
+TASK [Check if the operating system image server setting 'OS_Image_RHEL9.3_for_RHEL92-1' exists] **************************************************************************************************************************************
+ok: [RHEL92-2 -> localhost]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Create an operating system image server setting 'OS_Image_RHEL9.3_for_RHEL92-1' if it does not exist] ***************************************************************************************************************************
+ok: [RHEL92-2 -> localhost]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Result of the 'OS_Image_RHEL9.3_for_RHEL92-1' creation task] ********************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "OS_image_server_setting_result.msg": "OK (469 bytes)"
+}
+ok: [RHEL92-2] => {
+    "OS_image_server_setting_result.msg": "OK (469 bytes)"
+}
+
+TASK [Set variables for the id and the resourceUri of the OS Image configuration 'OS_Image_RHEL9.3_for_RHEL92-1' just created] ********************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Update the operating system image server setting 'OS_Image_RHEL9.3_for_RHEL92-1' if it does not exist] **************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Result of the 'OS_Image_RHEL9.3_for_RHEL92-1' update task] **********************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Set variables for the id and the resourceUri of the OS Image configuration 'OS_Image_RHEL9.3_for_RHEL92-1' just updated] ********************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "OS_image_server_setting_resourceuri": "/compute-ops/v1beta1/server-settings/431d7f69-5c7d-4f8e-bc69-a882deaa3097"
+}
+ok: [RHEL92-2] => {
+    "OS_image_server_setting_resourceuri": "/compute-ops/v1beta1/server-settings/f81ce4e6-3156-4c17-9c59-6622592d0603"
+}
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "OS_image_server_setting_id": "431d7f69-5c7d-4f8e-bc69-a882deaa3097"
+}
+ok: [RHEL92-2] => {
+    "OS_image_server_setting_id": "f81ce4e6-3156-4c17-9c59-6622592d0603"
+}
+
+TASK [Update temporary group 'RHEL92-1_server_group' to add OS image installation settings with NS204i] *******************************************************************************************************************************
+skipping: [RHEL92-2]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Display response of the group 'RHEL92-1_server_group' update request with NS204i] ***********************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "server_group_result.msg": "OK (1623 bytes)"
+}
+skipping: [RHEL92-2]
+
+TASK [Update temporary group 'RHEL92-1_server_group' to add OS image installation settings with storage controller (without NS204i)] **************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Display response of the group 'RHEL92-1_server_group' update request with storage controller] ***********************************************************************************************************************************
+skipping: [RHEL92-1]
+ok: [RHEL92-2] => {
+    "server_group_result.msg": "OK (1711 bytes)"
+}
+
+TASK [Start OS image installation in group 'RHEL92-1_server_group'] *******************************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Display response of the OS image installation request in group 'RHEL92-1_server_group'] *****************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "group_os_installation_result.msg": "OK (958 bytes)"
+}
+ok: [RHEL92-2] => {
+    "group_os_installation_result.msg": "OK (958 bytes)"
+}
+
+TASK [Wait for the OS image installation of server 'CZ2311004H' to complete] **********************************************************************************************************************************************************
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (60 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (60 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (59 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (59 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (58 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (58 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (57 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (57 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (56 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (56 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (55 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (55 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (54 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (54 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (53 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (53 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (52 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (52 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (51 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (51 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (50 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (50 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (49 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (49 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (48 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (48 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (47 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (47 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (46 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (46 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (45 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (45 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (44 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (44 retries left).
+FAILED - RETRYING: [RHEL92-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (43 retries left).
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Exit if operating system image installation task of server 'CZ2311004H' failed to complete] *************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Unassign server 'CZ2311004H' from temporary group 'RHEL92-1_server_group'] ******************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Wait for deletion to complete] **************************************************************************************************************************************************************************************************
+Pausing for 15 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [RHEL92-1]
+
+TASK [Display response of the temporary group unassignment task] **********************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "group_unassignment_result.msg": "OK (0 bytes)"
+}
+ok: [RHEL92-2] => {
+    "group_unassignment_result.msg": "OK (0 bytes)"
+}
+
+TASK [Delete temporary group 'RHEL92-1_server_group'] *********************************************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Display response of the temporary group deletion task] **************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "server_group_deletion_result.msg": "OK (0 bytes)"
+}
+ok: [RHEL92-2] => {
+    "server_group_deletion_result.msg": "OK (0 bytes)"
+}
+
+TASK [Delete operating system image server setting 'OS_Image_RHEL9.3_for_RHEL92-1'] ***************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Display response of the operating system image server setting deletion task] ****************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "OS_image_server_setting_deletion_result.msg": "OK (0 bytes)"
+}
+ok: [RHEL92-2] => {
+    "OS_image_server_setting_deletion_result.msg": "OK (0 bytes)"
+}
+
+TASK [Wait for '192.168.3.176' to respond on port 22...] ******************************************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Create a kickstart backup directory if it does not exist] ***********************************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Create a backup of the kickstart file named 'RHEL92-1_ks.cfg' in '/home/labrat/staging/kickstarts_backup/RHEL' folder] **********************************************************************************************************
+changed: [RHEL92-1 -> localhost]
+changed: [RHEL92-2 -> localhost]
+
+TASK [Delete all related files from staging location and nginx web server folder] *****************************************************************************************************************************************************
+changed: [RHEL92-1 -> localhost]
+changed: [RHEL92-2 -> localhost]
+
+TASK [Copy HPE Integrated Smart Update Tools (SUT) package 'sut-4.6.0-14.linux.x86_64.rpm' to 'RHEL92-1'] *****************************************************************************************************************************
+changed: [RHEL92-1]
+changed: [RHEL92-2]
+
+TASK [Wait for host to become reachable (faced a few times a host unreachable after the previous copy task)] **************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Install HPE SUT on 'RHEL92-1'] **************************************************************************************************************************************************************************************************
+changed: [RHEL92-1]
+changed: [RHEL92-2]
+
+TASK [Debug HPE SUT install result] ***************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "SUT_install_result": {
+        "changed": true,
+        "failed": false,
+        "msg": "",
+        "rc": 0,
+        "results": [
+            "Installed /tmp/sut.rpm",
+            "Installed: unzip-6.0-56.el9.x86_64",
+            "Installed: sut-4.6.0-14.linux.x86_64"
+        ]
+    }
+}
+ok: [RHEL92-2] => {
+    "SUT_install_result": {
+        "changed": true,
+        "failed": false,
+        "msg": "",
+        "rc": 0,
+        "results": [
+            "Installed /tmp/sut.rpm",
+            "Installed: unzip-6.0-56.el9.x86_64",
+            "Installed: sut-4.6.0-14.linux.x86_64"
+        ]
+    }
+}
+
+TASK [Initiate HPE SUT service] *******************************************************************************************************************************************************************************************************
+changed: [RHEL92-1]
+changed: [RHEL92-2]
+
+TASK [Rebooting the server as required after installing SUT] **************************************************************************************************************************************************************************
+changed: [RHEL92-2]
+changed: [RHEL92-1]
+
+TASK [Wait for HPE SUT service to be running] *****************************************************************************************************************************************************************************************
+FAILED - RETRYING: [RHEL92-1]: Wait for HPE SUT service to be running (20 retries left).
+ok: [RHEL92-2]
+ok: [RHEL92-1]
+
+TASK [Report the status of the HPE SUT service] ***************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "msg": "HPE SUT service is running."
+}
+ok: [RHEL92-2] => {
+    "msg": "HPE SUT service is running."
+}
+
+TASK [Fail if HPE SUT Service status is not running] **********************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Ensure HPE AMS service is in a running state] ***********************************************************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Report the status of the HPE AMS service] ***************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "msg": "HPE AMS service is running."
+}
+ok: [RHEL92-2] => {
+    "msg": "HPE AMS service is running."
+}
+
+TASK [Fail if HPE AMS Service status is not running] **********************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Wait a little while for things to stabilize] ************************************************************************************************************************************************************************************
+Pausing for 60 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [RHEL92-1]
+
+TASK [Wait for COM to detect SUT service to be running] *******************************************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Set fact for the first host in inventory] ***************************************************************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Collect firmware bundles] *******************************************************************************************************************************************************************************************************
+skipping: [RHEL92-2]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Set variable for Gen10 firmware bundle '2023.09.00.00'] *************************************************************************************************************************************************************************
+ok: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Exit if Gen10 firmware bundle '2023.09.00.00' does not exist] *******************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "Gen10_10p_firmware_bundle_ID": "275a59f78916400a761e4bf8c6958934"
+}
+skipping: [RHEL92-2]
+
+TASK [Set variable for '2023.09.00.01' associated patch for Gen10 firmware bundle '2023.09.00.00'] ************************************************************************************************************************************
+ok: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Exit if Gen10 associated patch '2023.09.00.01' does not exist] ******************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "Gen10_10p_patch_firmware_ID": "e3cfbf02d95c27e4aa5a4f824c032053"
+}
+skipping: [RHEL92-2]
+
+TASK [Set variable for Gen11 firmware bundle '2023.10.00.00'] *************************************************************************************************************************************************************************
+ok: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Exit if Gen11 firmware bundle '2023.10.00.00' does not exist] *******************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "Gen11_firmware_bundle_ID": "18aff817eb9c4bb256eeaf09743b3273"
+}
+skipping: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Set variable for '' associated patch for Gen11 firmware bundle '2023.10.00.00'] *************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Exit if Gen11 associated patch '' does not exist] *******************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Set the final variable value for the Gen10 firmware bundle ID] ******************************************************************************************************************************************************************
+ok: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Set the final variable value for the Gen11 firmware bundle ID] ******************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Fail if the firmware baselines for Gen10/Gen10+ and Gen11 servers could not be found.] ******************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Fail if the firmware baseline for Gen10/Gen10+ servers could not be found.] *****************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Fail if the firmware baseline for Gen11 servers could not be found.] ************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Set firmware bundle id for Gen10/Gen10+ server] *********************************************************************************************************************************************************************************
+ok: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Set firmware bundle id for Gen11 server] ****************************************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "bundle_id": "e3cfbf02d95c27e4aa5a4f824c032053"
+}
+skipping: [RHEL92-2]
+
+TASK [Check if the firmware server setting 'RHEL firmware baseline' exists] ***********************************************************************************************************************************************************
+skipping: [RHEL92-2]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Create the firmware server setting 'RHEL firmware baseline'] ********************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Display response of the firmware server setting 'RHEL firmware baseline' creation request] **************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Set variable for the resourceuri of the firmware server setting 'RHEL firmware baseline' just created] **************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Update the firmware server setting 'RHEL firmware baseline'] ********************************************************************************************************************************************************************
+skipping: [RHEL92-2]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Display response of the firmware server setting 'RHEL firmware baseline' update task] *******************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "firmware_server_setting_result.msg": "OK (518 bytes)"
+}
+skipping: [RHEL92-2]
+
+TASK [Set variable for the resourceuri of the firmware server setting 'RHEL firmware baseline' just updated] **************************************************************************************************************************
+skipping: [RHEL92-2]
+ok: [RHEL92-1]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "firmware_server_setting_resourceuri": "/compute-ops/v1beta1/server-settings/58f6413a-d454-43cf-9f5f-aec2f3913f73"
+}
+skipping: [RHEL92-2]
+
+TASK [Check if definitive group 'RHEL_group' already exist] ***************************************************************************************************************************************************************************
+skipping: [RHEL92-2]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Create definitive group 'RHEL_group' if it does not exist] **********************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Display response of the definitive group 'RHEL_group' creation request] *********************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Set variables for the id and the resourceUri of the definitive group 'RHEL_group' just created] *********************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Update definitive group 'RHEL_group' if it does exist] **************************************************************************************************************************************************************************
+skipping: [RHEL92-2]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Display response of the group 'RHEL_group' update request] **********************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "definitive_server_group_result.msg": "OK (1075 bytes)"
+}
+skipping: [RHEL92-2]
+
+TASK [Set variables for the id and the resourceUri of the existing definitive group 'RHEL_group' just updated] ************************************************************************************************************************
+skipping: [RHEL92-2]
+ok: [RHEL92-1]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "definitive_group_id": "c5a70a22-17e5-45f4-82ea-a3e0a3255398"
+}
+skipping: [RHEL92-2]
+
+TASK [debug] **************************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "definitive_group_resourceuri": "/compute-ops/v1beta2/groups/c5a70a22-17e5-45f4-82ea-a3e0a3255398"
+}
+skipping: [RHEL92-2]
+
+TASK [Gather subset facts on localhost] ***********************************************************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Capture the start time of the firmware update (will be used later to filter COM activities, etc.)] ******************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Display the start time of the firmware update] **********************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "msg": "2024-01-24T11:54:15Z"
+}
+ok: [RHEL92-2] => {
+    "msg": "2024-01-24T11:54:15Z"
+}
+
+TASK [Get definitive group 'RHEL_group' information] **********************************************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Set variable for existing definitive group 'RHEL_group' id] *********************************************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Check if server 'CZ2311004H' is already member of definitive server group 'RHEL_group'] *****************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Assign server 'CZ2311004H' to definitive server group 'RHEL_group'] *************************************************************************************************************************************************************
+ok: [RHEL92-2 -> localhost]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Display response of the group assignment task] **********************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "group_assignment_result.msg": "OK (518 bytes)"
+}
+ok: [RHEL92-2] => {
+    "group_assignment_result.msg": "OK (518 bytes)"
+}
+
+TASK [Wait for assignment to truly complete] ******************************************************************************************************************************************************************************************
+Pausing for 15 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [RHEL92-1]
+
+TASK [Get definitive group 'RHEL_group' information (first host only)] ****************************************************************************************************************************************************************
+skipping: [RHEL92-2]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Set fact for the list of server IDs member of the definitive server group (first host only)] ************************************************************************************************************************************
+ok: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Display the server IDs found (first host only)] *********************************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "server_ids": [
+        "P28948-B21+CZ2311004G",
+        "P28948-B21+CZ2311004H"
+    ]
+}
+skipping: [RHEL92-2]
+
+TASK [Create HPE Compute Ops Management session] **************************************************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Set variable access_token for the bearer token] *********************************************************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Start a group firmware update job using the defined firmware baseline (first host only)] ****************************************************************************************************************************************
+skipping: [RHEL92-2]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Display response of the group firmware update job (first host only)] ************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "group_firmware_update_job.msg": "OK (1126 bytes)"
+}
+skipping: [RHEL92-2]
+
+TASK [Capture the resourceUri of the group firmware update job (first host only)] *****************************************************************************************************************************************************
+ok: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Display the group firmware update job resource uri (first host only)] ***********************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "group_firmware_update_job_resourceUri": "/compute-ops/v1beta3/jobs/330b285d-4d27-4224-8851-5b8c02e17db4"
+}
+skipping: [RHEL92-2]
+
+TASK [Wait for the group firmware update job to complete (first host only)] ***********************************************************************************************************************************************************
+skipping: [RHEL92-2]
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (600 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (599 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (598 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (597 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (596 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (595 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (594 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (593 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (592 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (591 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (590 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (589 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (588 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (587 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (586 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (585 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (584 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (583 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (582 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (581 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (580 retries left).
+FAILED - RETRYING: [RHEL92-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (579 retries left).
+ok: [RHEL92-1 -> localhost]
+
+TASK [Display the group firmware update job result (first host only)] *****************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "msg": [
+        "State: COMPLETE",
+        "ResultCode: FAILURE",
+        "Status: JobErrorException : 2 servers failed update"
+    ]
+}
+skipping: [RHEL92-2]
+
+TASK [Get the latest activity of server 'CZ2311004H'] *********************************************************************************************************************************************************************************
+ok: [RHEL92-2 -> localhost]
+ok: [RHEL92-1 -> localhost]
+
+TASK [Extract items containing 'Firmware update'] *************************************************************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Display the firmware update activity status when successful] ********************************************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Display the firmware update activity status with recommanded actions when failed] ***********************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "msg": [
+        "Message: Firmware update failed",
+        "",
+        "Recommended action:",
+        "2 out of total 5 components did not complete the update successfully to baseline Patch 2023.09.00.01 + SPP 2023.09.00.00 (03 Nov 2023). To resolve this issue, open a support case by clicking on the help icon in the UI and select Compute Ops Management - Create case (error code: FWE-102).",
+        "  ",
+        "  ",
+        "Failed components:",
+        "hponcfg-6.0.0-0.x86_64.rpm",
+        "fibreutils-4.2-1_rhel.x86_64.rpm",
+        ""
+    ]
+}
+ok: [RHEL92-2] => {
+    "msg": [
+        "Message: Firmware update failed",
+        "",
+        "Recommended action:",
+        "2 out of total 5 components did not complete the update successfully to baseline Patch 2023.09.00.01 + SPP 2023.09.00.00 (03 Nov 2023). To resolve this issue, open a support case by clicking on the help icon in the UI and select Compute Ops Management - Create case (error code: FWE-102).",
+        "  ",
+        "  ",
+        "Failed components:",
+        "hponcfg-6.0.0-0.x86_64.rpm",
+        "fibreutils-4.2-1_rhel.x86_64.rpm",
+        ""
+    ]
+}
+
+TASK [Capture server information] *****************************************************************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Capture last firmware update information] ***************************************************************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Display server last firmware update information if up-to-date] ******************************************************************************************************************************************************************
+ok: [RHEL92-1]=> {
+    "msg": [
+        {
+            "name": "HPE MegaRAID Storage Administrator StorCLI for Linux 64-bit (fo",
+            "version": "007.2417.0000.0000",
+            "status": "OK"
+        },
+        {
+            "name": "HPE MegaRAID Storage Administrator for Linux 64-bit (HPE MRSA f",
+            "version": "8.4.16.0",
+            "status": "OK"
+        },
+        {
+            "name": "HPE Emulex Smart SAN Enablement Kit for Linux",
+            "version": "1.0.0.0-4",
+            "status": "OK"
+        },
+        {
+            "name": "HPE Lights-Out Online Configuration Utility for Linux (AMD64/EM",
+            "version": "6.0.0-0",
+            "status": "FAILED"
+        },
+        {
+            "name": "Fibreutils for HPE Storage Fibre Channel Host Bus Adapters for ",
+            "version": "4.2-1",
+            "status": "FAILED"
+        }
+    ]
+}
+ok: [RHEL92-2]=> {
+    "msg": [
+        {
+            "name": "HPE MegaRAID Storage Administrator StorCLI for Linux 64-bit (fo",
+            "version": "007.2417.0000.0000",
+            "status": "OK"
+        },
+        {
+            "name": "HPE MegaRAID Storage Administrator for Linux 64-bit (HPE MRSA f",
+            "version": "8.4.16.0",
+            "status": "OK"
+        },
+        {
+            "name": "HPE Emulex Smart SAN Enablement Kit for Linux",
+            "version": "1.0.0.0-4",
+            "status": "OK"
+        },
+        {
+            "name": "HPE Lights-Out Online Configuration Utility for Linux (AMD64/EM",
+            "version": "6.0.0-0",
+            "status": "FAILED"
+        },
+        {
+            "name": "Fibreutils for HPE Storage Fibre Channel Host Bus Adapters for ",
+            "version": "4.2-1",
+            "status": "FAILED"
+        }
+    ]
+}
+
+TASK [Force update of current timestamp] **********************************************************************************************************************************************************************************************
+ok: [RHEL92-1 -> localhost]
+ok: [RHEL92-2 -> localhost]
+
+TASK [Get runtime] ********************************************************************************************************************************************************************************************************************
+ok: [RHEL92-1]
+ok: [RHEL92-2]
+
+TASK [Status of the OS installation with the firmware update with HPE drivers and software] *******************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Status of the OS installation with the firmware update without HPE drivers and software] ****************************************************************************************************************************************
+skipping: [RHEL92-1]
+skipping: [RHEL92-2]
+
+TASK [Status of the OS installation with firmware update failure] *********************************************************************************************************************************************************************
+ok: [RHEL92-1] => {
+    "msg": [
+        "RHEL92-1.lj.lab installation completed but the firmware update operation failed to complete!",
+        "OS is configured and running.",
+        "Refer to the individual server activity entries in the HPE Compute Ops Management UI for more details.",
+        "To SSH to the new host from Ansible control node, use: ssh root@RHEL92-1.lj.lab",
+        "The provisioning task took 0:56:22."
+    ]
+}
+ok: [RHEL92-2] => {
+    "msg": [
+        "RHEL92-2.lj.lab installation completed but the firmware update operation failed to complete!",
+        "OS is configured and running.",
+        "Refer to the individual server activity entries in the HPE Compute Ops Management UI for more details.",
+        "To SSH to the new host from Ansible control node, use: ssh root@RHEL92-2.lj.lab",
+        "The provisioning task took 0:56:23."
+    ]
+}
+
+PLAY RECAP ****************************************************************************************************************************************************************************************************************************
+RHEL92-1                   : ok=142  changed=22   unreachable=0    failed=0    skipped=68   rescued=0    ignored=0   
+RHEL92-2                   : ok=118  changed=22   unreachable=0    failed=0    skipped=88   rescued=0    ignored=0 

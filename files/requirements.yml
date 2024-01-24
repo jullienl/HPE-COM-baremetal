@@ -1,5 +1,5 @@
 ---
-collections:
+collections:  
   # Community.vmware collection is required for vCenter
   - name: community.vmware
   # Community.windows collection is required to create a DNS record - Also install ansible.windows collection 

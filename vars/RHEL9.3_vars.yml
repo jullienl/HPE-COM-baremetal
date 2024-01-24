@@ -1,0 +1,117 @@
+---
+# Host information (name, IP and Serial number) is provided by the Ansible inventory 'hosts' file:
+#   RHEL-2 os_ip_address=192.168.3.172 serial_number=CZ2311004G
+#   RHEL-3 os_ip_address=192.168.3.175 serial_number=CZ2311004H
+
+
+#---------------------- Network settings -------------------------------------------------------------------------------------
+
+gateway: "192.168.1.1"
+nameserver: "192.168.2.1,192.168.2.3"
+netmask: "255.255.252.0"
+domain: "lj.lab"
+
+
+#---------------------- Server settings --------------------------------------------------------------------------------------
+
+# OS boot volume RAID type and size
+raid_type: RAID1       # Supported RAID types: RAID0, RAID1, RAID5
+volume_size_in_GB: -1  # It must be a number >0 or -1, where -1 indicates to use the entire disk.
+
+# BIOS/Workload profile
+workload_profile_name: "Virtualization - Power Efficient"       
+  # Supported workload profiles:  
+  # - Virtualization - Max Performance
+  # - Virtualization - Power Efficient
+  # - General Peak Frequency Compute
+  # - General Power Efficient Compute
+  # - General Throughput Compute
+  # - Low Latency
+
+
+#---------------------- COM server group settings ----------------------------------------------------------------------------
+
+# Name of the definitive server group where to place the host at the end of provisioning (created if not already present)
+server_group_name: "RHEL_group"
+# Name of the firmware server setting to be defined in definitive server group (created if not already present)
+firmware_server_setting_name: "RHEL firmware baseline"
+
+# Firmware baselines to be defined in the firmware server setting of the definitive server group 
+#  Note: it is mandatory to define at least one firmware baseline for Gen10/Gen10+ servers and one for Gen11 servers.
+Gen10_10p_firmware_bundle_name:  "2023.09.00.00" # "2023.03.00.00"
+Gen10_10p_patch_name_associated_with_firmware_bundle:   "2023.09.00.01"  # "2023.03.00.03" 
+Gen11_firmware_bundle_name: "2023.10.00.00" # "2023.04.00.00"
+Gen11_patch_name_associated_with_firmware_bundle: "" # "2023.04.00.04"
+
+# Downgrade components policy of the definitive server group to match baseline (boolean)
+# If "true", any component version higher than the baseline will be downgraded to match the baseline. 
+firmware_downgrade_policy: false
+
+# Install HPE drivers and software policy in the definitive server group 
+# If "true", firmware updates will include HPE drivers and software. 
+install_SWDrivers_policy: true
+
+
+#------------------------ ISO settings -------------------------------------------------------------------------------------
+
+# URL where the BOOT ISO image can be found
+src_iso_url: "https://liogw.lj.lab/deployment/rhel93-x64"
+
+# BOOT ISO file name
+src_iso_file: "rhel-9.3-x86_64-boot.iso"
+
+# Directory on the Ansible control node where the source ISO will be copied (will be created if not already present). 
+# Note: You must define a directory in your user home directory using {{ lookup('env','HOME') }}. 
+src_iso_directory: "{{ lookup('env','HOME') }}/ISOs/rhelisosrc"  
+
+# Directory on the Ansible control node to stage all files to build and generate the new ISO image with the custom kickstart (will be created if not already present).
+# Note: You must define a directory in your user home directory using {{ lookup('env','HOME') }}. 
+staging_directory: "{{ lookup('env','HOME') }}/staging"
+
+
+#------------------------ Kickstart file and HPE Packages ---------------------------------------------------------------------
+
+# Folder located in /files to store the kickstart and HPE AMS and SUT files
+# Recommended to use the template name: RHEL.<version>. (<version> can be found in the .discinfo file at the root of the iso)
+rhel_version: "RHEL_9.3"
+
+# Name of the kickstart file 
+kickstart: "ks-rhel9.sh"
+
+# Name of the HPE Agentless Management Service (AMS) (required)
+AMS_package: "amsd-3.4.0-1790.3.rhel9.x86_64.rpm"
+
+# Name of the HPE Integrated Smart Update Tools (iSUT)
+SUT_package: "sut-4.6.0-14.linux.x86_64.rpm"
+
+# RHEL repositories location (contains BaseOS and Appstream folders)
+# = Installation source URL (is a copy of the contents of the DVD ISO image containing the required repository and software packages)
+RHEL_repo_url:  "https://liogw.lj.lab/deployment/rhel93-x64"
+
+
+#------------------------ Kickstart file customization ----------------------------------------------------------------------
+
+# Password for root
+# To create an encrypted passord, you can use the following command for SHA512: 
+# > openssl passwd -6 
+# or
+# > python3 -c 'import crypt,getpass;pw=getpass.getpass();print(crypt.crypt(pw) if (pw==getpass.getpass("Confirm: ")) else exit())'
+encrypted_root_password: "$6$VRZaSg6YXxzE5IDL$e5J06Rf.ae.f8ZcVYa9ndbB/JgLPGEz3xVEqOqbn/regOPu.mCgHzrNdvnkKGa2ggJ8Yw09VQdHpFdLuGoXtW/"
+
+# System timezone
+# America/New York, etc.
+# To get the list of supported timezone values: timedatectl list-timezones
+timezone: "Europe/Paris"
+ntp_server: "time.cloudflare.com"
+
+# Keyboard layouts: us, fr, de, es, etc.
+# To get the list of supported keyboard values: ls /usr/lib/kbd/keymaps/xkb/ | sed 's/.\{7\}$//'
+keyboard: "us"
+# System language: fr_FR, en_US, en_GB, de_DE, es_ES, etc.
+# To get the list of supported language values: locale -a | grep _
+language: "en_US"
+
+# If true, create a NIC bonding using the first two connected NICs to set the network settings
+# If false, no NIC bonding is created. The first connected NIC found is used to set the network settings
+enable_nic_bonding: true
+
