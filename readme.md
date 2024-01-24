@@ -32,9 +32,17 @@ Here are some benefits of automatic bare metal provisioning:
 
 For a concise understanding of the possibilities offered by this bare metal provisioning project with HPE Compute Ops Management and Ansible, you can watch the following videos:
 
-**Efficient Bare Metal Provisioning for Windows Server with HPE Compute Ops Management and Ansible**:   
+**Efficient Bare Metal Provisioning for Windows Server with HPE Compute Ops Management and Ansible**:  
+
+https://www.youtube.com/watch?v=A6RD6nIAFmw 
+
 **Efficient Bare Metal Provisioning for RHEL 9.3 with HPE Compute Ops Management and Ansible**: 
-**Efficient Bare Metal Provisioning for ESXi with HPE Compute Ops Management and Ansible**:   
+
+https://www.youtube.com/watch?v=6_o8yB4cvag
+
+**Efficient Bare Metal Provisioning for ESXi with HPE Compute Ops Management and Ansible**: 
+
+https://www.youtube.com/watch?v=_ySgROdd_Bw 
 
 
 ## Supported operating systems
@@ -91,27 +99,25 @@ With Linux and Windows:
 
 The following diagrams describe the overall process flows:
 
-**ESXi Provisioning**:   
-
-![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/8c89fa9b-56d8-4767-88fa-a959888733ba)
-
-
-**ESXi Unprovisioning**:   
-
-![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/decc72b3-4a79-429d-b888-e98032aa5ef6)
-
-
 **RHEL Provisioning**:  
 
-
+![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/0cf77db0-dc3a-4fa7-a82b-2734e25a2dd9)
+ 
 **Windows Server Provisioning**:  
-
-
+ 
+![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/a7c2d4e5-c564-455a-b784-ba05de4a13b8)
+ 
 **RHEL and Windows Server Unprovisioning**:   
-
-
-A more detailed process flow is avalable at https://miro.com/app/board/uXjVNZ9eH-w=/?share_link_id=812370641566 
-
+ 
+![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/4b53cb2e-57d4-48f4-a912-7dd577b363ea)
+ 
+**ESXi Provisioning**:   
+  
+![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/9a31b6f4-2583-4688-a828-a468619ef221)
+   
+**ESXi Unprovisioning**:   
+   
+![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/0b9a414b-9dc7-4b12-9e17-00a4741a4f79)
 
 
 ## Pre-requisites
