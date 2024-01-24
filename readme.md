@@ -36,19 +36,15 @@ For a concise understanding of the possibilities offered by this bare metal prov
 
 [![Efficient Bare Metal Provisioning for Windows Server with HPE Compute Ops Management and Ansible](https://img.youtube.com/vi/A6RD6nIAFmw/0.jpg)](https://www.youtube.com/watch?v=A6RD6nIAFmw)
 
-https://www.youtube.com/watch?v=A6RD6nIAFmw 
 
 **Efficient Bare Metal Provisioning for RHEL 9.3 with HPE Compute Ops Management and Ansible**: 
 
 [![Efficient Bare Metal Provisioning for RHEL 9.3 with HPE Compute Ops Management and Ansible](https://img.youtube.com/vi/6_o8yB4cvag/0.jpg)](https://www.youtube.com/watch?v=6_o8yB4cvag)
 
-https://www.youtube.com/watch?v=6_o8yB4cvag
 
 **Efficient Bare Metal Provisioning for ESXi with HPE Compute Ops Management and Ansible**: 
 
 [![Efficient Bare Metal Provisioning for ESXi with HPE Compute Ops Management and Ansible](https://img.youtube.com/vi/_ySgROdd_Bw/0.jpg)](https://www.youtube.com/watch?v=_ySgROdd_Bw)
-
-https://www.youtube.com/watch?v=_ySgROdd_Bw 
 
 
 ## Supported operating systems
