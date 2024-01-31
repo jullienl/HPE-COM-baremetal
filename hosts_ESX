@@ -1,7 +1,14 @@
 localhost ansible_python_interpreter=/usr/bin/python3 ansible_connection=local 
+# localhost refers to the local machine on which Ansible is being run
+# tells Ansible to use Python 3 as the interpreter for running modules
+# local directive informs Ansible that it should execute the tasks locally instead of connecting over SSH 
 
 [All:vars]
 ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+# In Ansible, when connecting to servers for the first time, you might encounter an interactive prompt asking you 
+# to verify the authenticity of the host. For automated scripts and playbooks, this interaction can cause the process 
+# to halt, waiting for user input. By setting StrictHostKeyChecking=no, Ansible forces the SSH client to bypass this 
+# interactive step, enabling automated processes to run without manual intervention.
 
 [All]
 ESX-1 os_ip_address=192.168.3.174 serial_number=CZ2311004H            # DL360 Gen10 Plus (MR active - NS204i disabled)     [iLO: 192.168.0.20]

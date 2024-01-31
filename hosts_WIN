@@ -1,7 +1,7 @@
 localhost ansible_python_interpreter=/usr/bin/python3 ansible_connection=local 
-
-[WIN2022:vars]
-ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+# localhost refers to the local machine on which Ansible is being run
+# tells Ansible to use Python 3 as the interpreter for running modules
+# local directive informs Ansible that it should execute the tasks locally instead of connecting over SSH 
 
 [WIN2022]
 WIN-1 os_ip_address=192.168.3.178 serial_number=CZ2311004H       # DL360 Gen10 Plus (MR active - NS204i disabled)     [iLO: 192.168.0.20]
