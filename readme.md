@@ -214,7 +214,7 @@ To configure WinRM, you can simply run [ConfigureRemotingForAnsible.ps1](https:/
 
    > `group_vars` is a feature in Ansible that allows you to define variables that will be applied to groups of hosts. For instance, `group_vars/WIN2022` folder is specifically used for setting variables applicable to the Windows hosts that are part of the [WIN2022] group defined in the inventory file (i.e. `hosts`). So it's essential to retain the name of the `WIN2022` folder so that Ansible can correctly associate the variables within this folder with the hosts in the [WIN2022] group. When Ansible runs, it will look for a directory matching the group name inside `group_vars` and apply any variables it finds there to the hosts in that group.
 
-   > For ESXi and RHEL variables, the root password is encrypted in the kickstart using the variable `encrypted_root_password` to maintain the confidentiality of the root password. See the kickstart files for more information on how to encrypt your password from the Ansible control node.
+   > For ESXi and RHEL variables, the root password is hashed in the kickstart using the variable `hashed_root_password` to maintain the confidentiality of the root password. See the kickstart files for more information on how to hash your password from the Ansible control node.
 
 3. For ESXi and Linux, copy the operating system ISOs to a web server as defined in the variables `src_iso_url` and `src_iso_file`. For Windows, copy the WinPE image you created as described in [WinPE_image_creation.md](https://github.com/jullienl/HPE-COM-baremetal/blob/main/files/WinPE_image_creation.md) onto the web server and as defined in the variables `winpe_iso_url` and `winpe_iso_file`.
 
