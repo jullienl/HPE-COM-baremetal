@@ -125,6 +125,7 @@ The following diagrams describe the overall process flows:
 ## Pre-requisites
 
 - An Ansible control node running Ansible:
+  - Meets Ansible system requirements, see https://access.redhat.com/documentation/en-us/red_hat_ansible_automation_platform/2.3/html/red_hat_ansible_automation_platform_planning_guide/platform-system-requirements#ref-controller-system-requirements
   - With internet connectivity to interface with the HPE GreenLake platform and must also be connected to the management network where the servers will be deployed.
   - With a storage volume large enough to host a copy of the ISO files, and the temporary extraction of an ISO and the new generated ISO with the customized kickstart for each server being provisioned 
 
