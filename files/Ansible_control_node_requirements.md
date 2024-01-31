@@ -31,7 +31,7 @@ Openssh is installed by default on Rocky Linux so it is not necessary to install
 To generate an SSH RSA key pair without a passphrase:
 
 ```
-ssh-keygen -t rsa -f ~/.ssh/id_rsa -N ""
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
 ``` 
 
 > `-N ""` indicates that the passphrase is an empty string i.e., no passphrase. This is to prevent Ansible from asking for the passphrase when running a playbook.
