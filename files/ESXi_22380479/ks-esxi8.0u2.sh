@@ -1,6 +1,6 @@
 vmaccepteula
 
-rootpw --iscrypted {{encrypted_root_password}}
+rootpw --iscrypted {{hashed_root_password}}
 
 %include /tmp/DiskConfig
 

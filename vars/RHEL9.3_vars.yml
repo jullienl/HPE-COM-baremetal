@@ -92,11 +92,11 @@ RHEL_repo_url:  "https://liogw.lj.lab/deployment/rhel93-x64"
 #------------------------ Kickstart file customization ----------------------------------------------------------------------
 
 # Password for root
-# To create an encrypted passord, you can use the following command for SHA512: 
+# To generate a hashed password, you can use the following command for SHA512: 
 # > openssl passwd -6 
 # or
 # > python3 -c 'import crypt,getpass;pw=getpass.getpass();print(crypt.crypt(pw) if (pw==getpass.getpass("Confirm: ")) else exit())'
-encrypted_root_password: "$6$VRZaSg6YXxzE5IDL$e5J06Rf.ae.f8ZcVYa9ndbB/JgLPGEz3xVEqOqbn/regOPu.mCgHzrNdvnkKGa2ggJ8Yw09VQdHpFdLuGoXtW/"
+hashed_root_password: "$6$VRZaSg6YXxzE5IDL$e5J06Rf.ae.f8ZcVYa9ndbB/JgLPGEz3xVEqOqbn/regOPu.mCgHzrNdvnkKGa2ggJ8Yw09VQdHpFdLuGoXtW/"
 
 # System timezone
 # America/New York, etc.

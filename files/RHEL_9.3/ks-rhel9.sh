@@ -66,7 +66,7 @@ lang {{language}}
 # logging --level=info
 
 # Root password 
-rootpw --iscrypted {{encrypted_root_password}}
+rootpw --iscrypted {{hashed_root_password}}
 
 # System authorization information
 authselect --enableshadow --passalgo=sha512
