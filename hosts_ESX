@@ -1,3 +1,11 @@
+# Inventory file example for ESXi provisioning
+#
+#  Modify this inventory example file with information about the target servers you want to provision. 
+#  Only three parameters are required:
+#    •	Hostname: the OS hostname that will be configured (cautious: it is not the FQDN!)
+#    •	os_ip_address: the IP address that will be assigned to the operating system
+#    •	serial_number: the serial number of the server to be provisioned (found in COM)
+
 localhost ansible_python_interpreter=/usr/bin/python3 ansible_connection=local 
 # localhost refers to the local machine on which Ansible is being run
 # tells Ansible to use Python 3 as the interpreter for running modules
