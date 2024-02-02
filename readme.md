@@ -6,7 +6,7 @@ The goal is to enable quick and easy provisioning of servers managed by HPE Comp
 
 In this project, automating the provisioning of operating systems on bare metal servers is made simple and accessible to anyone with basic knowledge of Ansible, HPE Compute Ops Management, and kickstart techniques. While it is generally a complex process that requires a wide range of skills, this project simplifies it with the use of auto-customized kickstarts, auto-generated ISO files and by exploiting the very interesting functions of HPE Compute Ops Management server groups.
 
-One of the benefit of Ansible is parallel execution that allows the simultaneous execution of tasks on multiple hosts. In other words, with one playbook execution, you can provision a customized OS on multiple servers (5 by default). This can significantly speed up the execution time of playbooks, especially when managing large environments with a large number of hosts. Parallel execution enables faster infrastructure provisioning, configuration management, and application deployment across multiple hosts, improving overall efficiency and reducing the time required for administrative tasks.
+One of the benefits of Ansible is parallel execution that allows the simultaneous execution of tasks on multiple hosts. In other words, with one playbook execution, you can provision a customized OS on multiple servers (5 by default). This can significantly speed up the execution time of playbooks, especially when managing large environments with a large number of hosts. Parallel execution enables faster infrastructure provisioning, configuration management, and application deployment across multiple hosts, improving overall efficiency and reducing the time required for administrative tasks.
 
 
 ## Main benefits
@@ -54,7 +54,7 @@ For automating the provisioning of operating systems, three main playbooks are a
 - Red Hat Enterprise Linux and equivalent 
 - Windows Server 2022 and equivalent
 
-> **Note**: UEFI secure boot is not supported, but can be enabled at a later date once the operating system has been installed.
+> **Note**: UEFI secure boot is not supported but can be enabled at a later date once the operating system has been installed.
 
 > **Note**: iLO Security in FIPS or CAC mode is not supported.
 
@@ -139,7 +139,7 @@ The following diagrams describe the overall process flows:
 
   > **Note**: The installation source URL which points to the extracted contents of the DVD ISO image is defined by the variable `<OS>_repo_url` in `<OS>_vars.yml` in the `vars` folder. 
 
-  > **Note**: To reduce the process of creating Red Hat (and community Enterprise Linux: CentOS, Alma Linux, Rocky Linux) customized ISO images, this projet uses BOOT ISO images (~700MB) instead of traditional DVD ISOs (~8GB). The BOOT ISO does not contain any installable packages. It is therefore necessary to set up an installation source that stores a copy of the DVD ISO image contents, so that the BOOT ISO image installer can access the software packages and start the installation.
+  > **Note**: To reduce the process of creating Red Hat (and community Enterprise Linux: CentOS, Alma Linux, Rocky Linux) customized ISO images, this project uses BOOT ISO images (~700MB) instead of traditional DVD ISOs (~8GB). The BOOT ISO does not contain any installable packages. It is therefore necessary to set up an installation source that stores a copy of the DVD ISO image contents, so that the BOOT ISO image installer can access the software packages and start the installation.
 
   > **Note**: To learn how to prepare an installation source using HTTP/HTTPS, see [Creating an installation source using HTTP or HTTPS](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/performing_a_standard_rhel_8_installation/prepare-installation-source_installing-rhel#creating-an-installation-source-on-http_prepare-installation-source)
 
@@ -153,11 +153,11 @@ The following diagrams describe the overall process flows:
 
   > **Note**: There is no need for any predefined server groups or server settings in HPE Compute Ops Management. Each playbook is written to handle the creation of temporary server groups and server settings for the server BIOS, storage, and operating system configuration.
 
-- All HPE servers to be provsioned must be onboarded to the HPE GreenLake platform and their iLO must be correctly configured (with an IP address and connected to the cloud platform). 
+- All HPE servers to be provisioned must be onboarded to the HPE GreenLake platform and their iLO must be correctly configured (with an IP address and connected to the cloud platform). 
 
   > **Note**: To utilize the servers in HPE Compute Ops Management, certain steps need to be followed. Each server should be onboarded to the HPE GreenLake platform, properly licensed, and assigned to the COM application instance. Additionally, it is important to ensure that the iLO of each server is connected to the HPE GreenLake platform. To learn more, see [Configuring Compute Ops Management direct management](https://support.hpe.com/hpesc/public/docDisplay?docId=sd00001293en_us&page=GUID-8F12FE6C-DC13-44DC-921B-041E8DC628DB.html)
 
-- The Ansible inventory files for each operating sustem (i.e. [hosts_ESX](https://github.com/jullienl/HPE-COM-baremetal/blob/main/hosts_ESX)) must be updated. Each server should be listed in the corresponding inventory file along with its serial number and the IP address that should be assigned to the operating system.
+- The Ansible inventory files for each operating system (i.e. [hosts_ESX](https://github.com/jullienl/HPE-COM-baremetal/blob/main/hosts_ESX)) must be updated. Each server should be listed in the corresponding inventory file along with its serial number and the IP address that should be assigned to the operating system.
 
 - A Windows DNS server configured to be managed by Ansible. See below for more details.
 
@@ -167,7 +167,7 @@ The following diagrams describe the overall process flows:
 
   > **Note**: If in your environment, DNS records for servers to be provisioned are created in advance, you can remove the "Create DNS record for bare metal server" task from the playbooks.
 
-- For Windows server provisionning, a custom WinPE image is required.
+- For Windows server provisioning, a custom WinPE image is required.
 
   > **Note**: When using a Windows Server ISO for installation, you cannot execute a script prior to the initiation of the setup process. Additionally, PowerShell is inaccessible during the Panther phase of the installation. Although you can trigger a script execution via the unattend file, this approach does not support the dynamic use of variables to populate other sections within the unattend file for particular requirements, such as specifying the disk on which to install. Therefore, the only viable method to pre-configure the unattend file with the appropriate target disk information is by utilizing Windows Preinstallation Environment (WinPE) to run the necessary PowerShell commands.
 
@@ -212,7 +212,7 @@ To configure WinRM, you can simply run [ConfigureRemotingForAnsible.ps1](https:/
    
 2. Update all variables located in `vars` and `group_vars` folders.
 
-   > `group_vars` is a feature in Ansible that allows you to define variables that will be applied to groups of hosts. For instance, `group_vars/WIN2022` folder is specifically used for setting variables applicable to the Windows hosts that are part of the [WIN2022] group defined in the inventory file (i.e. `hosts`). So it's essential to retain the name of the `WIN2022` folder so that Ansible can correctly associate the variables within this folder with the hosts in the [WIN2022] group. When Ansible runs, it will look for a directory matching the group name inside `group_vars` and apply any variables it finds there to the hosts in that group.
+   > `group_vars` is a feature in Ansible that allows you to define variables that will be applied to groups of hosts. For instance, `group_vars/WIN2022` folder is specifically used for setting variables applicable to the Windows hosts that are part of the [WIN2022] group defined in the inventory file (i.e. `hosts`). So, it's essential to retain the name of the `WIN2022` folder so that Ansible can correctly associate the variables within this folder with the hosts in the [WIN2022] group. When Ansible runs, it will look for a directory matching the group name inside `group_vars` and apply any variables it finds there to the hosts in that group.
 
    > For ESXi and RHEL variables, the root password is hashed in the kickstart using the variable `hashed_root_password` to maintain the confidentiality of the root password. See the kickstart files for more information on how to hash your password from the Ansible control node.
 
@@ -323,4 +323,4 @@ The provisioned OS tested successfully are:
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details
+This project is licensed under the MIT License - see the LICENSE file for details.
