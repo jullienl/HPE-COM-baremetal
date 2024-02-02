@@ -106,14 +106,20 @@ pip3 install requests # (Should be already installed)
 ```
 
 
-## Windows collection requirements (used for Windows provisioning only)
+## Windows collection requirements 
+
+An important task to ensure the smooth operation of this project is the pre-creation of DNS records for all hosts that will be provisioned. For this reason, each playbook includes a task to create a DNS record on a Windows DNS server defined in the \vars folder. 
+For this Windows DNS server to be managed by Ansible, a Windows Remote Management (WinRM) listener should be created and activated. And for Ansible to execute commands remotely on this Windows server, the pywinrm library must be installed. 
 
 ```
 pip3 install pywinrm
 ```
+pywinrm is the Python library that allows Ansible to interact with the WinRM service running on the Windows DNS server to perform the DNS record operations. 
 
 
 ## Installation of json_query filter used in the playbooks
+
+The `json_query` filter part of the jmespath library is used in the playbooks to filter and manipulate JSON data. 
 
 ```
 pip3 install jmespath
@@ -122,7 +128,7 @@ pip3 install jmespath
 
 ## Ngnix web service
 
-Ngnix is used to host the OS ISO images from which the server that you’ll provision will boot from.
+Ngnix is used to host the custom OS ISO images that will be generated, and from which provisioned servers will boot from.
 
 ```
 sudo dnf install nginx

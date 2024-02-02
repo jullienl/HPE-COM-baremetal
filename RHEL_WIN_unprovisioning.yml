@@ -25,7 +25,7 @@
   hosts: all
   gather_facts: no
   vars_files:
-    - vars/GLP_HPE_Mougins_EU_Central_credentials_encrypted.yml    
+    - vars/GLP_COM_API_credentials_encrypted.yml    
   vars:
     ansible_forks: 5
 

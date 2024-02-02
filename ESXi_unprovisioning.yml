@@ -22,7 +22,7 @@
   gather_facts: no
   vars_files:
     - vars/ESXi7.0.u3_vars.yml
-    - vars/GLP_HPE_Mougins_EU_Central_credentials_encrypted.yml    
+    - vars/GLP_COM_API_credentials_encrypted.yml    
     - vars/VMware_vCenter_vars_encrypted.yml
   vars:
     ansible_forks: 5

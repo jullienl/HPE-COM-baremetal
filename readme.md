@@ -220,7 +220,7 @@ To configure WinRM, you can simply run [ConfigureRemotingForAnsible.ps1](https:/
 
 4. Secure your HPE Compute Ops Management credentials, using Ansible vault to encrypt them. From the root of this Ansible project on the Ansible control node, run:   
     ```
-    ansible-vault create vars/GLCP_US_West_credentials_encrypted.yml
+    ansible-vault create vars/GLP_COM_API_credentials_encrypted.yml
     ```   
     Once the password is entered, type the following content using your own API client credentials and connectivity endpoint:
      ```

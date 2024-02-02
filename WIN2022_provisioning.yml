@@ -19,7 +19,7 @@
   hosts: WIN2022
   gather_facts: no
   vars_files:
-    - vars/GLP_HPE_Mougins_EU_Central_credentials_encrypted.yml    
+    - vars/GLP_COM_API_credentials_encrypted.yml    
   vars:
     inventory_fqdn: "{{ inventory_hostname | lower }}.{{ domain }}"
     ansible_host_key_checking: false
@@ -1455,7 +1455,7 @@
   hosts: WIN2022
   gather_facts: no
   vars_files:
-    - vars/GLP_HPE_Mougins_EU_Central_credentials_encrypted.yml    
+    - vars/GLP_COM_API_credentials_encrypted.yml    
   vars:
     inventory_fqdn: "{{ inventory_hostname | lower }}.{{ domain }}"
     ansible_host_key_checking: false

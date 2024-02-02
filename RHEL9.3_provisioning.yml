@@ -38,7 +38,7 @@
   hosts: All
   gather_facts: no
   vars_files:
-    - vars/GLP_HPE_Mougins_EU_Central_credentials_encrypted.yml    
+    - vars/GLP_COM_API_credentials_encrypted.yml    
     - vars/RHEL9.3_vars.yml
   vars:
     inventory_fqdn: "{{ inventory_hostname | lower }}.{{ domain }}"
