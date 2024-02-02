@@ -229,6 +229,9 @@ To configure WinRM, you can simply run [ConfigureRemotingForAnsible.ps1](https:/
      ClientSecret: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
      ConnectivityEndpoint: "https://<connectivity_endpoint>-api.compute.cloud.hpe.com"
      ```
+    
+    > **Note**: The `GLP_COM_API_credentials_clear.yml` file illustrates the contents of the encrypted file to be supplied.
+
     > **Note**: To learn more, see [Protecting sensitive data with Ansible vault](https://docs.ansible.com/ansible/latest/user_guide/vault.html)
     
     > **Note**: To access the HPE Compute Ops Management API, you need to create your client credentials on the HPE GreenLake platform, see [Configuring API client credentials](https://support.hpe.com/hpesc/public/docDisplay?docId=a00120892en_us&page=GUID-23E6EE78-AAB7-472C-8D16-7169938BE628.html) 
