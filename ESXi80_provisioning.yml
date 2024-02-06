@@ -236,11 +236,11 @@
       msg: "Size of NS204i volume: {{ ((boot_drive_bytes_size | int) / (1024 ** 3)) | round(1) }} GB"
     when: NS204i_data is defined 
 
-  # Is the server equipped with an HPE MR or SR controller and with drives available?
+  # No NS204i but is the server equipped with an HPE MR or SR controller and with drives available?
 
   - name: Capture storage RAID controller information when an HPE MR or SR controller is used with available drives
     set_fact:
-      storage_controller_data: "{{ matched_item }}"
+      SR_MR_storage_controller_data: "{{ matched_item }}"
     vars:
         matched_item: "{{ item.value }}"
     loop: "{{ server_raw_inventory.json.storageInventory | dict2items }}"
@@ -248,23 +248,53 @@
       label: never
     when: NS204i_data is undefined and item.value.Drives | length > 0 and (item.value.Name is search('HPE MR') or item.value.Name is search('HPE SR'))
 
-  # - debug: var=storage_controller_data
+  # - debug: var=SR_MR_storage_controller_data
 
   - name: Set a variable for the name of the storage RAID controller found
     set_fact:
-      storage_controller_name: "{{ storage_controller_data.Name }}"
-    when: NS204i_data is undefined and storage_controller_data is defined
+      storage_controller_name: "{{ SR_MR_storage_controller_data.Name }}"
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
     
   - debug: 
-      msg: "Storage RAID controller found: '{{ storage_controller_name }}' with '{{ storage_controller_data.Drives | length }}' drives"
-    when: NS204i_data is undefined and storage_controller_data is defined
+      msg: "Storage RAID controller found: '{{ storage_controller_name }}' with '{{ SR_MR_storage_controller_data.Drives | length }}' drives"
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
 
-  - name: Exit when no NS204i and no SR/MR controller is found
+  # Retrieve storage controller data when no NS204i and no SR/MR controller with disk available found  
+
+  - name: Set controller type if disk found and when no NS204i and no SR/MR controller with disk available found     
+    set_fact:
+      no_NS204i_no_SR_MR_but_local_disk: "{{ matched_item }}"
+    vars:
+        matched_item: "{{ item }}"
+    loop: "{{ server_raw_inventory.json.storageInventory | dict2items }}"
+    loop_control:
+      label: never
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and item.value.Drives | length > 0
+
+  # - debug: var=no_NS204i_no_SR_MR_but_local_disk
+
+  - name: Exit when no NS204i and no SR/MR controller and no other controller with disks are found
     fail: 
-      msg: "Error ! No NS204i and no SR/MR controller with disk available found !"
-    when: NS204i_data is undefined and storage_controller_data is undefined
+      msg: "Error ! No controller found with disk available !"
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and no_NS204i_no_SR_MR_but_local_disk is undefined
 
-  - name: Set a controller type variable for kickstart creation when a NS204i is present
+  - name: Set a variable for the name of the storage controller found
+    set_fact:
+      storage_controller_name: "{{ no_NS204i_no_SR_MR_but_local_disk.value.Name }}"
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined 
+
+  - debug: 
+      msg: "Storage controller found: '{{ storage_controller_name }}' with '{{ no_NS204i_no_SR_MR_but_local_disk.value.Drives | length }}' drives"
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined 
+
+  # Set controller type name for kickstart creation
+
+  - name: Set controller type when no NS204i and no SR/MR controller with disk available found     
+    set_fact:
+      Controller_type: "Local"
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and no_NS204i_no_SR_MR_but_local_disk is defined
+
+  - name: Set a controller type variable for kickstart creation when an NS204i is present
     set_fact:
       Controller_type: "NS204i"
     when: NS204i_data is defined 
@@ -272,10 +302,12 @@
   - name: Set a controller type variable for kickstart creation when there is no NS204i but an SR/MR controller is present.
     set_fact:
       Controller_type: "{{ storage_controller_name }}"
-    when: NS204i_data is undefined and storage_controller_data is defined
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
 
   - debug: 
-      msg: "Controller type found that will be used by autounattend.xml: {{ Controller_type }}" 
+      msg: "Controller type found that will be used by kickstart: {{ Controller_type }}" 
+
+  # Server settings for internal storage RAID configuration (creation or modification)
     
   - name: Check if server settings '{{ raid_type }}' already exist
     uri:
@@ -286,14 +318,12 @@
     vars:
       filter: "name eq '{{ raid_type }}'"
     register: internal_storage_server_setting
-    when: NS204i_data is undefined
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
     delegate_to: localhost
 
   # - debug: var=internal_storage_server_setting
 
-  # If NS204i NVMe boot controller is found then no need to set a RAID internal storage configuration
-  # If NS204i NVMe boot controller is not found then need to set a RAID internal storage configuration
- 
+  # Need to create an internal storage RAID configuration if there is no NS204i but there is a storage controller
   - name: Create internal storage configuration using '{{ raid_type }}' with a volume size of '{{ volume_size_in_GB }}' GB for the OS boot volume when it does not exist
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings"
@@ -314,16 +344,16 @@
             volumeSizeInGB: "{{ volume_size_in_GB }}"
     register: internal_storage_server_setting_result
     delegate_to: localhost
-    when:  NS204i_data is undefined and internal_storage_server_setting.json.count == 0
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 0
 
   - name: Result of the '{{ raid_type }}' creation task
     debug: var=internal_storage_server_setting_result
-    when:  NS204i_data is undefined and internal_storage_server_setting.json.count == 0
+    when:  NS204i_data is undefined and SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 0
 
   - name: Set a variable for the resourceUri of the internal storage configuration '{{ raid_type }}' just created
     set_fact: 
       internal_storage_server_setting_resourceuri: "{{ internal_storage_server_setting_result.json.resourceUri }}"
-    when:  NS204i_data is undefined and internal_storage_server_setting.json.count == 0
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 0
 
   - name: Update internal storage configuration using '{{ raid_type }}' with a volume size of '{{ volume_size_in_GB }}' GB for the OS boot volume 
     uri:
@@ -347,19 +377,19 @@
       internal_storage_server_setting_id: "{{ internal_storage_server_setting  | json_query('json.items[0].id') }}"
     register: internal_storage_server_setting_result
     delegate_to: localhost
-    when:  NS204i_data is undefined and internal_storage_server_setting.json.count == 1
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 1
 
   - name: Result of the '{{ raid_type }}' update task
     debug: var=internal_storage_server_setting_result.msg
-    when:  NS204i_data is undefined and internal_storage_server_setting.json.count == 1
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 1
 
   - name: Set a variable for the resourceUri of the internal storage configuration '{{ raid_type }}' just updated
     set_fact: 
       internal_storage_server_setting_resourceuri: "{{ internal_storage_server_setting | json_query('json.items[0].resourceUri') }}"
-    when:  NS204i_data is undefined and internal_storage_server_setting.json.count == 1  
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 1  
 
   - debug: var=internal_storage_server_setting_resourceuri
-    when:  NS204i_data is undefined
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
 
 
 #--------------------------------------Create temporary server group with server settings -----------------------------------------------------------------------------
@@ -385,7 +415,7 @@
 
   # - debug: var=temporary_server_group
 
-  # Server group creation or modification when NS204i is found => no local storage configuration definition
+  # Server group creation or modification when NS204i is found or when no_NS204i_no_SR_MR_but_local_disk => no local storage configuration definition
 
   - name: Create temporary group '{{ temporary_server_group_name }}' with no local storage configuration definition (if it does not exist)
     uri:
@@ -413,18 +443,18 @@
             firmwareDowngrade: false
         autoAddServerTags:
     register: server_group_result
-    when: NS204i_data is defined and temporary_server_group.json.count == 0
+    when: (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined) and temporary_server_group.json.count == 0
     delegate_to: localhost
 
   - name: Display response of the temporary group '{{ temporary_server_group_name }}' creation request
     debug: var=server_group_result.msg
-    when:  NS204i_data is defined and temporary_server_group.json.count == 0
+    when: (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined) and temporary_server_group.json.count == 0
 
   - name: Set variables for the id and the resourceUri of temporary group '{{ temporary_server_group_name }}' just created
     set_fact:
       temporary_group_id: "{{ server_group_result.json.id }}" 
       temporary_group_resourceuri: "{{ server_group_result.json.resourceUri }}"
-    when:  NS204i_data is defined and temporary_server_group.json.count == 0
+    when: (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined) and temporary_server_group.json.count == 0
   
   - name: Update temporary group '{{ temporary_server_group_name }}' with no local storage configuration definition (if it does exist)
     uri:
@@ -454,20 +484,20 @@
     vars: 
       group_id: "{{ temporary_server_group  | json_query('json.items[0].id') }}"
     register: server_group_result
-    when:  NS204i_data is defined and temporary_server_group.json.count == 1
+    when: (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined) and temporary_server_group.json.count == 1
     delegate_to: localhost
 
   - name: Display response of the temporary group '{{ temporary_server_group_name }}' update request
     debug: var=server_group_result.msg
-    when:  NS204i_data is defined and temporary_server_group.json.count == 1
+    when: (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined) and temporary_server_group.json.count == 1
 
   - name: Set variables for the id and the resourceUri of temporary group '{{ temporary_server_group_name }}' just updated
     set_fact:
       temporary_group_id: "{{ temporary_server_group | json_query('json.items[0].id') }}" 
       temporary_group_resourceuri: "{{ temporary_server_group | json_query('json.items[0].resourceUri') }}"
-    when:  NS204i_data is defined and temporary_server_group.json.count == 1
+    when: (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined) and temporary_server_group.json.count == 1
 
-  # Server group creation or modification when NS204i is not found => with local storage configuration definition
+  # Server group creation or modification when NS204i is not found but storage controller is found => with local storage RAID configuration definition
 
   - name: Create temporary group '{{ temporary_server_group_name }}' with local storage configuration definition (if it does not exist)
     uri:
@@ -496,18 +526,18 @@
             firmwareDowngrade: false
         autoAddServerTags:
     register: server_group_result
-    when: NS204i_data is undefined and temporary_server_group.json.count == 0
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and temporary_server_group.json.count == 0
     delegate_to: localhost
 
   - name: Display response of the temporary group '{{ temporary_server_group_name }}' creation request
     debug: var=server_group_result.msg
-    when:  NS204i_data is undefined and temporary_server_group.json.count == 0
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and temporary_server_group.json.count == 0
 
   - name: Set variables for the id and the resourceUri of temporary group '{{ temporary_server_group_name }}' just created
     set_fact:
       temporary_group_id: "{{ server_group_result.json.id }}" 
       temporary_group_resourceuri: "{{ server_group_result.json.resourceUri }}"
-    when: NS204i_data is undefined and temporary_server_group.json.count == 0
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and temporary_server_group.json.count == 0
   
   - name: Update temporary group '{{ temporary_server_group_name }}' with local storage configuration definition (if it does exist)
     uri:
@@ -538,18 +568,18 @@
     vars: 
       group_id: "{{ temporary_server_group  | json_query('json.items[0].id') }}"
     register: server_group_result
-    when:  NS204i_data is undefined and temporary_server_group.json.count == 1
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and temporary_server_group.json.count == 1
     delegate_to: localhost
 
   - name: Display response of the temporary group '{{ temporary_server_group_name }}' update request
     debug: var=server_group_result.msg
-    when:  NS204i_data is undefined and temporary_server_group.json.count == 1
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and temporary_server_group.json.count == 1
 
   - name: Set variables for the id and the resourceUri of temporary group '{{ temporary_server_group_name }}' just updated
     set_fact:
       temporary_group_id: "{{ temporary_server_group | json_query('json.items[0].id') }}" 
       temporary_group_resourceuri: "{{ temporary_server_group | json_query('json.items[0].resourceUri') }}"
-    when: NS204i_data is undefined and temporary_server_group.json.count == 1
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and temporary_server_group.json.count == 1
 
   - debug: var=temporary_group_id
 
@@ -645,7 +675,7 @@
       query: "json.items[? name=='Server automatic configuration' && contains(message,'failed')]"
     when: server_activities | json_query(query) 
 
- # Capture the size of the volume created once the server configuration is complete only when NS204i is not found
+ # Capture the size of the volume created once the server configuration is complete only when NS204i is not found with Storage RAID controller
 
   - name: Capture server '{{ serial_number }}' raw inventory information
     uri:
@@ -655,32 +685,38 @@
         Authorization: "Bearer {{ access_token }}"
     register: server_raw_inventory
     delegate_to: localhost
-    when: NS204i_data is undefined
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
   
   # - debug: var=server_raw_inventory
   
   - name: Capture storage RAID controller information when an HPE MR or SR controller is used with available drives
     set_fact:
-      storage_controller_data: "{{ matched_item }}"
+      SR_MR_storage_controller_data: "{{ matched_item }}"
     vars:
         matched_item: "{{ item.value }}"
     loop: "{{ server_raw_inventory.json.storageInventory | dict2items }}"
     loop_control:
       label: never
-    when: NS204i_data is undefined and item.value.Name == storage_controller_name 
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and item.value.Name == storage_controller_name 
    
   - name: Capture the size of the OS volume configured on the {{ storage_controller_name }}
     set_fact:
-      boot_drive_bytes_size: "{{ (storage_controller_data |  json_query(query))[0]  }}"
+      boot_drive_bytes_size: "{{ (SR_MR_storage_controller_data |  json_query(query))[0]  }}"
     vars:
       query: "Volumes.Members[?Name=='OS_boot_volume'].CapacityBytes"
-    when: NS204i_data is undefined
-    
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
+
   - debug: var=boot_drive_bytes_size
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
+
+  - name: Set the size of the OS volume as '0' with local disk
+    set_fact:
+      boot_drive_bytes_size: "0"
+    when: no_NS204i_no_SR_MR_but_local_disk is defined
         
   - debug: 
       msg: "Size of RAID volume: {{ ((boot_drive_bytes_size | int) / (1024 ** 3)) | round(1) }} GB"
-    when: NS204i_data is undefined
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
 
 
 #--------------------------------------Build ISO image with customized kickstart --------------------------------------------------------------------------------------
@@ -928,12 +964,12 @@
             firmwareDowngrade: false
         autoAddServerTags:
     register: server_group_result
-    when:  NS204i_data is defined 
+    when:  NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined
     delegate_to: localhost
 
   - name: Display response of the group '{{ temporary_server_group_name }}' update request with NS204i
     debug: var=server_group_result.msg
-    when:  NS204i_data is defined 
+    when:  NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined
 
   # Server group modification when NS204i is not found => set local storage configuration definition
 
@@ -965,12 +1001,12 @@
             firmwareDowngrade: false
         autoAddServerTags:
     register: server_group_result
-    when:  NS204i_data is undefined 
+    when:  NS204i_data is undefined and SR_MR_storage_controller_data is defined
     delegate_to: localhost
 
   - name: Display response of the group '{{ temporary_server_group_name }}' update request with storage controller
     debug: var=server_group_result.msg
-    when:  NS204i_data is undefined 
+    when:  NS204i_data is undefined and SR_MR_storage_controller_data is defined
 
   - name: Start OS image installation in group '{{ temporary_server_group_name }}'
     uri:
@@ -1161,9 +1197,9 @@
       cluster_name: "{{ cluster_name }}"
       enable: true
       validate_certs: false
+    ignore_errors: yes
     delegate_to: localhost
     when: is_first_host
-
 
   - name: Enable DRS with VM distribution across hosts for availability on '{{ cluster_name }}' cluster
     community.vmware.vmware_cluster_drs:
@@ -1176,6 +1212,7 @@
       advanced_settings:
         'TryBalanceVmsPerHost': '1'
       validate_certs: false
+    ignore_errors: yes
     delegate_to: localhost
     when: is_first_host
 
@@ -1207,6 +1244,7 @@
       license: "{{ esxi_license }}"
       state: present
       validate_certs: false
+    ignore_errors: yes
     delegate_to: localhost
 
   - name: Add vmnic1 to standard switch vSwitch0
@@ -1220,6 +1258,7 @@
         - vmnic0
         - vmnic1
       validate_certs: false
+    ignore_errors: yes
     delegate_to: localhost
 
   - name: Pause for 10 seconds to give time for the vswitch0 configuration
@@ -1235,6 +1274,7 @@
       switch: "vSwitch0"
       portgroup: "vMotion"
       validate_certs: false
+    ignore_errors: yes
     delegate_to: localhost
 
   - name: Pause for 10 seconds to give time for the vswitch0 configuration
@@ -1268,6 +1308,7 @@
       options:
         "UserVars.SuppressCoredumpWarning": "1"
       validate_certs: false
+    ignore_errors: yes
     delegate_to: localhost
 
   - name: Set the Power Management Policy to high-performance
@@ -1278,6 +1319,7 @@
       esxi_hostname: "{{ inventory_fqdn }}"
       policy: high-performance
       validate_certs: false
+    ignore_errors: yes
     delegate_to: localhost
 
   - name: Configure NTP servers
@@ -1289,6 +1331,7 @@
       ntp_servers:
         - pool.ntp.org
       validate_certs: false
+    ignore_errors: yes
     delegate_to: localhost
 
   - name: Start NTP Service and set to start at boot
@@ -1301,6 +1344,7 @@
       service_name: ntpd
       service_policy: on
       state: start
+    ignore_errors: yes
     delegate_to: localhost
 
   - name: Start ESXi Shell Service and setting to enable at boot
@@ -1313,6 +1357,7 @@
       service_name: TSM
       service_policy: on
       state: start
+    ignore_errors: yes
     delegate_to: localhost
 
   - name: Start SSH Service and setting to enable at boot
@@ -1325,6 +1370,7 @@
       service_name: TSM-SSH
       service_policy: on
       state: start
+    ignore_errors: yes
     delegate_to: localhost
 
 
@@ -1890,16 +1936,17 @@
     register: server
     delegate_to: localhost
 
-  - name: Capture last firmware update information 
+  - name: Capture last firmware update information if any
     set_fact:
       last_firmware_update: "{{ server | json_query('json.items[0].lastFirmwareUpdate') }}"
+    when: (server | json_query('json.items[0].lastFirmwareUpdate')) is not none
 
   # - debug: var=last_firmware_update.attemptedAt
 
   - name: Display server last firmware update information if up-to-date
     debug: 
       msg: "{{ last_firmware_update }}"  
-    when: last_firmware_update.attemptedAt > firmware_update_start_time
+    when: last_firmware_update is defined and last_firmware_update.attemptedAt > firmware_update_start_time
 
 
 #--------------------------------------Exit ESXi server from maintenance mode -----------------------------------------------------------------------------------------
@@ -1927,6 +1974,7 @@
       esxi_hostname: "{{ inventory_fqdn }}"
       validate_certs: false
       state: absent
+    ignore_errors: yes
     delegate_to: localhost
 
 

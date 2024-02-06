@@ -22,11 +22,6 @@ LOGFILE="/tmp/Pre_install.log"
 SIZEinBytes={{boot_drive_bytes_size}}
 CONTROLLER="{{Controller_type}}"
 
-echo "SIZEinBytes=$SIZEinBytes" >> "${LOGFILE}" 2>&1
-
-SIZEinGigaBytes=$(($SIZEinBytes >> 30))
-
-echo "SIZEinGB=$SIZEinGigaBytes" >> "${LOGFILE}" 2>&1
 
 echo "CONTROLLER=$CONTROLLER" >> "${LOGFILE}" 2>&1
 
@@ -45,58 +40,73 @@ if echo "$CONTROLLER" | grep -q "MR"; then
     INDEX="n*"
 fi 
 
-echo "INDEX=$INDEX" >> "${LOGFILE}" 2>&1
 
+# if SIZEinBytes exists then run the disk detection process
+if [ "$SIZEinBytes" != "0" ]; then 
 
-# Minimum delta between COM value and volume found in bytes
-MINDELTA=1000000  # 1MB
-DRIVESIZE=""
+        echo "INDEX=$INDEX" >> "${LOGFILE}" 2>&1
 
-for DISK in $(ls /vmfs/devices/disks/$INDEX | grep -v ":"); do
-    echo "" >> "${LOGFILE}" 2>&1
-    VML=$(echo $DISK | awk '{ print substr ($0, 21 ) }')
-    VSIZE=$(localcli storage core device list -d $VML  | sed -n 5p |  awk '{ print substr ($0, 10 ) }')
-    echo "VML = $VML" >> "${LOGFILE}" 2>&1
-    # echo "VSIZE = $VSIZE" >> "${LOGFILE}" 2>&1
+        echo "SIZEinBytes=$SIZEinBytes" >> "${LOGFILE}" 2>&1
 
-    VSIZEinBytes=$(($VSIZE * 1024 * 1024))
-    echo "VSIZEinBytes = $VSIZEinBytes" >> "${LOGFILE}" 2>&1
-    
-    # If $VSIZE is not null and not equal to zero
-    if [[ -n $VSIZE && $VSIZE -ne 0 ]]; then
+        SIZEinGigaBytes=$(($SIZEinBytes >> 30))
 
-        GB=$(($VSIZE/1024))
-        echo "VSIZEinGB = $GB" >> "${LOGFILE}" 2>&1
+        echo "SIZEinGB=$SIZEinGigaBytes" >> "${LOGFILE}" 2>&1
 
-        DELTA=$(( $VSIZEinBytes - $SIZEinBytes ))
-        echo "DELTA = $DELTA" >> "${LOGFILE}" 2>&1
+        # Minimum delta between COM value and volume found in bytes
+        MINDELTA=1000000  # 1MB
+        DRIVESIZE=""
 
-        if [[ $DELTA -lt 0 ]]; then
+        for DISK in $(ls /vmfs/devices/disks/$INDEX | grep -v ":"); do
             echo "" >> "${LOGFILE}" 2>&1
-            DELTA=$((-DELTA))
-            echo "DELTA is less than 0=$DELTA" >> "${LOGFILE}" 2>&1
-        fi
+            VML=$(echo $DISK | awk '{ print substr ($0, 21 ) }')
+            VSIZE=$(localcli storage core device list -d $VML  | sed -n 5p |  awk '{ print substr ($0, 10 ) }')
+            echo "VML = $VML" >> "${LOGFILE}" 2>&1
+            # echo "VSIZE = $VSIZE" >> "${LOGFILE}" 2>&1
 
-        if [[ $DELTA -lt $MINDELTA ]]; then
-            MINDELTA=$DELTA
-            echo "DELTA is less than MINDELTA-$MINDELTA" >> "${LOGFILE}" 2>&1
-            TARGET_DISK=$DISK
-            DRIVESIZE=$GB
-        fi
+            VSIZEinBytes=$(($VSIZE * 1024 * 1024))
+            echo "VSIZEinBytes = $VSIZEinBytes" >> "${LOGFILE}" 2>&1
+            
+            # If $VSIZE is not null and not equal to zero
+            if [[ -n $VSIZE && $VSIZE -ne 0 ]]; then
 
-        echo "Diff is $DELTA with `echo $DEV | awk '{ print substr ($0, 12 ) }'` $GB GB" >> "${LOGFILE}" 2>&1
-        echo "Matching Drive: $DRIVESIZE GB" >> "${LOGFILE}" 2>&1
-    fi
-done
+                GB=$(($VSIZE/1024))
+                echo "VSIZEinGB = $GB" >> "${LOGFILE}" 2>&1
 
-echo "Target disk is $TARGET_DISK with $DRIVESIZE GB" >> "${LOGFILE}" 2>&1
+                DELTA=$(( $VSIZEinBytes - $SIZEinBytes ))
+                echo "DELTA = $DELTA" >> "${LOGFILE}" 2>&1
 
-# Clearing partitions on target disk found
-echo "clearpart --drives=$TARGET_DISK --overwritevmfs" >/tmp/DiskConfig
+                if [[ $DELTA -lt 0 ]]; then
+                    echo "" >> "${LOGFILE}" 2>&1
+                    DELTA=$((-DELTA))
+                    echo "DELTA is less than 0=$DELTA" >> "${LOGFILE}" 2>&1
+                fi
 
-# Starting the ESXi installation on the target disk found
-echo "install --disk=$TARGET_DISK --overwritevmfs --novmfsondisk" >>/tmp/DiskConfig
-   
+                if [[ $DELTA -lt $MINDELTA ]]; then
+                    MINDELTA=$DELTA
+                    echo "DELTA is less than MINDELTA-$MINDELTA" >> "${LOGFILE}" 2>&1
+                    TARGET_DISK=$DISK
+                    DRIVESIZE=$GB
+                fi
+
+                echo "Diff is $DELTA with `echo $DEV | awk '{ print substr ($0, 12 ) }'` $GB GB" >> "${LOGFILE}" 2>&1
+                echo "Matching Drive: $DRIVESIZE GB" >> "${LOGFILE}" 2>&1
+            fi
+        done
+
+        echo "Target disk is $TARGET_DISK with $DRIVESIZE GB" >> "${LOGFILE}" 2>&1
+
+        # Clearing partitions on target disk found
+        echo "clearpart --drives=$TARGET_DISK --overwritevmfs" >/tmp/DiskConfig
+
+        # Starting the ESXi installation on the target disk found
+        echo "install --disk=$TARGET_DISK --overwritevmfs --novmfsondisk" >>/tmp/DiskConfig
+
+else
+# if SIZE does not exist then use local disk for the OS installation
+    echo "Target disk is local" >> "${LOGFILE}" 2>&1
+    echo "clearpart --firstdisk=local --overwritevmfs" >/tmp/DiskConfig
+    echo "install --firstdisk=local --overwritevmfs --novmfsondisk" >>/tmp/DiskConfig
+fi            
 
 ###############################################################################
 # Post-Installation Scripts
