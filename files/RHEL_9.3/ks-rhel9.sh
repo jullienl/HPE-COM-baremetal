@@ -100,15 +100,22 @@ SIZEinBytes={{boot_drive_bytes_size}}
 
 CONTROLLER="{{Controller_type}}"
 
-if [[ "$CONTROLLER" == "NS204i" ]]; then
+
+if echo "$CONTROLLER" | grep -q "NS204i"; then
     echo "The controller is a 'NS204i'"
     INDEX="nvme"
 fi
 
-if [[ "$CONTROLLER" == "SR/MR controller" ]]; then
-    echo "The controller is a 'SR/MR controller'"
+if echo "$CONTROLLER" | grep -q "SR"; then
+    echo "The controller is a 'SR controller'"
     INDEX="sd"
-fi
+
+fi 
+
+if echo "$CONTROLLER" | grep -q "MR"; then
+    echo "The controller is a 'MR controller'"
+    INDEX="sd"
+fi 
 
 
 echo "Detecting boot drive for OS installation..."
