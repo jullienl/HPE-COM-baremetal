@@ -21,7 +21,7 @@
   hosts: all
   gather_facts: no
   vars_files:
-    - vars/ESXi7.0.u3_vars.yml
+    - vars/ESXi8.0.u2_vars.yml
     - vars/GLP_COM_API_credentials_encrypted.yml    
     - vars/VMware_vCenter_vars_encrypted.yml
   vars:
@@ -55,6 +55,12 @@
 
   - name: Capture Resource API versions
     import_tasks: files/Get_resource_API_versions.yml
+
+
+#--------------------------------------Capture Job Templates Resource Uri-----------------------------------------------------------------------------------------------
+  
+  - name: Capture Job Templates ResourceUri
+    import_tasks: files/Get_job_templates_resourceuri.yml
 
 
 #--------------------------------------Capture server information -----------------------------------------------------------------------------------------------------
@@ -248,25 +254,6 @@
 
 #--------------------------------------Power off the server -----------------------------------------------------------------------------------------------------------
 
-  - name: Capture all job templates
-    uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ job_templates_API_version }}/job-templates"
-      method: GET
-      status_code: 200
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    register: job_templates
-    delegate_to: localhost
-
-  # - debug: var=job_templates
-
-  - name: Capture jobTemplateUri of PowerOff.New
-    set_fact:
-      job_template_resourceuri: "{{ (job_templates | json_query(query))[0] }}"
-    vars:
-      query: "json.items[?name=='PowerOff.New'].resourceUri"
-
-  - debug: var=job_template_resourceuri
 
   - name: Power off server '{{ inventory_hostname }}' 
     uri:
@@ -278,7 +265,7 @@
         Content-Type: "application/json"
       body_format: json
       body:
-        jobTemplateUri: "{{ job_template_resourceuri }}"
+        jobTemplateUri: "{{ PowerOff_New_job_template_resourceUri }}"
         resourceUri: "{{ server_uri }}"
     register: power_off_status
     delegate_to: localhost
