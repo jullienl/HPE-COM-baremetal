@@ -119,7 +119,7 @@ pywinrm is the Python library that allows Ansible to interact with the WinRM ser
 
 ## Installation of json_query filter used in the playbooks
 
-The `json_query` filter part of the jmespath library is used in the playbooks to filter and manipulate JSON data. 
+The `json_query` filter enables the filtration and transformation of JSON data within Ansible playbooks. This particular filter isn't bundled with the core Ansible package; rather, it comes with the community.general collection that has been added through the `requirements.yml` file earlier. However, to function correctly, `json_query` relies on the jmespath Python library—an additional dependency that must be installed separately. 
 
 ```
 pip3 install jmespath
@@ -161,4 +161,14 @@ Wimlib is used to inject scripts into the WinPE image.
 
 ```
 sudo dnf install wimlib-utils
+```
+
+
+
+## Rsync
+
+rsync is used to copy ISO image files.
+
+```
+sudo dnf install rsync
 ```
