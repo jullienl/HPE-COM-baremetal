@@ -1,5 +1,7 @@
 ---
 collections:  
+  # Community.general collection (includes a wide variety of plugins, modules, and roles that are not part of the core Ansible distribution)
+  - name: community.general
   # Community.vmware collection is required for vCenter
   - name: community.vmware
   # Community.windows collection is required to create a DNS record - Also install ansible.windows collection 
