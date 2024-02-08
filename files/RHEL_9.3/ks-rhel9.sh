@@ -117,24 +117,38 @@ if echo "$CONTROLLER" | grep -q "MR"; then
     INDEX="sd"
 fi 
 
+# if SIZEinBytes exists then run the disk detection process
+if [ "$SIZEinBytes" != "0" ]; then 
 
-echo "Detecting boot drive for OS installation..."
+    echo "Detecting boot drive for OS installation..."
 
-# Get the first disk from the disk list with the size defined:
-BOOTDRIVE=`lsblk -dbo NAME,SIZE | grep "^$INDEX" | awk '$2 == "'"$SIZEinBytes"'" {print $1}' | head -n 1` # => usually returns sdb or nvme0n1 
+    # Get the first disk from the disk list with the size defined:
+    BOOTDRIVE=`lsblk -dbo NAME,SIZE | grep "^$INDEX" | awk '$2 == "'"$SIZEinBytes"'" {print $1}' | head -n 1` # => usually returns sdb or nvme0n1 
 
-if [ -z "$BOOTDRIVE" ]
-then
-    echo "ERROR: BOOTDRIVE is undefined"
-else
-    echo "BOOTDRIVE detected is $BOOTDRIVE"
-    cat << EOF > /tmp/storage.ks
-zerombr
-ignoredisk --only-use=$BOOTDRIVE
-clearpart  --all --initlabel --drives=$BOOTDRIVE
-autopart --type=lvm
+    if [ -z "$BOOTDRIVE" ]
+    then
+        echo "ERROR: BOOTDRIVE is undefined"
+    else
+        echo "BOOTDRIVE detected is $BOOTDRIVE"
+        cat << EOF > /tmp/storage.ks
+        zerombr
+        ignoredisk --only-use=$BOOTDRIVE
+        clearpart  --all --initlabel --drives=$BOOTDRIVE
+        autopart --type=lvm
 EOF
-fi
+    fi
+
+# if SIZE does not exist then use sda disk for the OS installation
+else
+    echo "BOOTDRIVE detected is sda"
+    
+    cat << EOF > /tmp/storage.ks
+    zerombr
+    ignoredisk --only-use=sda
+    clearpart  --all --initlabel --drives=sda
+    autopart --type=lvm
+EOF
+fi  
 
 %end
 
@@ -240,15 +254,3 @@ cat <<EOF >/root/.ssh/authorized_keys
 EOF
 chmod 0600 /root/.ssh/authorized_keys
 %end
-
-
-
-
-
-
-
-
-
-
-
-

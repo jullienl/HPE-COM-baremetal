@@ -1702,6 +1702,33 @@
 
 #--------------------------------------Firmware update preparation: Put server in maintenance mode --------------------------------------------------------------------
   
+  - name: Re-add ESXi host '{{ inventory_fqdn }}' to '{{ cluster_name }}' cluster (sometimes the host disconnects for an unknown reason)
+    vmware_host:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      datacenter_name: "{{ datacenter_name }}"
+      cluster_name: "{{ cluster_name }}"
+      esxi_hostname: "{{ inventory_fqdn }}"
+      esxi_username: "root"
+      esxi_password: "{{ root_password }}"
+      state: present
+      validate_certs: false
+    delegate_to: localhost
+
+  - name: Wait until VMware host is 'connected' in vCenter
+    community.vmware.vmware_host_facts:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ inventory_fqdn }}"
+      validate_certs: false
+    register: host_facts 
+    delegate_to: localhost
+    delay: 10
+    timeout: 900 # 15 minutes
+    until: host_facts.ansible_facts.ansible_host_connection_state == "connected"
+
   - name: Place ESXi host '{{ inventory_fqdn }}' into maintenance mode
     community.vmware.vmware_maintenancemode:
       hostname: "{{ vcenter_hostname }}"
