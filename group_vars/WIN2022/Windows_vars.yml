@@ -72,6 +72,7 @@ winpe_iso_file: "WinPEx64.iso"
 src_iso_network_share: "\\\\liogw.lj.lab\\deployment"
 # Note: In Ansible, the backslash (\) character is used as an escape character in strings. 
 #       To use a literal backslash in an Ansible variable, you need to escape it with another backslash.
+# Note: win_domain_admin_user and win_domain_admin_password variables defined in Windows_sensitive_vars_encrypted.yml are used to mount the network drive
 
 # Windows Server ISO image location in the network share (be sure to use a backslash for each backslash used)
 src_iso_file_path: "win2022-x64-en_us\\en-us_windows_server_version_2022_updated_october_2021_x64_dvd_b6e25591.iso"
@@ -145,3 +146,22 @@ remote_desktop: true
 # If true, create a NIC bonding using the first two connected NICs to set the network settings
 # If false, no NIC bonding is created. The first connected NIC found is used to set the network settings
 enable_nic_bonding: true
+
+
+#---------------------- WinRM settings -------------------------------------------------------------------------------------
+
+# Information required for Ansible to manage the Windows hosts 
+
+# Microsoft Windows account username 
+# These variable names are mandatory for Ansible to manage Windows hosts so don't rename them)
+ansible_user: "Administrator"
+# Password of that account is the same as the one defined earlier
+ansible_password: "{{ administrator_password }}"
+
+# Defines WinRM as the connection method (instead of SSH)
+ansible_connection: winrm
+ansible_winrm_transport: ntlm
+ansible_port: 5985
+
+# The following is necessary for Python 2.7.9+ when using default WinRM self-signed certificates:
+ansible_winrm_server_cert_validation: ignore
