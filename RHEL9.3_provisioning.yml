@@ -440,7 +440,7 @@
             osInstall: false
           onSettingsApply:
             firmwareDowngrade: false
-        autoAddServerTags:
+        # autoAddServerTags:
     register: server_group_result
     when: (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined) and temporary_server_group.json.count == 0
     delegate_to: localhost
@@ -479,7 +479,7 @@
             osInstall: false
           onSettingsApply:
             firmwareDowngrade: false
-        autoAddServerTags:
+        # autoAddServerTags:
     vars: 
       group_id: "{{ temporary_server_group  | json_query('json.items[0].id') }}"
     register: server_group_result
@@ -523,7 +523,7 @@
             osInstall: false
           onSettingsApply:
             firmwareDowngrade: false
-        autoAddServerTags:
+        # autoAddServerTags:
     register: server_group_result
     when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and temporary_server_group.json.count == 0
     delegate_to: localhost
@@ -563,7 +563,7 @@
             osInstall: false
           onSettingsApply:
             firmwareDowngrade: false
-        autoAddServerTags:
+        # autoAddServerTags:
     vars: 
       group_id: "{{ temporary_server_group  | json_query('json.items[0].id') }}"
     register: server_group_result
@@ -1015,7 +1015,7 @@
             osInstall: true
           onSettingsApply:
             firmwareDowngrade: false
-        autoAddServerTags:
+        # autoAddServerTags:
     register: server_group_result
     when:  NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined
     delegate_to: localhost
@@ -1052,7 +1052,7 @@
             osInstall: true
           onSettingsApply:
             firmwareDowngrade: false
-        autoAddServerTags:
+        # autoAddServerTags:
     register: server_group_result
     when:  NS204i_data is undefined and SR_MR_storage_controller_data is defined
     delegate_to: localhost
@@ -1583,7 +1583,7 @@
             osInstall: false
           onSettingsApply:
             firmwareDowngrade: "{{ firmware_downgrade_policy }}"
-        autoAddServerTags:
+        # autoAddServerTags:
     register: definitive_server_group_result
     when: is_first_host and definitive_server_group.json.count == 0
     delegate_to: localhost
@@ -1625,7 +1625,7 @@
             osInstall: false
           onSettingsApply:
             firmwareDowngrade: "{{ firmware_downgrade_policy }}"
-        autoAddServerTags:
+        # autoAddServerTags:
     vars: 
       group_id: "{{ definitive_server_group  | json_query('json.items[0].id') }}"
     register: definitive_server_group_result
