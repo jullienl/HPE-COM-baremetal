@@ -288,12 +288,20 @@ The Windows DNS Server to be managed by Ansible should meet below requirements:
     
     > **Note**: Groups are defined by [...] like [All] and [WIN2022] in the examples above. These groups define the list of hosts that will be provisioned using the `<ESXi|RHEL|WIN>_provisioning.yml>` playbooks. All hosts defined in the group will be provisioned in parallel by Ansible when the playbook is executed.
 
-9. To provision all hosts present in the corresponding inventory group, run the following command to have Ansible prompt you for the vault and sudo passwords:    
-   ```
-   ansible-playbook <ESXi|RHEL|WIN>_provisioning.yml> -i hosts_<OS> --ask-vault-pass --ask-become-pass
-   ```
+
+## How to run a playbook
+
+A single command is required to provision all hosts listed in an inventory file: 
+```
+ansible-playbook <provisioning_file>.yml -i <inventory_file> --ask-vault-pass --ask-become-pass
+```
+
+
+Where `<provisioning_file>` should be replaced with `ESXi80_provisioning`, `RHEL_provisioning`, or `WIN_provisioning` depending on the target operating system. Similarly, replace `<inventory_file>` with the appropriate inventory filename such as `hosts_ESXi`, `hosts_RHEL`, or `hosts_WIN`.
+
+Upon running this command, Ansible will prompt you to enter the vault password and the sudo password to proceed with the provisioning process.
   
-   For example, running `ansible-playbook ESXi80_provisioning.yml -i hosts_ESX --ask-vault-pass --ask-become-pass` will provision all servers listed in `hosts_ESX` in the [All] inventory group, i.e. ESX-1 and ESX-2.
+For example, running `ansible-playbook ESXi80_provisioning.yml -i hosts_ESX --ask-vault-pass --ask-become-pass` will provision all servers listed in `hosts_ESX` in the [All] inventory group, i.e. ESX-1 and ESX-2.
 
 
 ## Provisioning playbook output samples 
