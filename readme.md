@@ -122,7 +122,7 @@ The following diagrams describe the overall process flows:
 ![image](https://github.com/jullienl/HPE-COM-baremetal/assets/13134334/20234a57-95c1-4563-b399-b16ef2f259c1)
 
 
-## Pre-requisites
+## Prerequisites
 
 - An Ansible control node running Ansible:
   - Meets Ansible system requirements, see https://access.redhat.com/documentation/en-us/red_hat_ansible_automation_platform/2.3/html/red_hat_ansible_automation_platform_planning_guide/platform-system-requirements#ref-controller-system-requirements
