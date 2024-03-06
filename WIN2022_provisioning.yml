@@ -632,6 +632,10 @@
   
   # Wait for the server configuration to complete 
 
+  - name: Display the url that will be used to monitor the server configuration activity task
+    debug:
+      msg: "{{ ConnectivityEndpoint }}/compute-ops/{{ activities_API_version }}/activities?filter=associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"
+
   - name: Wait for the configuration of server '{{ serial_number }}' to complete 
     uri:
       url:  "{{ ConnectivityEndpoint }}/compute-ops/{{ activities_API_version }}/activities?filter={{ filter | urlencode  }}"  
