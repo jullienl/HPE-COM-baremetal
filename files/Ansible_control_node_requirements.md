@@ -6,7 +6,7 @@
 Ensure that all packages are up to date with the latest security patches and bug fixes.
 
 ```
-sudo dnf update -y
+sudo dnf -y update
 ```
 
 
@@ -22,7 +22,7 @@ sudo hostnamectl set-hostname <hostname>.<your-domain>
 ## Clone the Github repository
 
 ```
-sudo dnf install git
+sudo dnf -y install git
 mkdir ~/Projects
 cd ~/Projects
 git clone https://github.com/jullienl/HPE-COM-baremetal
@@ -51,24 +51,24 @@ ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
 
 ```
 # mkisofs
-sudo dnf install epel-release
-sudo dnf install mkisofs
+sudo dnf -y install epel-release
+sudo dnf -y install mkisofs
 
 # isoinfo (used for RHEL only)
-sudo dnf install genisoimage
+sudo dnf -y install genisoimage
 
 # isohybrid (used for RHEL only)
-sudo dnf install syslinux
+sudo dnf -y install syslinux
 
 # implantisomd5 (used for RHEL only)
-sudo dnf install isomd5sum
+sudo dnf -y install isomd5sum
 ```
 
 
 ## Ansible installation and requirements
 
 ```
-sudo dnf install python3-pip
+sudo dnf -y install python3-pip
 pip3 install setuptools-rust wheel
 pip3 install ansible-core
 ```
@@ -84,7 +84,7 @@ pip install ansible-lint
 ## Installation of ksvalidator (optional, useful to validate kickstart file modifications)
 
 ```
-sudo dnf install pykickstart
+sudo dnf -y install pykickstart
 ```
 
 
@@ -131,7 +131,7 @@ pip3 install jmespath
 Ngnix is used to host the custom OS ISO images that will be generated, and from which provisioned servers will boot from.
 
 ```
-sudo dnf install nginx
+sudo dnf -y install nginx
 sudo systemctl enable nginx
 sudo systemctl start nginx
 sudo firewall-cmd --permanent --add-service=http
@@ -151,7 +151,7 @@ sudo systemctl restart nginx
 Unzip is used to extract HPE Package to get product id information that is required when the package is installed.
 
 ```
-sudo dnf install unzip 
+sudo dnf -y install unzip 
 ```
 
 
@@ -160,15 +160,15 @@ sudo dnf install unzip
 Wimlib is used to inject scripts into the WinPE image.
 
 ```
-sudo dnf install wimlib-utils
+sudo dnf -y install wimlib-utils
 ```
 
 
 
 ## Rsync
 
-rsync is used to copy ISO image files.
+rsync is a utility for efficiently transferring and synchronizing files across computer systems, by using differential data transfer to minimize network usage. It is used in this project to copy ISO image files.
 
 ```
-sudo dnf install rsync
+sudo dnf -y install rsync
 ```
