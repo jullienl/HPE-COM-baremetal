@@ -133,7 +133,7 @@ The following diagrams describe the overall process flows:
 
   - At the right date and time to support the various time-dependent playbook operations. 
 
-    > **Note**: Ensure that your machine's clock is synchronized using NTP before invoking playbooks.
+    > **Note**: Ensure that your Ansible machine's clock is accurately synchronized. This synchronization is essential for time-sensitive playbook operations, such as task monitoring operations, which use time-based activity filtering. This check must be performed before running any playbook associated with this project. If the time isn't right, these playbooks might not work as expected. It is highly recommended to use NTP (Network Time protocol) for synchronizing the Ansible Control node's time. 
 
 - A web server containing ISO images of the various operating systems to be provisioned. For Windows provisioning, a custom WinPE image must be created and supplied. See below for more details.
 
