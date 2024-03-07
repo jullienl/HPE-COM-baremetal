@@ -133,6 +133,8 @@ The following diagrams describe the overall process flows:
 
   - At the right date and time to support the various time-dependent playbook operations. 
 
+    > **Note**: Ensure that your machine's clock is synchronized using NTP before invoking playbooks.
+
 - A web server containing ISO images of the various operating systems to be provisioned. For Windows provisioning, a custom WinPE image must be created and supplied. See below for more details.
 
 - For Linux provisioning, a network location (http/https) containing an installation source for each Linux version to be provisioned. 
