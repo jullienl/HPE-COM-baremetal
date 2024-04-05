@@ -275,7 +275,7 @@
 
   - name: Exit when no NS204i and no SR/MR controller and no other controller with disks are found
     fail: 
-      msg: "Error ! No controller found with disk available !"
+      msg: "Check your server storage options as no SATA / NS204i / SR / MR controllers with disks/volumes were found to install the operating system!"
     when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and no_NS204i_no_SR_MR_but_local_disk is undefined
 
   - name: Set a variable for the name of the storage controller found
