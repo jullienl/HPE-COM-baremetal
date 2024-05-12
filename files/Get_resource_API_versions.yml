@@ -11,7 +11,8 @@
 ---
 - name: Capture resource API versions from the COM API reference
   uri:
-    url: "https://developer.greenlake.hpe.com/_auth/sidebar/__alternative-sidebar__-data-glcp-doc-portal-docs-greenlake-services-compute-ops-sidebars.yaml"
+    url: "https://developer.greenlake.hpe.com/_auth/sidebar/__alternative-sidebar__-data-glcp-doc-portal-docs-greenlake-services-compute-ops-mgmt-sidebars.yaml"
+    # url: "https://developer.greenlake.hpe.com/_auth/sidebar/__alternative-sidebar__-data-glcp-doc-portal-docs-greenlake-services-compute-ops-sidebars.yaml"
     method: GET
     return_content: true
   register: data
