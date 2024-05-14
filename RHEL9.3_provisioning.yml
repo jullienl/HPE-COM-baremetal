@@ -197,6 +197,75 @@
     delay: 60
     delegate_to: localhost
 
+  # Run a server inventory job to collect the local storage information
+
+  - name: Run a server inventory job to collect the local storage information
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ jobs_API_version }}/jobs"
+      method: POST
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        resourceUri: "{{ server_resourceUri }}"
+        jobTemplateUri: "{{ GetFullServerInventory_job_template_resourceUri }}"
+        data:
+          is_reports_call: true
+          filters: 
+            - localStorageV2
+    register: inventory_job_result
+    delegate_to: localhost
+
+  # - debug: var=inventory_job_result
+
+  - name: Set a variable for the job resource URI
+    set_fact:
+      job_resourceUri: "{{ inventory_job_result.json.resourceUri }}"
+
+  # - debug: var=job_resourceUri
+
+  - name: Wait for the server inventory job to complete
+    uri:
+      url: "{{ ConnectivityEndpoint }}{{ job_resourceUri }}"
+      method: GET
+      return_content: yes
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    retries: 60
+    delay: 5
+    until: >
+      (server_inventory_job_status.json.state == "COMPLETE" or 
+      server_inventory_job_status.json.state == "ERROR")
+    register: server_inventory_job_status
+    delegate_to: localhost
+
+  # - debug: var=server_inventory_job_status
+
+  - name: Display the server inventory job result 
+    debug: 
+      msg:
+        - "State: {{ server_inventory_job_status.json.state }}"
+        - "ResultCode: {{ server_inventory_job_status.json.resultCode }}"
+        - "Status: {{ server_inventory_job_status.json.status }}"
+
+  - name: Exit when server inventory job is failing
+    fail: 
+      msg: "Error ! Server inventory job to collect the local storage information has failed !"
+    when: server_inventory_job_status.json.state == "ERROR" 
+
+  - name: Capture the server '{{ serial_number }}' raw inventory information 
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server_raw_inventory
+    delegate_to: localhost
+
+  # - debug: var=server_raw_inventory
+
   # Is the server equipped with an NVMe NS204i boot controller?
 
   - name: Capture the presence of a NS204i NVMe boot controller in server '{{ serial_number }}'
@@ -204,10 +273,10 @@
       NS204i_data: "{{ matched_item }}"
     vars:
         matched_item: "{{ item }}"
-    loop: "{{ server_raw_inventory.json.storageInventory | dict2items }}"
+    loop: "{{ server_raw_inventory.json.storageInventory.LocalStorageV2 }}"
     loop_control:
       label: never
-    when: item.value.Name is search('NS204i')
+    when: item.Name is search('NS204i')
 
   # - debug: var=NS204i_data
 
@@ -225,11 +294,11 @@
     set_fact:
       boot_drive_bytes_size: "{{ matched_item }}"
     vars:
-        matched_item: "{{ item.value.Volumes.Members[0].CapacityBytes }}"
-    loop: "{{ server_raw_inventory.json.storageInventory | dict2items }}"
+        matched_item: "{{ item.Volumes[0].CapacityBytes }}"
+    loop: "{{ server_raw_inventory.json.storageInventory.LocalStorageV2 }}"
     loop_control:
       label: never
-    when: NS204i_data is defined and item.value.Name is search('NS204i')
+    when: NS204i_data is defined and item.Name is search('NS204i')
     
   - debug: 
       msg: "Size of NS204i volume: {{ ((boot_drive_bytes_size | int) / (1024 ** 3)) | round(1) }} GB"
@@ -241,11 +310,11 @@
     set_fact:
       SR_MR_storage_controller_data: "{{ matched_item }}"
     vars:
-        matched_item: "{{ item.value }}"
-    loop: "{{ server_raw_inventory.json.storageInventory | dict2items }}"
+        matched_item: "{{ item }}"
+    loop: "{{ server_raw_inventory.json.storageInventory.LocalStorageV2 }}"
     loop_control:
       label: never
-    when: NS204i_data is undefined and item.value.Drives | length > 0 and (item.value.Name is search('HPE MR') or item.value.Name is search('HPE SR'))
+    when: NS204i_data is undefined and item.Drives | length > 0 and (item.Name is search('HPE MR') or item.Name is search('HPE SR'))
 
   # - debug: var=SR_MR_storage_controller_data
 
@@ -265,25 +334,25 @@
       no_NS204i_no_SR_MR_but_local_disk: "{{ matched_item }}"
     vars:
         matched_item: "{{ item }}"
-    loop: "{{ server_raw_inventory.json.storageInventory | dict2items }}"
+    loop: "{{ server_raw_inventory.json.storageInventory.LocalStorageV2 }}"
     loop_control:
       label: never
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and item.value.Drives | length > 0
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and item.Drives | length > 0
 
   # - debug: var=no_NS204i_no_SR_MR_but_local_disk
 
   - name: Exit when no NS204i and no SR/MR controller and no other controller with disks are found
     fail: 
-      msg: "Check your server storage options as no SATA / NS204i / SR / MR controllers with disks/volumes were found to install the operating system!"
+      msg: "Error ! No controller found with disk available !"
     when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and no_NS204i_no_SR_MR_but_local_disk is undefined
 
   - name: Set a variable for the name of the storage controller found
     set_fact:
-      storage_controller_name: "{{ no_NS204i_no_SR_MR_but_local_disk.value.Name }}"
+      storage_controller_name: "{{ no_NS204i_no_SR_MR_but_local_disk.Name }}"
     when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined 
 
   - debug: 
-      msg: "Storage controller found: '{{ storage_controller_name }}' with '{{ no_NS204i_no_SR_MR_but_local_disk.value.Drives | length }}' drives"
+      msg: "Storage controller found: '{{ storage_controller_name }}' with '{{ no_NS204i_no_SR_MR_but_local_disk.Drives | length }}' drives"
     when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined 
 
   # Set controller type name for kickstart creation
@@ -678,6 +747,64 @@
       query: "json.items[? name=='Server automatic configuration' && contains(message,'failed')]"
     when: server_activities | json_query(query) 
 
+  # Run a server inventory job to collect the local storage information
+
+  - name: Run a server inventory job to collect the local storage information
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ jobs_API_version }}/jobs"
+      method: POST
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        resourceUri: "{{ server_resourceUri }}"
+        jobTemplateUri: "{{ GetFullServerInventory_job_template_resourceUri }}"
+        data:
+          is_reports_call: true
+          filters: 
+            - localStorageV2
+    register: inventory_job_result
+    delegate_to: localhost
+
+  # - debug: var=inventory_job_result
+
+  - name: Set a variable for the job resource URI
+    set_fact:
+      job_resourceUri: "{{ inventory_job_result.json.resourceUri }}"
+
+  # - debug: var=job_resourceUri
+
+  - name: Wait for the server inventory job to complete
+    uri:
+      url: "{{ ConnectivityEndpoint }}{{ job_resourceUri }}"
+      method: GET
+      return_content: yes
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    retries: 60
+    delay: 5
+    until: >
+      (server_inventory_job_status.json.state == "COMPLETE" or 
+      server_inventory_job_status.json.state == "ERROR")
+    register: server_inventory_job_status
+    delegate_to: localhost
+
+  # - debug: var=server_inventory_job_status
+
+  - name: Display the server inventory job result 
+    debug: 
+      msg:
+        - "State: {{ server_inventory_job_status.json.state }}"
+        - "ResultCode: {{ server_inventory_job_status.json.resultCode }}"
+        - "Status: {{ server_inventory_job_status.json.status }}"
+
+  - name: Exit when server inventory job is failing
+    fail: 
+      msg: "Error ! Server inventory job to collect the local storage information has failed !"
+    when: server_inventory_job_status.json.state == "ERROR" 
+
  # Capture the size of the volume created once the server configuration is complete only when NS204i is not found with Storage RAID controller
 
   - name: Capture server '{{ serial_number }}' raw inventory information
@@ -696,17 +823,17 @@
     set_fact:
       SR_MR_storage_controller_data: "{{ matched_item }}"
     vars:
-        matched_item: "{{ item.value }}"
-    loop: "{{ server_raw_inventory.json.storageInventory | dict2items }}"
+        matched_item: "{{ item }}"
+    loop: "{{ server_raw_inventory.json.storageInventory.LocalStorageV2 }}"
     loop_control:
       label: never
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and item.value.Name == storage_controller_name 
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and item.Name == storage_controller_name 
    
   - name: Capture the size of the OS volume configured on the {{ storage_controller_name }}
     set_fact:
       boot_drive_bytes_size: "{{ (SR_MR_storage_controller_data |  json_query(query))[0]  }}"
     vars:
-      query: "Volumes.Members[?Name=='OS_boot_volume'].CapacityBytes"
+      query: "Volumes[?Name=='OS_boot_volume'].CapacityBytes"
     when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
     
   - debug: var=boot_drive_bytes_size
