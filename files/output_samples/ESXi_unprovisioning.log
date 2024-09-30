@@ -79,10 +79,10 @@ ok: [ESX-3]
 
 TASK [debug] *******************************************************************
 ok: [ESX-2] => {
-    "server_uri": "/compute-ops/v1beta2/servers/P28948-B21+CZ2311004G"
+    "server_uri": "/compute-ops-mgmt/v1beta2/servers/P28948-B21+CZ2311004G"
 }
 ok: [ESX-3] => {
-    "server_uri": "/compute-ops/v1beta2/servers/P28948-B21+CZ2311004H"
+    "server_uri": "/compute-ops-mgmt/v1beta2/servers/P28948-B21+CZ2311004H"
 }
 
 TASK [Exit if server 'ESX-2' is not connected to COM] **************************
@@ -136,10 +136,10 @@ ok: [ESX-3]
 
 TASK [debug] *******************************************************************
 ok: [ESX-2] => {
-    "job_template_resourceuri": "/compute-ops/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4"
+    "job_template_resourceuri": "/compute-ops-mgmt/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4"
 }
 ok: [ESX-3] => {
-    "job_template_resourceuri": "/compute-ops/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4"
+    "job_template_resourceuri": "/compute-ops-mgmt/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4"
 }
 
 TASK [Power off server ESX-2] **************************************************

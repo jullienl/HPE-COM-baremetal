@@ -67,7 +67,7 @@
 
   - name: Capture server '{{ inventory_hostname }}' information
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ inventory_hostname }}'"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ inventory_hostname }}'"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -104,7 +104,7 @@
 
   - name: Capture server '{{ inventory_hostname }}' raw inventory information
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -237,7 +237,7 @@
 
   - name: Remove server '{{ inventory_hostname }}' from the server group of which it is currently a member
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ server_group_id_found }}/devices/{{ server_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ server_group_id_found }}/devices/{{ server_id }}"
       method: DELETE
       status_code: 204
       headers:
@@ -257,7 +257,7 @@
 
   - name: Power off server '{{ inventory_hostname }}' 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ jobs_API_version }}/jobs"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
       method: POST
       status_code: 200
       headers:

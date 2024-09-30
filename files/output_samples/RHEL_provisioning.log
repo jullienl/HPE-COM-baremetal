@@ -87,70 +87,70 @@ ok: [RHEL92-1]
 ok: [RHEL92-2]
 
 TASK [Set variables for each job templates] *******************************************************************************************************************************************************************************************
-ok: [RHEL92-1] => (item=Variable set: ApplianceReconnect_job_template_resourceUri = /compute-ops/v1beta2/job-templates/0e818877-5a9a-4ea9-8978-8391270fbaba)
-ok: [RHEL92-2] => (item=Variable set: ApplianceReconnect_job_template_resourceUri = /compute-ops/v1beta2/job-templates/0e818877-5a9a-4ea9-8978-8391270fbaba)
-ok: [RHEL92-1] => (item=Variable set: ApplySettingsTemplate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
-ok: [RHEL92-2] => (item=Variable set: ApplySettingsTemplate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
-ok: [RHEL92-1] => (item=Variable set: ColdBoot_job_template_resourceUri = /compute-ops/v1beta2/job-templates/aacfb3e0-6575-4d4f-a711-1ee1ae768407)
-ok: [RHEL92-2] => (item=Variable set: ColdBoot_job_template_resourceUri = /compute-ops/v1beta2/job-templates/aacfb3e0-6575-4d4f-a711-1ee1ae768407)
-ok: [RHEL92-1] => (item=Variable set: CopyServerProfileTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
-ok: [RHEL92-2] => (item=Variable set: CopyServerProfileTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
-ok: [RHEL92-1] => (item=Variable set: CreateOneviewComplianceReport_job_template_resourceUri = /compute-ops/v1beta2/job-templates/aae145a1-79a2-4516-b191-c98039c96542)
-ok: [RHEL92-2] => (item=Variable set: CreateOneviewComplianceReport_job_template_resourceUri = /compute-ops/v1beta2/job-templates/aae145a1-79a2-4516-b191-c98039c96542)
-ok: [RHEL92-1] => (item=Variable set: DataRoundupReportOrchestrator_job_template_resourceUri = /compute-ops/v1beta2/job-templates/b0001d36-6490-48ac-93af-a87adfb997ed)
-ok: [RHEL92-2] => (item=Variable set: DataRoundupReportOrchestrator_job_template_resourceUri = /compute-ops/v1beta2/job-templates/b0001d36-6490-48ac-93af-a87adfb997ed)
-ok: [RHEL92-1] => (item=Variable set: FirmwareUpdate_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/fd54a96c-cabc-42e3-aee3-374a2d009dba)
-ok: [RHEL92-2] => (item=Variable set: FirmwareUpdate_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/fd54a96c-cabc-42e3-aee3-374a2d009dba)
-ok: [RHEL92-1] => (item=Variable set: GetExpandedSPT_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d17898e6-6907-491e-8430-7c2da795d2e5)
-ok: [RHEL92-2] => (item=Variable set: GetExpandedSPT_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d17898e6-6907-491e-8430-7c2da795d2e5)
-ok: [RHEL92-1] => (item=Variable set: GetFullServerInventory_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d6595f1b-84e6-4587-ade5-656e2a5ea20d)
-ok: [RHEL92-2] => (item=Variable set: GetFullServerInventory_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d6595f1b-84e6-4587-ade5-656e2a5ea20d)
-ok: [RHEL92-1] => (item=Variable set: GetOneviewServerInventory_job_template_resourceUri = /compute-ops/v1beta2/job-templates/a0124cb1-00f1-46b7-818f-a9eb5f60591f)
-ok: [RHEL92-2] => (item=Variable set: GetOneviewServerInventory_job_template_resourceUri = /compute-ops/v1beta2/job-templates/a0124cb1-00f1-46b7-818f-a9eb5f60591f)
-ok: [RHEL92-1] => (item=Variable set: GetOneViewSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/fc16aa48-c73c-4463-9112-e061383ebfa9)
-ok: [RHEL92-2] => (item=Variable set: GetOneViewSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/fc16aa48-c73c-4463-9112-e061383ebfa9)
-ok: [RHEL92-1] => (item=Variable set: GetPowerMeterData_job_template_resourceUri = /compute-ops/v1beta2/job-templates/50fa7d05-5941-4e8e-90c3-5995f1d600a8)
-ok: [RHEL92-2] => (item=Variable set: GetPowerMeterData_job_template_resourceUri = /compute-ops/v1beta2/job-templates/50fa7d05-5941-4e8e-90c3-5995f1d600a8)
-ok: [RHEL92-1] => (item=Variable set: GetSettingsForTemplate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/6cd671db-ce6b-45ce-894e-7b5ae23e0399)
-ok: [RHEL92-2] => (item=Variable set: GetSettingsForTemplate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/6cd671db-ce6b-45ce-894e-7b5ae23e0399)
-ok: [RHEL92-1] => (item=Variable set: GetSSOUrl_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2c7de503-77af-4340-b68d-7a26e5359b8e)
-ok: [RHEL92-2] => (item=Variable set: GetSSOUrl_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2c7de503-77af-4340-b68d-7a26e5359b8e)
-ok: [RHEL92-1] => (item=Variable set: GroupApplyOneviewSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/a229a162-b43f-45b0-b7bb-692df77b9746)
-ok: [RHEL92-2] => (item=Variable set: GroupApplyOneviewSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/a229a162-b43f-45b0-b7bb-692df77b9746)
-ok: [RHEL92-1] => (item=Variable set: GroupApplyServerSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/beff07ce-f36d-4699-9ac3-f872dcd63133)
-ok: [RHEL92-2] => (item=Variable set: GroupApplyServerSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/beff07ce-f36d-4699-9ac3-f872dcd63133)
-ok: [RHEL92-1] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/db3620d4-19a4-4b54-9804-83f8f59d48a4)
-ok: [RHEL92-2] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/db3620d4-19a4-4b54-9804-83f8f59d48a4)
-ok: [RHEL92-1] => (item=Variable set: GroupFirmwareCompliance_job_template_resourceUri = /compute-ops/v1beta2/job-templates/23b8ba2a-6c46-4223-b028-919382c7dcac)
-ok: [RHEL92-2] => (item=Variable set: GroupFirmwareCompliance_job_template_resourceUri = /compute-ops/v1beta2/job-templates/23b8ba2a-6c46-4223-b028-919382c7dcac)
-ok: [RHEL92-1] => (item=Variable set: GroupFirmwareUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
-ok: [RHEL92-2] => (item=Variable set: GroupFirmwareUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
-ok: [RHEL92-1] => (item=Variable set: GroupGetIloSecurityParams_job_template_resourceUri = /compute-ops/v1beta2/job-templates/08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
-ok: [RHEL92-2] => (item=Variable set: GroupGetIloSecurityParams_job_template_resourceUri = /compute-ops/v1beta2/job-templates/08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
-ok: [RHEL92-1] => (item=Variable set: GroupOSInstallation_job_template_resourceUri = /compute-ops/v1beta2/job-templates/e2952628-2629-4088-93db-91742304ef0c)
-ok: [RHEL92-1] => (item=Variable set: GroupServerInventoryReport_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
-ok: [RHEL92-2] => (item=Variable set: GroupOSInstallation_job_template_resourceUri = /compute-ops/v1beta2/job-templates/e2952628-2629-4088-93db-91742304ef0c)
-ok: [RHEL92-1] => (item=Variable set: GroupStorageVolumeConfiguration_job_template_resourceUri = /compute-ops/v1beta2/job-templates/c708eb57-235d-4ea8-9e21-8ceea2438773)
-ok: [RHEL92-2] => (item=Variable set: GroupServerInventoryReport_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
-ok: [RHEL92-1] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/94caa4ef-9ff8-4805-9e97-18a09e673b66)
-ok: [RHEL92-2] => (item=Variable set: GroupStorageVolumeConfiguration_job_template_resourceUri = /compute-ops/v1beta2/job-templates/c708eb57-235d-4ea8-9e21-8ceea2438773)
-ok: [RHEL92-1] => (item=Variable set: iLOSecurity_job_template_resourceUri = /compute-ops/v1beta2/job-templates/e1d69e76-38cc-4079-9192-a380baea2973)
-ok: [RHEL92-2] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/94caa4ef-9ff8-4805-9e97-18a09e673b66)
-ok: [RHEL92-1] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/abfda355-6e58-4c00-be0a-af35dbd70398)
-ok: [RHEL92-2] => (item=Variable set: iLOSecurity_job_template_resourceUri = /compute-ops/v1beta2/job-templates/e1d69e76-38cc-4079-9192-a380baea2973)
-ok: [RHEL92-2] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_resourceUri = /compute-ops/v1beta2/job-templates/abfda355-6e58-4c00-be0a-af35dbd70398)
-ok: [RHEL92-1] => (item=Variable set: PowerOff_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
-ok: [RHEL92-2] => (item=Variable set: PowerOff_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
-ok: [RHEL92-1] => (item=Variable set: PowerOn_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/0cbb2377-1834-488d-840c-d5bf788c34fb)
-ok: [RHEL92-1] => (item=Variable set: Restart_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/30110551-cad6-4069-95b8-dbce9bbd8525)
-ok: [RHEL92-2] => (item=Variable set: PowerOn_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/0cbb2377-1834-488d-840c-d5bf788c34fb)
-ok: [RHEL92-1] => (item=Variable set: ServerNetworkConnectivity_job_template_resourceUri = /compute-ops/v1beta2/job-templates/b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
-ok: [RHEL92-2] => (item=Variable set: Restart_New_job_template_resourceUri = /compute-ops/v1beta2/job-templates/30110551-cad6-4069-95b8-dbce9bbd8525)
-ok: [RHEL92-1] => (item=Variable set: SetIloSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/cf4f929b-d44a-4a90-93a9-820955458fd4)
-ok: [RHEL92-2] => (item=Variable set: ServerNetworkConnectivity_job_template_resourceUri = /compute-ops/v1beta2/job-templates/b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
-ok: [RHEL92-1] => (item=Variable set: SppUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2626e682-7bd4-40e3-b93a-745133deecd2)
-ok: [RHEL92-2] => (item=Variable set: SetIloSettings_job_template_resourceUri = /compute-ops/v1beta2/job-templates/cf4f929b-d44a-4a90-93a9-820955458fd4)
-ok: [RHEL92-2] => (item=Variable set: SppUpdate_job_template_resourceUri = /compute-ops/v1beta2/job-templates/2626e682-7bd4-40e3-b93a-745133deecd2)
+ok: [RHEL92-1] => (item=Variable set: ApplianceReconnect_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/0e818877-5a9a-4ea9-8978-8391270fbaba)
+ok: [RHEL92-2] => (item=Variable set: ApplianceReconnect_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/0e818877-5a9a-4ea9-8978-8391270fbaba)
+ok: [RHEL92-1] => (item=Variable set: ApplySettingsTemplate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
+ok: [RHEL92-2] => (item=Variable set: ApplySettingsTemplate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
+ok: [RHEL92-1] => (item=Variable set: ColdBoot_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/aacfb3e0-6575-4d4f-a711-1ee1ae768407)
+ok: [RHEL92-2] => (item=Variable set: ColdBoot_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/aacfb3e0-6575-4d4f-a711-1ee1ae768407)
+ok: [RHEL92-1] => (item=Variable set: CopyServerProfileTemplates_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
+ok: [RHEL92-2] => (item=Variable set: CopyServerProfileTemplates_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
+ok: [RHEL92-1] => (item=Variable set: CreateOneviewComplianceReport_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/aae145a1-79a2-4516-b191-c98039c96542)
+ok: [RHEL92-2] => (item=Variable set: CreateOneviewComplianceReport_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/aae145a1-79a2-4516-b191-c98039c96542)
+ok: [RHEL92-1] => (item=Variable set: DataRoundupReportOrchestrator_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/b0001d36-6490-48ac-93af-a87adfb997ed)
+ok: [RHEL92-2] => (item=Variable set: DataRoundupReportOrchestrator_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/b0001d36-6490-48ac-93af-a87adfb997ed)
+ok: [RHEL92-1] => (item=Variable set: FirmwareUpdate_New_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/fd54a96c-cabc-42e3-aee3-374a2d009dba)
+ok: [RHEL92-2] => (item=Variable set: FirmwareUpdate_New_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/fd54a96c-cabc-42e3-aee3-374a2d009dba)
+ok: [RHEL92-1] => (item=Variable set: GetExpandedSPT_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/d17898e6-6907-491e-8430-7c2da795d2e5)
+ok: [RHEL92-2] => (item=Variable set: GetExpandedSPT_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/d17898e6-6907-491e-8430-7c2da795d2e5)
+ok: [RHEL92-1] => (item=Variable set: GetFullServerInventory_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/d6595f1b-84e6-4587-ade5-656e2a5ea20d)
+ok: [RHEL92-2] => (item=Variable set: GetFullServerInventory_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/d6595f1b-84e6-4587-ade5-656e2a5ea20d)
+ok: [RHEL92-1] => (item=Variable set: GetOneviewServerInventory_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/a0124cb1-00f1-46b7-818f-a9eb5f60591f)
+ok: [RHEL92-2] => (item=Variable set: GetOneviewServerInventory_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/a0124cb1-00f1-46b7-818f-a9eb5f60591f)
+ok: [RHEL92-1] => (item=Variable set: GetOneViewSettings_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/fc16aa48-c73c-4463-9112-e061383ebfa9)
+ok: [RHEL92-2] => (item=Variable set: GetOneViewSettings_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/fc16aa48-c73c-4463-9112-e061383ebfa9)
+ok: [RHEL92-1] => (item=Variable set: GetPowerMeterData_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/50fa7d05-5941-4e8e-90c3-5995f1d600a8)
+ok: [RHEL92-2] => (item=Variable set: GetPowerMeterData_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/50fa7d05-5941-4e8e-90c3-5995f1d600a8)
+ok: [RHEL92-1] => (item=Variable set: GetSettingsForTemplate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/6cd671db-ce6b-45ce-894e-7b5ae23e0399)
+ok: [RHEL92-2] => (item=Variable set: GetSettingsForTemplate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/6cd671db-ce6b-45ce-894e-7b5ae23e0399)
+ok: [RHEL92-1] => (item=Variable set: GetSSOUrl_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/2c7de503-77af-4340-b68d-7a26e5359b8e)
+ok: [RHEL92-2] => (item=Variable set: GetSSOUrl_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/2c7de503-77af-4340-b68d-7a26e5359b8e)
+ok: [RHEL92-1] => (item=Variable set: GroupApplyOneviewSettings_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/a229a162-b43f-45b0-b7bb-692df77b9746)
+ok: [RHEL92-2] => (item=Variable set: GroupApplyOneviewSettings_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/a229a162-b43f-45b0-b7bb-692df77b9746)
+ok: [RHEL92-1] => (item=Variable set: GroupApplyServerSettings_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/beff07ce-f36d-4699-9ac3-f872dcd63133)
+ok: [RHEL92-2] => (item=Variable set: GroupApplyServerSettings_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/beff07ce-f36d-4699-9ac3-f872dcd63133)
+ok: [RHEL92-1] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/db3620d4-19a4-4b54-9804-83f8f59d48a4)
+ok: [RHEL92-2] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/db3620d4-19a4-4b54-9804-83f8f59d48a4)
+ok: [RHEL92-1] => (item=Variable set: GroupFirmwareCompliance_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/23b8ba2a-6c46-4223-b028-919382c7dcac)
+ok: [RHEL92-2] => (item=Variable set: GroupFirmwareCompliance_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/23b8ba2a-6c46-4223-b028-919382c7dcac)
+ok: [RHEL92-1] => (item=Variable set: GroupFirmwareUpdate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
+ok: [RHEL92-2] => (item=Variable set: GroupFirmwareUpdate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
+ok: [RHEL92-1] => (item=Variable set: GroupGetIloSecurityParams_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
+ok: [RHEL92-2] => (item=Variable set: GroupGetIloSecurityParams_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
+ok: [RHEL92-1] => (item=Variable set: GroupOSInstallation_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/e2952628-2629-4088-93db-91742304ef0c)
+ok: [RHEL92-1] => (item=Variable set: GroupServerInventoryReport_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
+ok: [RHEL92-2] => (item=Variable set: GroupOSInstallation_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/e2952628-2629-4088-93db-91742304ef0c)
+ok: [RHEL92-1] => (item=Variable set: GroupStorageVolumeConfiguration_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/c708eb57-235d-4ea8-9e21-8ceea2438773)
+ok: [RHEL92-2] => (item=Variable set: GroupServerInventoryReport_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
+ok: [RHEL92-1] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/94caa4ef-9ff8-4805-9e97-18a09e673b66)
+ok: [RHEL92-2] => (item=Variable set: GroupStorageVolumeConfiguration_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/c708eb57-235d-4ea8-9e21-8ceea2438773)
+ok: [RHEL92-1] => (item=Variable set: iLOSecurity_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/e1d69e76-38cc-4079-9192-a380baea2973)
+ok: [RHEL92-2] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/94caa4ef-9ff8-4805-9e97-18a09e673b66)
+ok: [RHEL92-1] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/abfda355-6e58-4c00-be0a-af35dbd70398)
+ok: [RHEL92-2] => (item=Variable set: iLOSecurity_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/e1d69e76-38cc-4079-9192-a380baea2973)
+ok: [RHEL92-2] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/abfda355-6e58-4c00-be0a-af35dbd70398)
+ok: [RHEL92-1] => (item=Variable set: PowerOff_New_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
+ok: [RHEL92-2] => (item=Variable set: PowerOff_New_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
+ok: [RHEL92-1] => (item=Variable set: PowerOn_New_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/0cbb2377-1834-488d-840c-d5bf788c34fb)
+ok: [RHEL92-1] => (item=Variable set: Restart_New_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/30110551-cad6-4069-95b8-dbce9bbd8525)
+ok: [RHEL92-2] => (item=Variable set: PowerOn_New_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/0cbb2377-1834-488d-840c-d5bf788c34fb)
+ok: [RHEL92-1] => (item=Variable set: ServerNetworkConnectivity_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
+ok: [RHEL92-2] => (item=Variable set: Restart_New_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/30110551-cad6-4069-95b8-dbce9bbd8525)
+ok: [RHEL92-1] => (item=Variable set: SetIloSettings_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/cf4f929b-d44a-4a90-93a9-820955458fd4)
+ok: [RHEL92-2] => (item=Variable set: ServerNetworkConnectivity_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
+ok: [RHEL92-1] => (item=Variable set: SppUpdate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/2626e682-7bd4-40e3-b93a-745133deecd2)
+ok: [RHEL92-2] => (item=Variable set: SetIloSettings_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/cf4f929b-d44a-4a90-93a9-820955458fd4)
+ok: [RHEL92-2] => (item=Variable set: SppUpdate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/2626e682-7bd4-40e3-b93a-745133deecd2)
 
 TASK [Capture server 'CZ2311004H' information] ****************************************************************************************************************************************************************************************
 ok: [RHEL92-1 -> localhost]
@@ -169,7 +169,7 @@ ok: [RHEL92-1] => {
     "msg": [
         "Generation: GEN_10",
         "ID: P28948-B21+CZ2311004H",
-        "URI: /compute-ops/v1beta2/servers/P28948-B21+CZ2311004H",
+        "URI: /compute-ops-mgmt/v1beta2/servers/P28948-B21+CZ2311004H",
         "Connection status: True",
         "iLO IP: 192.168.0.21"
     ]
@@ -178,7 +178,7 @@ ok: [RHEL92-2] => {
     "msg": [
         "Generation: GEN_10",
         "ID: P28948-B21+CZ2311004G",
-        "URI: /compute-ops/v1beta2/servers/P28948-B21+CZ2311004G",
+        "URI: /compute-ops-mgmt/v1beta2/servers/P28948-B21+CZ2311004G",
         "Connection status: True",
         "iLO IP: 192.168.0.20"
     ]
@@ -311,7 +311,7 @@ ok: [RHEL92-2]
 TASK [debug] **************************************************************************************************************************************************************************************************************************
 skipping: [RHEL92-1]
 ok: [RHEL92-2] => {
-    "internal_storage_server_setting_resourceuri": "/compute-ops/v1beta1/server-settings/378bd822-db05-419b-abd2-e63ce2ad10bf"
+    "internal_storage_server_setting_resourceuri": "/compute-ops-mgmt/v1beta1/server-settings/378bd822-db05-419b-abd2-e63ce2ad10bf"
 }
 
 TASK [Create server group name 'RHEL92-1_server_group' variable] **********************************************************************************************************************************************************************
@@ -384,10 +384,10 @@ ok: [RHEL92-2] => {
 
 TASK [debug] **************************************************************************************************************************************************************************************************************************
 ok: [RHEL92-1] => {
-    "temporary_group_resourceuri": "/compute-ops/v1beta2/groups/47f37712-9c51-4451-94d7-27e5402d7a41"
+    "temporary_group_resourceuri": "/compute-ops-mgmt/v1beta2/groups/47f37712-9c51-4451-94d7-27e5402d7a41"
 }
 ok: [RHEL92-2] => {
-    "temporary_group_resourceuri": "/compute-ops/v1beta2/groups/cdb03557-4784-42e8-aee5-753788825f4a"
+    "temporary_group_resourceuri": "/compute-ops-mgmt/v1beta2/groups/cdb03557-4784-42e8-aee5-753788825f4a"
 }
 
 TASK [Check if server 'CZ2311004H' is already member of a server group] ***************************************************************************************************************************************************************
@@ -588,10 +588,10 @@ skipping: [RHEL92-2]
 
 TASK [debug] **************************************************************************************************************************************************************************************************************************
 ok: [RHEL92-1] => {
-    "OS_image_server_setting_resourceuri": "/compute-ops/v1beta1/server-settings/431d7f69-5c7d-4f8e-bc69-a882deaa3097"
+    "OS_image_server_setting_resourceuri": "/compute-ops-mgmt/v1beta1/server-settings/431d7f69-5c7d-4f8e-bc69-a882deaa3097"
 }
 ok: [RHEL92-2] => {
-    "OS_image_server_setting_resourceuri": "/compute-ops/v1beta1/server-settings/f81ce4e6-3156-4c17-9c59-6622592d0603"
+    "OS_image_server_setting_resourceuri": "/compute-ops-mgmt/v1beta1/server-settings/f81ce4e6-3156-4c17-9c59-6622592d0603"
 }
 
 TASK [debug] **************************************************************************************************************************************************************************************************************************
@@ -956,7 +956,7 @@ ok: [RHEL92-1]
 
 TASK [debug] **************************************************************************************************************************************************************************************************************************
 ok: [RHEL92-1] => {
-    "firmware_server_setting_resourceuri": "/compute-ops/v1beta1/server-settings/58f6413a-d454-43cf-9f5f-aec2f3913f73"
+    "firmware_server_setting_resourceuri": "/compute-ops-mgmt/v1beta1/server-settings/58f6413a-d454-43cf-9f5f-aec2f3913f73"
 }
 skipping: [RHEL92-2]
 
@@ -998,7 +998,7 @@ skipping: [RHEL92-2]
 
 TASK [debug] **************************************************************************************************************************************************************************************************************************
 ok: [RHEL92-1] => {
-    "definitive_group_resourceuri": "/compute-ops/v1beta2/groups/c5a70a22-17e5-45f4-82ea-a3e0a3255398"
+    "definitive_group_resourceuri": "/compute-ops-mgmt/v1beta2/groups/c5a70a22-17e5-45f4-82ea-a3e0a3255398"
 }
 skipping: [RHEL92-2]
 
@@ -1088,7 +1088,7 @@ skipping: [RHEL92-2]
 
 TASK [Display the group firmware update job resource uri (first host only)] ***********************************************************************************************************************************************************
 ok: [RHEL92-1] => {
-    "group_firmware_update_job_resourceUri": "/compute-ops/v1beta3/jobs/330b285d-4d27-4224-8851-5b8c02e17db4"
+    "group_firmware_update_job_resourceUri": "/compute-ops-mgmt/v1beta3/jobs/330b285d-4d27-4224-8851-5b8c02e17db4"
 }
 skipping: [RHEL92-2]
 

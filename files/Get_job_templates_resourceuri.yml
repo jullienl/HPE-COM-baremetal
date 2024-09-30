@@ -7,14 +7,14 @@
 #  - For GroupFirmwareUpdate, the generated variable name is 'GroupFirmwareUpdate_job_template_resourceUri'
 #  - For PowerOn.New, the generated variable name is 'PowerOn_New_job_template_resourceUri'
 #
-# Each variable value is equal to the resourceUri attribute of the corresponding job template (e.g. /compute-ops/v1beta2/job-templates/d17898e6-6907-491e-8430-7c2da795d2e5). 
+# Each variable value is equal to the resourceUri attribute of the corresponding job template (e.g. /compute-ops-mgmt/v1beta2/job-templates/d17898e6-6907-491e-8430-7c2da795d2e5). 
 
 
 
 ---
   - name: Capture all job templates
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ job_templates_API_version }}/job-templates"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ job_templates_API_version }}/job-templates"
       method: GET
       status_code: 200
       headers:

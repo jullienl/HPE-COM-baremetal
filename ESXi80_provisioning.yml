@@ -89,7 +89,7 @@
 
   - name: Capture server '{{ serial_number }}' information
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ serial_number }}'"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ serial_number }}'"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -128,7 +128,7 @@
 
   - name: Wait until the server '{{ serial_number }}' raw inventory information is available (necessary when the server has recently been added to COM) then capture the data
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -160,7 +160,7 @@
 
   - name: Check if workload profile '{{ workload_profile_name }}' exists
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -187,7 +187,7 @@
 
   - name: Wait until PCI devices information is available then capture the server '{{ serial_number }}' raw inventory information 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -202,7 +202,7 @@
 
   - name: Run a server inventory job to collect the local storage information
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ jobs_API_version }}/jobs"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
       method: POST
       status_code: 200
       headers:
@@ -258,7 +258,7 @@
 
   - name: Capture the server '{{ serial_number }}' raw inventory information 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -380,7 +380,7 @@
     
   - name: Check if server settings '{{ raid_type }}' already exist
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -395,7 +395,7 @@
   # Need to create an internal storage RAID configuration if there is no NS204i but there is a storage controller
   - name: Create internal storage configuration using '{{ raid_type }}' with a volume size of '{{ volume_size_in_GB }}' GB for the OS boot volume when it does not exist
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings"
       method: POST
       status_code: 201
       headers:
@@ -426,7 +426,7 @@
 
   - name: Update internal storage configuration using '{{ raid_type }}' with a volume size of '{{ volume_size_in_GB }}' GB for the OS boot volume 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings/{{ internal_storage_server_setting_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings/{{ internal_storage_server_setting_id }}"
       method: PATCH
       status_code: 200
       headers:
@@ -473,7 +473,7 @@
   
   - name: Check if group '{{ temporary_server_group_name }}' already exists
     uri:
-      url:  "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups?filter={{ filter | urlencode }}"
+      url:  "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups?filter={{ filter | urlencode }}"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -488,7 +488,7 @@
 
   - name: Create temporary group '{{ temporary_server_group_name }}' with no local storage configuration definition (if it does not exist)
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups"
       method: POST
       status_code: 201
       headers:
@@ -527,7 +527,7 @@
   
   - name: Update temporary group '{{ temporary_server_group_name }}' with no local storage configuration definition (if it does exist)
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ group_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ group_id }}"
       method: PATCH
       status_code: 200
       headers:
@@ -570,7 +570,7 @@
 
   - name: Create temporary group '{{ temporary_server_group_name }}' with local storage configuration definition (if it does not exist)
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups"
       method: POST
       status_code: 201
       headers:
@@ -610,7 +610,7 @@
   
   - name: Update temporary group '{{ temporary_server_group_name }}' with local storage configuration definition (if it does exist)
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ group_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ group_id }}"
       method: PATCH
       status_code: 200
       headers:
@@ -683,7 +683,7 @@
 
   - name: Remove server '{{ serial_number }}' from the server group of which it is currently a member
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ server_group_id_found }}/devices/{{ server_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ server_group_id_found }}/devices/{{ server_id }}"
       method: DELETE
       status_code: 204
       headers:
@@ -701,7 +701,7 @@
 
   - name: Assign server '{{ serial_number }}' to temporary group '{{ temporary_server_group_name }}'
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ temporary_group_id }}/devices"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ temporary_group_id }}/devices"
       method: POST
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -724,11 +724,11 @@
 
   - name: Display the url that will be used to monitor the server configuration activity task
     debug:
-      msg: "{{ ConnectivityEndpoint }}/compute-ops/{{ activities_API_version }}/activities?filter=associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"
+      msg: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ activities_API_version }}/activities?filter=associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"
 
   - name: Wait for the configuration of server '{{ serial_number }}' to complete 
     uri:
-      url:  "{{ ConnectivityEndpoint }}/compute-ops/{{ activities_API_version }}/activities?filter={{ filter | urlencode  }}"  
+      url:  "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ activities_API_version }}/activities?filter={{ filter | urlencode  }}"  
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -752,7 +752,7 @@
 
   - name: Run a server inventory job to collect the local storage information
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ jobs_API_version }}/jobs"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
       method: POST
       status_code: 200
       headers:
@@ -810,7 +810,7 @@
 
   - name: Capture server '{{ serial_number }}' raw inventory information
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -980,7 +980,7 @@
 
   - name: Check if the operating system image server setting 'OS_Image_ESXi8.0.u2_for_{{ inventory_hostname }}' exists
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -993,7 +993,7 @@
 
   - name: Create an operating system image server setting 'OS_Image_ESXi8.0.u2_for_{{ inventory_hostname }}' if it does not exist
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings"
       method: POST
       status_code: 201
       headers:
@@ -1025,7 +1025,7 @@
 
   - name: Update the operating system image server setting 'OS_Image_ESXi8.0.u2_for_{{ inventory_hostname }}' if it does not exist
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings/{{ OS_image_server_setting_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings/{{ OS_image_server_setting_id }}"
       method: PATCH
       status_code: 200
       headers:
@@ -1070,7 +1070,7 @@
   
   - name: Update temporary group '{{ temporary_server_group_name }}' to add OS image installation settings with NS204i
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ temporary_group_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ temporary_group_id }}"
       method: PATCH
       status_code: 200
       headers:
@@ -1106,7 +1106,7 @@
 
   - name: Update temporary group '{{ temporary_server_group_name }}' to add OS image installation settings with storage controller (without NS204i)
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ temporary_group_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ temporary_group_id }}"
       method: PATCH
       status_code: 200
       headers:
@@ -1141,7 +1141,7 @@
 
   - name: Start OS image installation in group '{{ temporary_server_group_name }}'
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ jobs_API_version }}/jobs"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
       method: POST
       status_code: 200
       headers:
@@ -1169,7 +1169,7 @@
 
   - name: Wait for the OS image installation of server '{{ serial_number }}' to complete 
     uri:
-      url:  "{{ ConnectivityEndpoint }}/compute-ops/{{ activities_API_version }}/activities?filter={{ filter | urlencode  }}"  
+      url:  "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ activities_API_version }}/activities?filter={{ filter | urlencode  }}"  
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -1196,7 +1196,7 @@
 
   - name: Unassign server '{{ serial_number }}' from temporary group '{{ temporary_server_group_name }}' 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ temporary_group_id }}/devices/{{ server_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ temporary_group_id }}/devices/{{ server_id }}"
       method: DELETE
       status_code: 204
       headers:
@@ -1215,7 +1215,7 @@
 
   - name: Delete temporary group '{{ temporary_server_group_name }}' 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ temporary_group_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ temporary_group_id }}"
       method: DELETE
       status_code: 204
       headers:
@@ -1230,7 +1230,7 @@
 
   - name: Delete operating system image server setting 'OS_Image_ESXi8.0.u2_for_{{ inventory_hostname }}' 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings/{{ OS_image_server_setting_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings/{{ OS_image_server_setting_id }}"
       method: DELETE
       status_code: 204
       headers:
@@ -1509,7 +1509,7 @@
   
   - name: Collect firmware bundles
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ firmware_bundles_API_version }}/firmware-bundles"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ firmware_bundles_API_version }}/firmware-bundles"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -1638,7 +1638,7 @@
 
   - name: Check if the firmware server setting '{{ firmware_server_setting_name }}' exists
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -1652,7 +1652,7 @@
 
   - name: Create the firmware server setting '{{ firmware_server_setting_name }}' 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings"
       method: POST
       status_code: 201
       headers:
@@ -1684,7 +1684,7 @@
 
   - name: Update the firmware server setting '{{ firmware_server_setting_name }}' 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ server_settings_API_version }}/server-settings/{{ firmware_server_setting_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings/{{ firmware_server_setting_id }}"
       method: PATCH
       status_code: 200
       headers:
@@ -1726,7 +1726,7 @@
   
   - name: Check if definitive group '{{ server_group_name }}' already exist
     uri:
-      url:  "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups?filter={{ filter | urlencode }}"
+      url:  "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups?filter={{ filter | urlencode }}"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -1742,7 +1742,7 @@
 
   - name: Create definitive group '{{ server_group_name }}' if it does not exist
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups"
       method: POST
       status_code: 201
       headers:
@@ -1784,7 +1784,7 @@
     
   - name: Update definitive group '{{ server_group_name }}' if it does exist
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ group_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ group_id }}"
       method: PATCH
       status_code: 200
       headers:
@@ -1891,7 +1891,7 @@
 
   - name: Get definitive group '{{ server_group_name }}' information
     uri:
-      url:  "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups?filter={{ filter | urlencode }}"
+      url:  "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups?filter={{ filter | urlencode }}"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -1919,7 +1919,7 @@
 
   - name: Assign server '{{ serial_number }}' to definitive server group '{{ server_group_name }}'
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ groups_API_version }}/groups/{{ definitive_group_id }}/devices"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ definitive_group_id }}/devices"
       method: POST
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -1976,7 +1976,7 @@
 
   - name: Start a group firmware update job using the defined firmware baseline (first host only)
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ jobs_API_version }}/jobs"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
       method: POST
       status_code: 200
       headers:
@@ -2045,7 +2045,7 @@
 
   - name: Get the latest activity of server '{{ serial_number }}'
     uri:
-      url:  "{{ ConnectivityEndpoint }}/compute-ops/{{ activities_API_version }}/activities?filter={{ filter | urlencode  }}"  
+      url:  "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ activities_API_version }}/activities?filter={{ filter | urlencode  }}"  
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -2087,7 +2087,7 @@
 
   - name: Capture server information   
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ serial_number }}'"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ serial_number }}'"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
