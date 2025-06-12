@@ -26,6 +26,7 @@
   gather_facts: no
   vars_files:
     - vars/GLP_COM_API_credentials_encrypted.yml    
+    - vars/api_versions.yml
   vars:
     ansible_forks: 5
 
@@ -53,10 +54,10 @@
     import_tasks: files/Create_COM_session.yml
 
 
-#--------------------------------------Capture COM resource API versions ----------------------- ----------------------------------------------------------------------
+#--------------------------------------Capture Job Templates Resource Uri-----------------------------------------------------------------------------------------------
 
-  - name: Capture Resource API versions
-    import_tasks: files/Get_resource_API_versions.yml
+  - name: Capture Job Templates ResourceUri
+    import_tasks: files/Get_job_templates_resourceuri.yml
 
 
 #--------------------------------------Capture server information -----------------------------------------------------------------------------------------------------
@@ -77,10 +78,10 @@
       msg: "Server '{{ inventory_hostname }}' does not exist!"
     when: server.json.count == 0
 
-  - name: Capture server '{{ inventory_hostname }}' uri
+  - name: Capture server '{{ inventory_hostname }}' facts
     set_fact:
       server_id:  "{{ server | json_query('json.items[0].id') }}"
-      server_name:  "{{ server | json_query('json.items[0].name') }}"
+      server_name:  "{{ server | json_query('json.items[0].name') | lower }}"
       server_uri:  "{{ server | json_query('json.items[0].resourceUri') }}"
       server_connected_status:  "{{ server | json_query('json.items[0].state.connected') }}"
       server_ilo_ip:  "{{ server | json_query('json.items[0].hardware.bmc.ip') }}"
@@ -98,16 +99,18 @@
         - "Make sure to connect the server's iLO to COM ! Go to iLO UI / Management / Compute Ops Management"
     when: server_connected_status == false
 
-  - name: Capture server '{{ inventory_hostname }}' raw inventory information
-    uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
-      method: GET
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    register: server_raw_inventory
-    delegate_to: localhost
+  # - name: Capture server '{{ inventory_hostname }}' inventory information
+  #   uri:
+  #     url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/inventory"
+  #     method: GET
+  #     headers:
+  #       Authorization: "Bearer {{ access_token }}"
+  #   register: server_inventory
+  #   delegate_to: localhost
     
-  # - debug: var=server_raw_inventory
+  # - debug: var=server_inventory
+
+
 
 
 #--------------------------------------Remove the server from server group --------------------------------------------------------------------------------------------
@@ -135,11 +138,17 @@
 
   - name: Remove server '{{ inventory_hostname }}' from the server group of which it is currently a member
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ server_group_id_found }}/devices/{{ server_id }}"
-      method: DELETE
-      status_code: 204
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ server_group_id_found }}/devices/unassign"
+      method: POST
+      status_code: 202
       headers:
         Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        devices:
+          # Only servers that are not part of a group can be assigned to a group.
+          - deviceId: "{{ server_id }}"
     register: group_unassignment_result
     delegate_to: localhost
     when: server_info_from_ui_doorway.json.group_ is defined and server_info_from_ui_doorway.json.group_ is not none
@@ -152,25 +161,6 @@
 
 #--------------------------------------Power off the server -----------------------------------------------------------------------------------------------------------
 
-  - name: Capture all job templates
-    uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ job_templates_API_version }}/job-templates"
-      method: GET
-      status_code: 200
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    register: job_templates
-    delegate_to: localhost
-
-  # - debug: var=job_templates
-
-  - name: Capture jobTemplateUri of PowerOff.New
-    set_fact:
-      job_template_resourceuri: "{{ (job_templates | json_query(query))[0] }}"
-    vars:
-      query: "json.items[?name=='PowerOff.New'].resourceUri"
-
-  - debug: var=job_template_resourceuri
 
   - name: Power off server '{{ inventory_hostname }}' 
     uri:
@@ -182,7 +172,7 @@
         Content-Type: "application/json"
       body_format: json
       body:
-        jobTemplateUri: "{{ job_template_resourceuri }}"
+        jobTemplateUri: "{{ PowerOff_New_job_template_resourceUri }}"
         resourceUri: "{{ server_uri }}"
     register: power_off_status
     delegate_to: localhost
@@ -222,7 +212,7 @@
     - vars/Windows_DNS_vars_encrypted.yml
   tasks:
 
-    - name: Remove '{{ hostname }}' from '{{ dns_server }}'
+    - name: Remove "{{ hostname }}" from "{{ dns_server }}" 
       community.windows.win_dns_record:
         name: "{{ hostname }}"
         type: "A"
