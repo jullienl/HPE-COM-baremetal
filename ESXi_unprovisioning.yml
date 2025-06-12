@@ -13,6 +13,9 @@
 #     or
 #     $ ansible-playbook -i "CZ2311004G,CZ2311004H" ESXi_unprovisioning.yml --ask-vault-password 
 #
+#   With a pass file containing the vault/become password:
+#     $ ansible-playbook -i "CZ2311004G," ESXi_unprovisioning.yml --become-password-file pass --vault-password-file pass
+#
 #----------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -24,6 +27,7 @@
     - vars/ESXi8.0.u2_vars.yml
     - vars/GLP_COM_API_credentials_encrypted.yml    
     - vars/VMware_vCenter_vars_encrypted.yml
+    - vars/api_versions.yml
   vars:
     ansible_forks: 5
 
@@ -49,12 +53,6 @@
 
   - name: Create HPE Compute Ops Management session
     import_tasks: files/Create_COM_session.yml
-
-
-#--------------------------------------Capture COM resource API versions ----------------------------------------------------------------------------------------------
-
-  - name: Capture Resource API versions
-    import_tasks: files/Get_resource_API_versions.yml
 
 
 #--------------------------------------Capture Job Templates Resource Uri-----------------------------------------------------------------------------------------------
@@ -102,16 +100,16 @@
         - "Make sure to connect the server's iLO to COM ! Go to iLO UI / Management / Compute Ops Management"
     when: server_connected_status == false
 
-  - name: Capture server '{{ inventory_hostname }}' raw inventory information
-    uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
-      method: GET
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    register: server_raw_inventory
-    delegate_to: localhost
+  # - name: Capture server '{{ inventory_hostname }}' inventory information
+  #   uri:
+  #     url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/inventory"
+  #     method: GET
+  #     headers:
+  #       Authorization: "Bearer {{ access_token }}"
+  #   register: server_inventory
+  #   delegate_to: localhost
     
-  # - debug: var=server_raw_inventory
+  # - debug: var=server_inventory
 
 
 #--------------------------------------Put ESXi in maintenance mode ---------------------------------------------------------------------------------------------------
@@ -237,11 +235,17 @@
 
   - name: Remove server '{{ inventory_hostname }}' from the server group of which it is currently a member
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ server_group_id_found }}/devices/{{ server_id }}"
-      method: DELETE
-      status_code: 204
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ server_group_id_found }}/devices/unassign"
+      method: POST
+      status_code: 202
       headers:
         Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        devices:
+          # Only servers that are not part of a group can be assigned to a group.
+          - deviceId: "{{ server_id }}"
     register: group_unassignment_result
     delegate_to: localhost
     when: server_info_from_ui_doorway.json.group_ is defined and server_info_from_ui_doorway.json.group_ is not none
