@@ -32,7 +32,7 @@ sed -i 's/:/\ /g' /tmp/interface
 # Merge the lines into a single line separated by a comma then remove spaces
 interface=`cat /tmp/interface | paste -sd ',' | tr -d ' '`
 
-if [[ "$nicbonding" == "true" ]]; then
+if [[ "${nicbonding,,}" == "true" ]]; then
     # With bonding:
     #  Create a team with the first two connected nics if any, 
     #  If only one nic is connected, use only one nic in the team
@@ -116,6 +116,17 @@ if echo "$CONTROLLER" | grep -q "MR"; then
     echo "The controller is a 'MR controller'"
     INDEX="sd"
 fi 
+
+# Handle the case when local disks are used (no controller string matches)
+if [ -z "$INDEX" ]; then
+    echo "No known controller detected, assuming local disks (e.g., sda, nvme0n1)"
+    # Try to detect if nvme or sd disks are present
+    if lsblk -dno NAME | grep -q "^nvme"; then
+        INDEX="nvme"
+    else
+        INDEX="sd"
+    fi
+fi
 
 # if SIZEinBytes exists then run the disk detection process
 if [ "$SIZEinBytes" != "0" ]; then 
