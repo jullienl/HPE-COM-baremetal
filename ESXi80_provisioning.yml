@@ -1162,12 +1162,11 @@
             storageVolumeDeletion: false
             storageVolumeName: ""
             externalStorageConfiguration: false
-            osCompletionTimeoutMin: 240
+            osCompletionTimeoutMin: 60 # The OS completion timeout in minutes. Default: 240. Maximum: 720. Minimum: 60
           onDeviceApply:
             firmwareDowngrade: false
         # autoAddTags:       
     register: server_group_result
-    # when:  SATACTRL_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined
     when:  NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined
     delegate_to: localhost
 
