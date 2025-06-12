@@ -147,7 +147,7 @@ The following diagrams describe the overall process flows:
 
   > **Note**: To create the WinPE image needed to provision the Windows host, refer to [WinPE_image_creation.md](https://github.com/jullienl/HPE-COM-baremetal/blob/main/files/WinPE_image_creation.md) in the `files` folder.
 
-> **Note**: This project utilizes the HPE iLO virtual media feature to mount ISO files for operating system installation. The capability known as "script/URL-based virtual media" is unique to the HPE iLO Advanced license. However, this specific license is not necessary when you are using HPE Compute Ops Management.
+> **Note**: This project utilizes the HPE iLO virtual media feature to mount ISO files for operating system installation. The capability known as "script/URL-based virtual media" is unique to the HPE iLO Advanced license. However, this specific license is not necessary when HPE Compute Ops Management is used.
 
 
 ## Ansible control node information
@@ -291,18 +291,19 @@ Booting from a SAN (Storage Area Network) is currently not supported by this pro
 To avoid data loss or other issues, the playbooks include some logic to ensure that the target disk for OS installation is correctly identified. To do this, the size of the volume detected by Compute Ops Management and presented by the internal local storage (NS204i or MR or SR controller) is used to make this selection. In addition, when multiple controllers are detected, disk selection is determined by the following conditions:
 
 1. If an HPE NS204i-x NVMe Boot Controller is detected, the automatic RAID1 volume associated with it will be used for installing the OS.
-2. If there is no HPE NS204i-x NVMe Boot Controller found, the first available HPE MegaRAID (MR) or SmartRaid (SR) Storage Controller with disks will be utilized for the OS installation.
+2. If there is no HPE NS204i-x NVMe Boot Controller found, the first available HPE MegaRAID (MR) or SmartRaid (SR) Storage Controller with at least 2 disks will be utilized for the OS installation.
+3. If neither an HPE NS204i-x NVMe Boot Controller nor an MR/SR controller is detected, the playbooks will check for the presence of a local disk. If a local disk is available, it will be selected as the target volume for the OS installation.
 
 
 ### OS boot volume RAID type and size
 
-- When an HPE NS204i-x NVMe Boot Controller is used, a mirror (RAID1) between the two NVMe drives is by design automatically created and the whole disk is used to create the operating system volume. In this case, the playbooks in this project simply skip the task of creating the operating system boot volume, as it is automatically managed by the NS204i. 
+- When an HPE NS204i-x NVMe Boot Controller is present, it automatically creates a RAID1 (mirror) between the two NVMe drives and allocates the entire disk for the operating system volume. In this scenario, the playbooks in this project skip the OS boot volume creation step, as the NS204i controller manages it automatically. The same approach applies when only a local disk is used.
 
 - With MR/SR Storage controller, the creation of the operating system boot volume is managed by the playbooks of this project and in this case, you can define the volume settings in the OS variable file located in /vars using:
   - `raid_type`: Defines the RAID level (RAID0, RAID1 or RAID5) 
   - `volume_size_in_GB`: Defines the OS volume size. It must be a number greater than 0 or equal to -1 to indicate that the entire disk should be used.
 
-During the installation process, it is possible to present SAN volumes to the servers (such as vmfs datastore volumes/cluster volumes, etc.), as the installation process looks for the internal logical drive to install the operating system, and will not install the OS, nor destroy the data on the presented SAN volumes.
+> **Recommendation**: During the OS installation process, avoid presenting SAN volumes (such as VMFS datastores or cluster volumes) to the servers until the installation is complete. Even though the installer targets the internal logical drive, withholding SAN volumes during installation helps prevent accidental selection or modification, reducing the risk of data loss or corruption on existing SAN storage.
 
 ### Network configuration
 

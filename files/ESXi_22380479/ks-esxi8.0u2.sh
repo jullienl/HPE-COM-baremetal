@@ -15,6 +15,8 @@ reboot
 # Redirect output to a log file 
 LOGFILE="/tmp/Pre_install.log"
 
+echo "Starting pre-installation script" > "${LOGFILE}" 2>&1
+
 # Storage configuration - Drive selection and clearing existing partitions using drive size and storage controller type
 
 # Finding boot volume for the OS installation
@@ -22,12 +24,11 @@ LOGFILE="/tmp/Pre_install.log"
 SIZEinBytes={{boot_drive_bytes_size}}
 CONTROLLER="{{Controller_type}}"
 
-
 echo "CONTROLLER=$CONTROLLER" >> "${LOGFILE}" 2>&1
 
 if echo "$CONTROLLER" | grep -q "NS204i"; then
     # echo "The controller is an 'NS204i'" >> "${LOGFILE}" 2>&1
-    INDEX="t*"
+    INDEX="t*"  # an NVMe or SATA disk is detected as t10.nvme or t10.ATA vmfs disk by ESXi
 fi
 
 if echo "$CONTROLLER" | grep -q "SR"; then
@@ -36,7 +37,7 @@ if echo "$CONTROLLER" | grep -q "SR"; then
 fi 
 
 if echo "$CONTROLLER" | grep -q "MR"; then
-    echo "The controller is an 'MR controller'" >> "${LOGFILE}" 2>&1
+    # echo "The controller is an 'MR controller'" >> "${LOGFILE}" 2>&1
     INDEX="n*"
 fi 
 
@@ -88,7 +89,7 @@ if [ "$SIZEinBytes" != "0" ]; then
                     DRIVESIZE=$GB
                 fi
 
-                echo "Diff is $DELTA with `echo $DEV | awk '{ print substr ($0, 12 ) }'` $GB GB" >> "${LOGFILE}" 2>&1
+                echo "Diff is $DELTA with $VML $GB GB" >> "${LOGFILE}" 2>&1
                 echo "Matching Drive: $DRIVESIZE GB" >> "${LOGFILE}" 2>&1
             fi
         done
@@ -108,6 +109,17 @@ else
     echo "install --firstdisk=local --overwritevmfs --novmfsondisk" >>/tmp/DiskConfig
 fi            
 
+# Error handling: Check if TARGET_DISK was found
+if [ -z "$TARGET_DISK" ]; then
+    echo "ERROR: No suitable target disk found for installation." >> "${LOGFILE}" 2>&1
+    echo "ERROR: No suitable target disk found for installation." > /tmp/disk_detection_error
+    # Exit with error code to halt installation
+    exit 1
+fi
+
+
+
+
 ###############################################################################
 # Post-Installation Scripts
 ###############################################################################
@@ -118,6 +130,7 @@ fi
 esxcli system hostname set --host="{{inventory_hostname}}"
 esxcli system hostname set --fqdn="{{inventory_hostname}}.{{domain}}"
 esxcli network ip dns search add --domain="{{domain}}"
+esxcli system time set --day="{{ ansible_date_time.day }}" --month="{{ ansible_date_time.month }}" --year="{{ ansible_date_time.year }}" --hour="{{ ansible_date_time.hour }}" --min="{{ ansible_date_time.minute }}" --sec="{{ ansible_date_time.second }}"
 
 # Adding Ansible control node SSH public key to host authorized_keys 
 echo "Installing Ansible SSH public key"

@@ -1,0 +1,37 @@
+# Versions of the COM APIs to use with the playbooks
+    
+accounts_API_version: v1beta1
+activation_keys_API_version: v1beta1
+activation_tokens_API_version: v1beta1
+activities_API_version: v1beta2
+appliance_firmware_bundles_API_version: v1beta1
+# appliance_firmware_bundles_API_version: v1
+async_operations_API_version: v1beta1
+# async_operations_API_version: v1
+external_services_API_version: v1beta1
+filters_API_version: v1beta1
+firmware_bundles_API_version: v1beta2
+# firmware_bundles_API_version: v1
+groups_API_version: v1
+# groups_API_version: v1beta2
+job_templates_API_version: v1beta2
+jobs_API_version: v1beta3
+# jobs_API_version: v1beta2
+# jobs_API_version: v1
+metrics_configurations_API_version: v1beta1
+# metrics_configurations_API_version: v1
+oneview_appliances_API_version: v1beta1
+oneview_server_templates_API_version: v1beta1
+oneview_settings_API_version: v1beta1
+reports_API_version: v1beta2
+# reports_API_version: v1beta1
+schedules_API_version: v1beta2
+server_locations_API_version: v1beta1
+server_settings_API_version: v1beta1
+settings_API_version: v1
+# settings_API_version: v1beta1
+# servers_API_version: v1
+servers_API_version: v1beta2
+user_preferences_API_version: v1beta1
+# user_preferences_API_version: v1
+webhooks_API_version: v1beta1
