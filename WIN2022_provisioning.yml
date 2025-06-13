@@ -5,6 +5,9 @@
 #   
 #   $ ansible-playbook -i hosts_WIN WIN2022_provisioning.yml --ask-vault-password --ask-become-pass
 #
+#   With a pass file containing the vault/become password:
+#   $ ansible-playbook -i hosts_WIN WIN2022_provisioning.yml --become-password-file pass --vault-password-file pass
+#
 #  Note: Make sure to provide the list of servers to be provisioned with their details in the inventory file 'hosts_WIN'
 #
 #----------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -20,6 +23,7 @@
   gather_facts: no
   vars_files:
     - vars/GLP_COM_API_credentials_encrypted.yml    
+    - vars/api_versions.yml
   vars:
     inventory_fqdn: "{{ inventory_hostname | lower }}.{{ domain }}"
     ansible_host_key_checking: false
@@ -52,16 +56,25 @@
     import_tasks: files/Create_COM_session.yml
 
 
-#--------------------------------------Capture COM resource API versions ----------------------- ----------------------------------------------------------------------
-
-  - name: Capture Resource API versions
-    import_tasks: files/Get_resource_API_versions.yml
-
-
 #--------------------------------------Capture Job Templates Resource Uri-----------------------------------------------------------------------------------------------
   
   - name: Capture Job Templates ResourceUri
     import_tasks: files/Get_job_templates_resourceuri.yml
+
+
+#--------------------------------------Ensure hostname is supported -----------------------------------------------------------------------------------------------------
+  # This task ensures the playbook stops if the hostname does not match the required pattern.
+  # The hostname must be compliant with the Windows NetBIOS naming conventions.
+  - name: Validate hostname format for Windows server '{{ inventory_hostname }}'
+    assert:
+      that:
+        - inventory_hostname is match('^[a-zA-Z0-9-]+$') # Only letters, digits, and hyphens
+        - (inventory_hostname | length) <= 15 # Max 15 chars
+        - not (inventory_hostname is match('^-')) # Not start with hyphen
+        - not (inventory_hostname.endswith('-')) # Not end with hyphen
+        - not (inventory_hostname is match('^[0-9]+$'))  # Not all numeric
+        - not (inventory_hostname | regex_search('[ _.$!@#%^&*()+=|;:\'",<>?`~\[\]{}\\/]')) # No spaces/special chars
+      fail_msg: "Invalid hostname '{{ inventory_hostname }}'. Hostname must only contain letters, digits, hyphens, be at most 15 characters, and not start or end with a hyphen."
 
 
 #--------------------------------------Capture server information -----------------------------------------------------------------------------------------------------
@@ -79,12 +92,13 @@
 
   - name: Exit if server '{{ serial_number }}' does not exist
     fail:
-      msg: "Server '{{ serial_number }}' does not exist!"
+      msg: "Server '{{ serial_number }}' cannot be found in COM!"
     when: server.json.count == 0
 
   - name: Capture server '{{ serial_number }}' generation, id, uri, connection status and iLO IP
     set_fact:
       server_generation:  "{{ server | json_query('json.items[0].serverGeneration') }}"
+      server_model:  "{{ server | json_query('json.items[0].hardware.model') }}"
       server_id:  "{{ server | json_query('json.items[0].id') }}"
       server_resourceUri:  "{{ server | json_query('json.items[0].resourceUri') }}"
       server_connected_status:  "{{ server | json_query('json.items[0].state.connected') }}"
@@ -93,6 +107,7 @@
   - debug: 
       msg:
         - "Generation: {{ server_generation }}"
+        - "Model: {{ server_model }}"
         - "ID: {{ server_id }}"
         - "URI: {{ server_resourceUri }}"
         - "Connection status: {{ server_connected_status }}"
@@ -132,6 +147,58 @@
     delay: 60
     delegate_to: localhost
     
+  - name: Power on the server '{{ serial_number }}' to get the storage inventory information 
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
+      method: POST
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        resourceUri: "{{ server_resourceUri }}"
+        jobTemplateUri: "{{ PowerOn_New_job_template_resourceUri }}"
+    register: power_on_job_result
+    delegate_to: localhost
+
+  # - debug: var=inventory_job_result
+
+  - name: Set a variable for the job resource URI
+    set_fact:
+      job_resourceUri: "{{ power_on_job_result.json.resourceUri }}"
+
+  # - debug: var=job_resourceUri
+
+  - name: Wait for the server power on job to complete
+    uri:
+      url: "{{ ConnectivityEndpoint }}{{ job_resourceUri }}"
+      method: GET
+      return_content: yes
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    retries: 60
+    delay: 5
+    until: >
+      (server_power_on_job_status.json.state == "COMPLETE" or 
+      server_power_on_job_status.json.state == "ERROR")
+    register: server_power_on_job_status
+    delegate_to: localhost
+
+  # - debug: var=server_power_on_job_status
+
+  - name: Display the server power on job result 
+    debug: 
+      msg:
+        - "State: {{ server_power_on_job_status.json.state }}"
+        - "ResultCode: {{ server_power_on_job_status.json.resultCode }}"
+        - "Status: {{ server_power_on_job_status.json.status }}"
+
+  - name: Exit when server power on job is failing
+    fail: 
+      msg: "Error ! Server power on job has failed !"
+    when: server_power_on_job_status.json.state == "ERROR" 
+
 
 #--------------------------------------Check BIOS/Workload profile settings -------------------------------------------------------------------------------------------
 
@@ -139,7 +206,7 @@
 
   - name: Check if workload profile '{{ workload_profile_name }}' exists
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ settings_API_version }}/settings?filter={{ filter | urlencode }}"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -162,7 +229,7 @@
   # - debug: var=bios_server_setting_resourceuri
 
 
-#--------------------------------------Create internal storage settings -----------------------------------------------------------------------------------------------
+#-------------------------------------- Run a server inventory job to collect the local storage information -----------------------------------------------------------------------------------------------
 
   - name: Wait until PCI devices information is available then capture the server '{{ serial_number }}' raw inventory information 
     uri:
@@ -193,8 +260,6 @@
         jobTemplateUri: "{{ GetFullServerInventory_job_template_resourceUri }}"
         data:
           is_reports_call: true
-          filters: 
-            - localStorageV2
     register: inventory_job_result
     delegate_to: localhost
 
@@ -232,28 +297,28 @@
 
   - name: Exit when server inventory job is failing
     fail: 
-      msg: "Error ! Server inventory job to collect the local storage information has failed !"
+      msg: "Error ! Server inventory job to collect the local storage information has failed!"
     when: server_inventory_job_status.json.state == "ERROR" 
 
-  - name: Capture the server '{{ serial_number }}' raw inventory information 
+  - name: Capture the server '{{ serial_number }}' inventory information 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/inventory"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
-    register: server_raw_inventory
+    register: server_inventory
     delegate_to: localhost
 
-  # - debug: var=server_raw_inventory
+  # - debug: var=server_inventory
 
-  # Is the server equipped with an NVMe NS204i boot controller?
+  # If the server is equipped with a NS204i controller, then the local storage configuration will be using the NS204i controller.
 
   - name: Capture the presence of a NS204i NVMe boot controller in server '{{ serial_number }}'
     set_fact:
       NS204i_data: "{{ matched_item }}"
     vars:
         matched_item: "{{ item }}"
-    loop: "{{ server_raw_inventory.json.storageInventory.LocalStorageV2 }}"
+    loop: "{{ server_inventory.json.storage.data }}"
     loop_control:
       label: never
     when: item.Name is search('NS204i')
@@ -275,26 +340,38 @@
       boot_drive_bytes_size: "{{ matched_item }}"
     vars:
         matched_item: "{{ item.Volumes[0].CapacityBytes }}"
-    loop: "{{ server_raw_inventory.json.storageInventory.LocalStorageV2 }}"
+    loop: "{{ server_inventory.json.storage.data }}"
     loop_control:
       label: never
-    when: NS204i_data is defined and item.Name is search('NS204i')
+    when: 
+      - NS204i_data is defined
+      - item.Name is defined
+      - item.Name is search('NS204i')
+      - item.Volumes is defined
+      - item.Volumes | length > 0
     
   - debug: 
       msg: "Size of NS204i volume: {{ ((boot_drive_bytes_size | int) / (1024 ** 3)) | round(1) }} GB"
     when: NS204i_data is defined 
 
-  # No NS204i but is the server equipped with an HPE MR or SR controller and with drives available?
+  # If no NS204i, check if the server is equipped with an HPE MR or SR controller and with at least 2 drives available?
+  # If so, then the local storage configuration will be using the HPE MR or SR controller.
+  # If more than one controller is present, then the first one with available drives will be used.
 
   - name: Capture storage RAID controller information when an HPE MR or SR controller is used with available drives
     set_fact:
       SR_MR_storage_controller_data: "{{ matched_item }}"
     vars:
         matched_item: "{{ item }}"
-    loop: "{{ server_raw_inventory.json.storageInventory.LocalStorageV2 }}"
+    loop: "{{ server_inventory.json.storage.data }}"
     loop_control:
       label: never
-    when: NS204i_data is undefined and item.Drives | length > 0 and (item.Name is search('HPE MR') or item.Name is search('HPE SR'))
+    when: 
+      - NS204i_data is undefined
+      - item.Drives is defined
+      - item.Drives | length > 1
+      - (item.Name is search('HPE MR') or item.Name is search('HPE SR'))
+      - SR_MR_storage_controller_data is not defined # Only capture the first controller with drives available
 
   # - debug: var=SR_MR_storage_controller_data
 
@@ -307,74 +384,119 @@
        msg: "Storage RAID controller found: '{{ storage_controller_name }}' with '{{ SR_MR_storage_controller_data.Drives | length }}' drives"
     when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
 
-  # Retrieve storage controller data when no NS204i and no SR/MR controller with disk available found  
+  - name: Capture size of the HPE MR or SR RAID1 volume if any
+    set_fact:
+      boot_drive_bytes_size: "{{ matched_item }}"
+    vars:
+        matched_item: "{{ item.Volumes[0].CapacityBytes }}"
+    loop: "{{ server_inventory.json.storage.data }}"
+    loop_control:
+      label: never
+    when: 
+      - NS204i_data is undefined
+      - SR_MR_storage_controller_data is defined
+      - (item.Name is search('HPE MR') or item.Name is search('HPE SR'))
+      - item.Volumes is defined
+      - item.Volumes | length > 0
+
+  - debug: 
+      msg: "Size of HPE MR or SR RAID1 volume: {{ ((boot_drive_bytes_size | int) / (1024 ** 3)) | round(1) }} GB"
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
+  
+  # If no NS204i and no HPE MR or SR controller with drives available found, then check if a local disk is available.
+  # If so, then the local disk will be used as the target volume for the installation of Windows.  
 
   - name: Set controller type if disk found and when no NS204i and no SR/MR controller with disk available found     
     set_fact:
       no_NS204i_no_SR_MR_but_local_disk: "{{ matched_item }}"
     vars:
         matched_item: "{{ item }}"
-    loop: "{{ server_raw_inventory.json.storageInventory.LocalStorageV2 }}"
+    loop: "{{ server_inventory.json.storage.data }}"
     loop_control:
       label: never
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and item.Drives | length > 0
+    when: 
+      - NS204i_data is undefined
+      - SR_MR_storage_controller_data is undefined
+      - item.Drives is defined
+      - item.Drives | length > 0
 
   # - debug: var=no_NS204i_no_SR_MR_but_local_disk
 
-  - name: Exit when no NS204i and no SR/MR controller and no other controller with disks are found
-    fail: 
-      msg: "Error ! No controller found with disk available !"
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and no_NS204i_no_SR_MR_but_local_disk is undefined
+  - debug:
+      msg: "No NS204i and no SR/MR controller with disk available found in server '{{ serial_number }}'! Local disk will be used as the target volume for the installation of Windows!"
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and no_NS204i_no_SR_MR_but_local_disk is defined
 
-  - name: Set a variable for the name of the storage controller found
+  # Exit if no NS204i and no SR/MR controller with disk available found and no local disk found
+  - name: Exit if no NS204i and no SR/MR controller with disk available found and no local disk found
+    fail: 
+      msg: "Error! No storage controller with drives available found in the server. Ensure the server contains storage drives. Then run the playbook again."
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and no_NS204i_no_SR_MR_but_local_disk is not defined
+
+  # Set a variable for the name of the storage controller when no NS204i and no SR/MR controller with disk available found
+  - name: Set a variable for the name of the storage controller when no NS204i and no SR/MR controller with disk available found
     set_fact:
       storage_controller_name: "{{ no_NS204i_no_SR_MR_but_local_disk.Name }}"
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined 
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and no_NS204i_no_SR_MR_but_local_disk is defined
 
   - debug: 
       msg: "Storage controller found: '{{ storage_controller_name }}' with '{{ no_NS204i_no_SR_MR_but_local_disk.Drives | length }}' drives"
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined 
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and no_NS204i_no_SR_MR_but_local_disk is defined
+
+  - name: Capture size of the local disk if any
+    set_fact:
+      boot_drive_bytes_size: "{{ matched_item }}"
+    vars:
+        matched_item: "{{ item.Drives[0].CapacityBytes }}"
+    loop: "{{ server_inventory.json.storage.data }}"
+    loop_control:
+      label: never
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and no_NS204i_no_SR_MR_but_local_disk is defined
+
+  - debug: 
+      msg: "Size of local disk: {{ ((boot_drive_bytes_size | int) / (1024 ** 3)) | round(1) }} GB"
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and no_NS204i_no_SR_MR_but_local_disk is defined
+
+
+#--------------------------------------Set controller type name for kickstart creation -----------------------------------------------------------------------------
 
   # Set controller type name for kickstart creation
 
-  - name: Set controller type when no NS204i and no SR/MR controller with disk available found     
-    set_fact:
-      Controller_type: "Local"
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and no_NS204i_no_SR_MR_but_local_disk is defined
-
-  - name: Set a controller type variable for kickstart creation when an NS204i is present
+  - name: Set a controller type variable for kickstart creation when a NS204i controller or local disk is present
     set_fact:
       Controller_type: "NS204i"
-    when: NS204i_data is defined 
+    when: NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined
 
   - name: Set a controller type variable for kickstart creation when there is no NS204i but an SR/MR controller is present.
     set_fact:
       Controller_type: "{{ storage_controller_name }}"
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
+    when: SR_MR_storage_controller_data is defined
 
   - debug: 
       msg: "Controller type found that will be used by autounattend.xml: {{ Controller_type }}" 
 
-  # Server settings for internal storage RAID configuration (creation or modification)
+
+#--------------------------------------Create internal storage settings when SR/MR controller with disk available found (no NS204i found) -----------------------------------------------------------------------------------------------
+
+ # Settings for internal storage RAID configuration (creation or modification)
     
-  - name: Check if server settings '{{ raid_type }}' already exist
+  - name: Check if settings '{{ raid_type }}' already exist
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/settings?filter={{ filter | urlencode }}"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
     vars:
       filter: "name eq '{{ raid_type }}'"
     register: internal_storage_server_setting
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
+    when: SR_MR_storage_controller_data is defined
     delegate_to: localhost
 
   # - debug: var=internal_storage_server_setting
 
-  # Need to create an internal storage RAID configuration if there is no NS204i but there is a storage controller
+  # Need to create an internal storage RAID configuration if there is no NS204i but there is a storage controller with drives available.
   - name: Create internal storage configuration using '{{ raid_type }}' with a volume size of '{{ volume_size_in_GB }}' GB for the OS boot volume when it does not exist
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/settings"
       method: POST
       status_code: 201
       headers:
@@ -391,21 +513,21 @@
             raidType:  "{{ raid_type }}"         
             volumeSizeInGB: "{{ volume_size_in_GB }}"
     register: internal_storage_server_setting_result
+    when: SR_MR_storage_controller_data is defined
     delegate_to: localhost
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 0
 
   - name: Result of the '{{ raid_type }}' creation task
     debug: var=internal_storage_server_setting_result
-    when:  NS204i_data is undefined and SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 0
+    when: SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 0
 
   - name: Set a variable for the resourceUri of the internal storage configuration '{{ raid_type }}' just created
     set_fact: 
       internal_storage_server_setting_resourceuri: "{{ internal_storage_server_setting_result.json.resourceUri }}"
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 0
+    when: SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 0
 
   - name: Update internal storage configuration using '{{ raid_type }}' with a volume size of '{{ volume_size_in_GB }}' GB for the OS boot volume 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings/{{ internal_storage_server_setting_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/settings/{{ internal_storage_server_setting_id }}"
       method: PATCH
       status_code: 200
       headers:
@@ -425,19 +547,19 @@
       internal_storage_server_setting_id: "{{ internal_storage_server_setting  | json_query('json.items[0].id') }}"
     register: internal_storage_server_setting_result
     delegate_to: localhost
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 1
+    when: SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 1
 
   - name: Result of the '{{ raid_type }}' update task
     debug: var=internal_storage_server_setting_result.msg
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 1
+    when: SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 1
 
   - name: Set a variable for the resourceUri of the internal storage configuration '{{ raid_type }}' just updated
     set_fact: 
       internal_storage_server_setting_resourceuri: "{{ internal_storage_server_setting | json_query('json.items[0].resourceUri') }}"
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 1  
+    when: SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 1
 
   - debug: var=internal_storage_server_setting_resourceuri
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
+    when: SR_MR_storage_controller_data is defined
 
 
 #--------------------------------------Create temporary server group with server settings -----------------------------------------------------------------------------
@@ -463,7 +585,11 @@
 
   # - debug: var=temporary_server_group
 
-  # Server group creation or modification when NS204i is found or when no_NS204i_no_SR_MR_but_local_disk => no local storage configuration definition
+  # Create temporary server group with server settings when NS204i is present or local disk is used
+
+  # Server group creation or modification with no local storage configuration definition 
+  # Handle scenario where an NS204i controller is present or a local disk will be used as the Windows installation target.
+  # The temporary group is used to configure the server with the BIOS settings and to install Windows on the server.
 
   - name: Create temporary group '{{ temporary_server_group_name }}' with no local storage configuration definition (if it does not exist)
     uri:
@@ -476,33 +602,43 @@
       body_format: json
       body:
         name: "{{ temporary_server_group_name }}"
-        description: "Temporary server group for Windows Server installation on server '{{ inventory_hostname }}'"
-        serverSettingsUris: 
+        description: "Temporary server group for Windows installation on server '{{ inventory_hostname }}'"
+        deviceType: "DIRECT_CONNECT_SERVER"
+        settingsUris: 
           - "{{ bios_server_setting_resourceuri }}"     
-        serverPolicies:
-          onServerAdd:
+        policies:
+          onDeviceAdd:
+            biosApplySettings: false
+            biosFactoryReset: false
+            firmwarePowerOff: false
             firmwareUpdate: false
-            biosApplySettings: true
+            iloApplySettings: false
+            osInstall: false
+            # osCompletionTimeoutMin: 240
             storageConfiguration: false
             storageVolumeDeletion: false
             storageVolumeName: ""
-            osInstall: false
-          onSettingsApply:
+            externalStorageConfiguration: false
+          onDeviceApply:
             firmwareDowngrade: false
-        # autoAddServerTags:
+        # autoAddTags:
     register: server_group_result
-    when: (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined) and temporary_server_group.json.count == 0
+    # This condition checks if the 'temporary_server_group.json.count' is equal to 0,
+    # meaning there are no temporary server groups present.
+    # Additionally, it ensures that either 'NS204i_data' is defined or
+    # 'no_NS204i_no_SR_MR_but_local_disk' is defined before proceeding.
+    when: temporary_server_group.json.count == 0 and (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined )  
     delegate_to: localhost
 
   - name: Display response of the temporary group '{{ temporary_server_group_name }}' creation request
     debug: var=server_group_result.msg
-    when: (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined) and temporary_server_group.json.count == 0
+    when: temporary_server_group.json.count == 0 and (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined )  
 
   - name: Set variables for the id and the resourceUri of temporary group '{{ temporary_server_group_name }}' just created
     set_fact:
       temporary_group_id: "{{ server_group_result.json.id }}" 
       temporary_group_resourceuri: "{{ server_group_result.json.resourceUri }}"
-    when: (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined) and temporary_server_group.json.count == 0
+    when: temporary_server_group.json.count == 0 and (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined )
   
   - name: Update temporary group '{{ temporary_server_group_name }}' with no local storage configuration definition (if it does exist)
     uri:
@@ -515,37 +651,48 @@
       body_format: json
       body:
         name: "{{ temporary_server_group_name }}"
-        description: "Temporary server group for Windows Server installation on server '{{ inventory_hostname }}'"
-        serverSettingsUris: 
+        description: "Temporary server group for Windows installation on server '{{ inventory_hostname }}'"
+        settingsUris: 
           - "{{ bios_server_setting_resourceuri }}"   
-        serverPolicies:
-          onServerAdd:
+        policies:
+          onDeviceAdd:
+            biosApplySettings: false
+            biosFactoryReset: false
+            firmwarePowerOff: false
             firmwareUpdate: false
-            biosApplySettings: true
+            iloApplySettings: false
+            osInstall: false
+            # osCompletionTimeoutMin: 240
             storageConfiguration: false
             storageVolumeDeletion: false
             storageVolumeName: ""
-            osInstall: false
-          onSettingsApply:
+            externalStorageConfiguration: false
+          onDeviceApply:
             firmwareDowngrade: false
-        # autoAddServerTags:
+        # autoAddTags:
     vars: 
       group_id: "{{ temporary_server_group  | json_query('json.items[0].id') }}"
     register: server_group_result
-    when: (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined) and temporary_server_group.json.count == 1
+    when: temporary_server_group.json.count == 1 and (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined )
     delegate_to: localhost
 
   - name: Display response of the temporary group '{{ temporary_server_group_name }}' update request
     debug: var=server_group_result.msg
-    when: (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined) and temporary_server_group.json.count == 1
+    when: temporary_server_group.json.count == 1 and (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined )
 
   - name: Set variables for the id and the resourceUri of temporary group '{{ temporary_server_group_name }}' just updated
     set_fact:
       temporary_group_id: "{{ temporary_server_group | json_query('json.items[0].id') }}" 
       temporary_group_resourceuri: "{{ temporary_server_group | json_query('json.items[0].resourceUri') }}"
-    when: (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined) and temporary_server_group.json.count == 1
+    when: temporary_server_group.json.count == 1 and (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined )
 
-  # Server group creation or modification when NS204i is not found but storage controller is found => with local storage RAID configuration definition
+  - debug: var=temporary_group_id
+
+  - debug: var=temporary_group_resourceuri
+
+  # Create temporary server group with server settings when NS204i is not present but an HPE MR or SR controller with drives available is present
+  # Handle scenario where an HPE MR or SR controller is present with drives available.
+  # The temporary group is used to configure the server with the BIOS and local storage settings and to install Windows on the server.
 
   - name: Create temporary group '{{ temporary_server_group_name }}' with local storage configuration definition (if it does not exist)
     uri:
@@ -558,36 +705,45 @@
       body_format: json
       body:
         name: "{{ temporary_server_group_name }}"
-        description: "Temporary server group for Windows Server installation on server '{{ inventory_hostname }}'"
-        serverSettingsUris: 
+        description: "Temporary server group for Windows installation on server '{{ inventory_hostname }}'"
+        deviceType: "DIRECT_CONNECT_SERVER"
+        settingsUris: 
           - "{{ bios_server_setting_resourceuri }}"   
           - "{{ internal_storage_server_setting_resourceuri }}"       
-        serverPolicies:
-          onServerAdd:
+        policies:
+          onDeviceAdd:
+            biosApplySettings: false
+            biosFactoryReset: false
+            firmwarePowerOff: false
             firmwareUpdate: false
-            biosApplySettings: true
-            storageConfiguration: true
-            storageVolumeDeletion: true
-            storageVolumeName: "OS_boot_volume"
+            iloApplySettings: false
             osInstall: false
-          onSettingsApply:
+            # osCompletionTimeoutMin: 240
+            storageConfiguration: false
+            storageVolumeDeletion: false
+            storageVolumeName: ""
+            externalStorageConfiguration: false
+          onDeviceApply:
             firmwareDowngrade: false
-        # autoAddServerTags:
+        # autoAddTags:
     register: server_group_result
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and temporary_server_group.json.count == 0
+    # This condition checks if the 'temporary_server_group.json.count' is equal to 0,
+    # meaning there are no temporary server groups present.
+    # Additionally, it ensures that SR_MR_storage_controller_data is defined before proceeding.
+    when: temporary_server_group.json.count == 0 and SR_MR_storage_controller_data is defined
     delegate_to: localhost
 
   - name: Display response of the temporary group '{{ temporary_server_group_name }}' creation request
     debug: var=server_group_result.msg
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and temporary_server_group.json.count == 0
+    when: temporary_server_group.json.count == 0 and SR_MR_storage_controller_data is defined
 
   - name: Set variables for the id and the resourceUri of temporary group '{{ temporary_server_group_name }}' just created
     set_fact:
       temporary_group_id: "{{ server_group_result.json.id }}" 
       temporary_group_resourceuri: "{{ server_group_result.json.resourceUri }}"
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and temporary_server_group.json.count == 0
+    when: temporary_server_group.json.count == 0 and SR_MR_storage_controller_data is defined
   
-  - name: Update temporary group '{{ temporary_server_group_name }}' with local storage configuration definition (if it does exist)
+  - name: Update temporary group '{{ temporary_server_group_name }}' with no local storage configuration definition (if it does exist)
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ group_id }}"
       method: PATCH
@@ -598,36 +754,41 @@
       body_format: json
       body:
         name: "{{ temporary_server_group_name }}"
-        description: "Temporary server group for Windows Server installation on server '{{ inventory_hostname }}'"
-        serverSettingsUris: 
+        description: "Temporary server group for Windows installation on server '{{ inventory_hostname }}'"
+        settingsUris: 
           - "{{ bios_server_setting_resourceuri }}"   
           - "{{ internal_storage_server_setting_resourceuri }}"           
-        serverPolicies:
-          onServerAdd:
+        policies:
+          onDeviceAdd:
+            biosApplySettings: false
+            biosFactoryReset: false
+            firmwarePowerOff: false
             firmwareUpdate: false
-            biosApplySettings: true
-            storageConfiguration: true
-            storageVolumeDeletion: true
-            storageVolumeName: "OS_boot_volume"
+            iloApplySettings: false
             osInstall: false
-          onSettingsApply:
+            # osCompletionTimeoutMin: 240
+            storageConfiguration: false
+            storageVolumeDeletion: false
+            storageVolumeName: ""
+            externalStorageConfiguration: false
+          onDeviceApply:
             firmwareDowngrade: false
-        # autoAddServerTags:
+        # autoAddTags:
     vars: 
       group_id: "{{ temporary_server_group  | json_query('json.items[0].id') }}"
     register: server_group_result
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and temporary_server_group.json.count == 1
+    when: temporary_server_group.json.count == 1 and SR_MR_storage_controller_data is defined 
     delegate_to: localhost
 
   - name: Display response of the temporary group '{{ temporary_server_group_name }}' update request
     debug: var=server_group_result.msg
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and temporary_server_group.json.count == 1
+    when: temporary_server_group.json.count == 1 and SR_MR_storage_controller_data is defined
 
   - name: Set variables for the id and the resourceUri of temporary group '{{ temporary_server_group_name }}' just updated
     set_fact:
       temporary_group_id: "{{ temporary_server_group | json_query('json.items[0].id') }}" 
       temporary_group_resourceuri: "{{ temporary_server_group | json_query('json.items[0].resourceUri') }}"
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and temporary_server_group.json.count == 1
+    when: temporary_server_group.json.count == 1 and SR_MR_storage_controller_data is defined
 
   - debug: var=temporary_group_id
 
@@ -648,8 +809,8 @@
 
   # - debug: var=server_info_from_ui_doorway
 
-  - debug: var=server_info_from_ui_doorway.json.group_
-    when: server_info_from_ui_doorway.json.group_ is defined
+  # - debug: var=server_info_from_ui_doorway.json.group_
+  #   when: server_info_from_ui_doorway.json.group_ is defined
 
   - name: Capture the id of the server group of which the server '{{ serial_number }}' is a member (if applicable)
     set_fact:
@@ -662,11 +823,17 @@
 
   - name: Remove server '{{ serial_number }}' from the server group of which it is currently a member
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ server_group_id_found }}/devices/{{ server_id }}"
-      method: DELETE
-      status_code: 204
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ server_group_id_found }}/devices/unassign"
+      method: POST
+      status_code: 202
       headers:
         Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        devices:
+          # Only servers that are not part of a group can be assigned to a group.
+          - deviceId: "{{ server_id }}"
     when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
     register: group_unassignment_result
     delegate_to: localhost
@@ -682,6 +849,7 @@
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ temporary_group_id }}/devices"
       method: POST
+      status_code: 202
       headers:
         Authorization: "Bearer {{ access_token }}"
         Content-Type: "application/json"
@@ -689,7 +857,7 @@
       body:
         devices:
           # Only servers that are not part of a group can be assigned to a group.
-          - serverId: "{{ server_id }}"
+          - deviceId: "{{ server_id }}"
     register: group_assignment_result
     delegate_to: localhost
 
@@ -699,135 +867,36 @@
 
 #--------------------------------------Monitor the server configuration status ----------------------------------------------------------------------------------------
   
+  # NOT used in this playbook, but can be used to monitor the server configuration activity task.
+  
   # Wait for the server configuration to complete 
 
-  - name: Display the url that will be used to monitor the server configuration activity task
-    debug:
-      msg: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ activities_API_version }}/activities?filter=associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"
+  # - name: Display the url that will be used to monitor the server configuration activity task
+  #   debug:
+  #     msg: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ activities_API_version }}/activities?filter=associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"
 
-  - name: Wait for the configuration of server '{{ serial_number }}' to complete 
-    uri:
-      url:  "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ activities_API_version }}/activities?filter={{ filter | urlencode  }}"  
-      method: GET
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    vars: 
-      filter: "associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"      
-      query: "json.items[? name=='Server automatic configuration' && (contains(message,'Automatic configuration of server is complete') || contains(message,'failed'))]"
-    register: server_activities
-    until: server_activities | json_query(query) 
-    retries: 30
-    delay: 60
-    delegate_to: localhost
+  # - name: Wait for the configuration of server '{{ serial_number }}' to complete 
+  #   uri:
+  #     url:  "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ activities_API_version }}/activities?filter={{ filter | urlencode  }}"  
+  #     method: GET
+  #     headers:
+  #       Authorization: "Bearer {{ access_token }}"
+  #   vars: 
+  #     filter: "associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"      
+  #     query: "json.items[? name=='Server automatic configuration' && (contains(message,'Automatic configuration of server is complete') || contains(message,'failed'))]"
+  #   register: server_activities
+  #   until: server_activities | json_query(query) 
+  #   retries: 30
+  #   delay: 60
+  #   delegate_to: localhost
 
-  - name: Exit if configuration of server '{{ serial_number }}' failed to complete
-    fail:
-      msg: "The configuration of server '{{ serial_number }}' failed to complete! Refer to the individual server activity entries in GLCP UI for details."
-    vars:
-      query: "json.items[? name=='Server automatic configuration' && contains(message,'failed')]"
-    when: server_activities | json_query(query) 
-
-  # Run a server inventory job to collect the local storage information
-
-  - name: Run a server inventory job to collect the local storage information
-    uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
-      method: POST
-      status_code: 200
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-        Content-Type: "application/json"
-      body_format: json
-      body:
-        resourceUri: "{{ server_resourceUri }}"
-        jobTemplateUri: "{{ GetFullServerInventory_job_template_resourceUri }}"
-        data:
-          is_reports_call: true
-          filters: 
-            - localStorageV2
-    register: inventory_job_result
-    delegate_to: localhost
-
-  # - debug: var=inventory_job_result
-
-  - name: Set a variable for the job resource URI
-    set_fact:
-      job_resourceUri: "{{ inventory_job_result.json.resourceUri }}"
-
-  # - debug: var=job_resourceUri
-
-  - name: Wait for the server inventory job to complete
-    uri:
-      url: "{{ ConnectivityEndpoint }}{{ job_resourceUri }}"
-      method: GET
-      return_content: yes
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    retries: 60
-    delay: 5
-    until: >
-      (server_inventory_job_status.json.state == "COMPLETE" or 
-      server_inventory_job_status.json.state == "ERROR")
-    register: server_inventory_job_status
-    delegate_to: localhost
-
-  # - debug: var=server_inventory_job_status
-
-  - name: Display the server inventory job result 
-    debug: 
-      msg:
-        - "State: {{ server_inventory_job_status.json.state }}"
-        - "ResultCode: {{ server_inventory_job_status.json.resultCode }}"
-        - "Status: {{ server_inventory_job_status.json.status }}"
-
-  - name: Exit when server inventory job is failing
-    fail: 
-      msg: "Error ! Server inventory job to collect the local storage information has failed !"
-    when: server_inventory_job_status.json.state == "ERROR" 
-
- # Capture the size of the volume created once the server configuration is complete only when NS204i is not found with Storage RAID controller
-
-  - name: Capture server '{{ serial_number }}' raw inventory information
-    uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
-      method: GET
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    register: server_raw_inventory
-    delegate_to: localhost
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
+  # - name: Exit if configuration of server '{{ serial_number }}' failed to complete
+  #   fail:
+  #     msg: "The configuration of server '{{ serial_number }}' failed to complete! Refer to the individual server activity entries in GLP UI for details."
+  #   vars:
+  #     query: "json.items[? name=='Server automatic configuration' && contains(message,'failed')]"
+  #   when: server_activities | json_query(query) 
   
-  # - debug: var=server_raw_inventory
-  
-  - name: Capture storage RAID controller information when an HPE MR or SR controller is used with available drives
-    set_fact:
-      SR_MR_storage_controller_data: "{{ matched_item }}"
-    vars:
-        matched_item: "{{ item }}"
-    loop: "{{ server_raw_inventory.json.storageInventory.LocalStorageV2 }}"
-    loop_control:
-      label: never
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined and item.Name == storage_controller_name 
-   
-  - name: Capture the size of the OS volume configured on the {{ storage_controller_name }}
-    set_fact:
-      boot_drive_bytes_size: "{{ (SR_MR_storage_controller_data |  json_query(query))[0]  }}"
-    vars:
-      query: "Volumes[?Name=='OS_boot_volume'].CapacityBytes"
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
-    
-  - debug: var=boot_drive_bytes_size 
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
-
-  - name: Set the size of the OS volume as '0' with local disk
-    set_fact:
-      boot_drive_bytes_size: "0"
-    when: no_NS204i_no_SR_MR_but_local_disk is defined
-        
-  - debug: 
-      msg: "Size of RAID volume: {{ ((boot_drive_bytes_size | int) / (1024 ** 3)) | round(1) }} GB"
-    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
-
 
 #--------------------------------------Customize WinPE ISO image --------------------------------------------------------------------------------------
   
@@ -1335,7 +1404,7 @@
 
   - name: Check if the operating system image server setting 'OS_Image_WIN2022_for_{{ inventory_hostname }}' exists
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ settings_API_version }}/settings?filter={{ filter | urlencode }}"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -1348,7 +1417,7 @@
 
   - name: Create an operating system image server setting 'OS_Image_WIN2022_for_{{ inventory_hostname }}' if it does not exist
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ settings_API_version }}/settings"
       method: POST
       status_code: 201
       headers:
@@ -1358,7 +1427,6 @@
       body:
         name:  "OS_Image_WIN2022_for_{{ inventory_hostname }}"
         description: ""
-        platformFamily: "Any"
         category:  "OS"
         settings:
           DEFAULT:
@@ -1380,7 +1448,7 @@
 
   - name: Update the operating system image server setting 'OS_Image_WIN2022_for_{{ inventory_hostname }}' if it does not exist
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings/{{ OS_image_server_setting_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ settings_API_version }}/settings/{{ OS_image_server_setting_id }}"
       method: PATCH
       status_code: 200
       headers:
@@ -1390,8 +1458,6 @@
       body:
         name:  "OS_Image_WIN2022_for_{{ inventory_hostname }}"
         description: ""
-        platformFamily: "Any"
-        category:  "OS"
         settings:
           DEFAULT:
             osType: "MICROSOFT_WINDOWS"
@@ -1422,6 +1488,7 @@
 #--------------------------------------Start OS image installation-----------------------------------------------------------------------------------------------------
 
   # Server group modification when NS204i is found => no local storage configuration definition
+  # Handle scenario where an NS204i controller is present or a local disk will be used as the Windows installation target.
 
   - name: Update temporary group '{{ temporary_server_group_name }}' to add OS image installation settings with NS204i
     uri:
@@ -1435,20 +1502,25 @@
       body:
         name: "{{ temporary_server_group_name }}"
         description: "Temporary server group for Windows Server installation on server '{{ inventory_hostname }}'"
-        serverSettingsUris: 
+        settingsUris: 
           - "{{ bios_server_setting_resourceuri }}"   
           - "{{ OS_image_server_setting_resourceuri }}"
-        serverPolicies:
-          onServerAdd:
-            firmwareUpdate: false
+        policies:
+          onDeviceAdd:
             biosApplySettings: true
+            biosFactoryReset: false
+            firmwarePowerOff: false
+            firmwareUpdate: false
+            iloApplySettings: false
+            osInstall: true
             storageConfiguration: false
             storageVolumeDeletion: false
             storageVolumeName: ""
-            osInstall: true
-          onSettingsApply:
+            externalStorageConfiguration: false
+            osCompletionTimeoutMin: 240 # The OS completion timeout in minutes. Default: 240. Maximum: 720. Minimum: 60
+          onDeviceApply:
             firmwareDowngrade: false
-        # autoAddServerTags:
+        # autoAddTags:       
     register: server_group_result
     when:  NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined
     delegate_to: localhost
@@ -1471,7 +1543,7 @@
       body:
         name: "{{ temporary_server_group_name }}"
         description: "Temporary server group for Windows Server installation on server '{{ inventory_hostname }}'"
-        serverSettingsUris: 
+        settingsUris: 
           - "{{ bios_server_setting_resourceuri }}"   
           - "{{ internal_storage_server_setting_resourceuri }}"       
           - "{{ OS_image_server_setting_resourceuri }}"
@@ -1511,6 +1583,7 @@
             - "{{ server_id }}"
           parallel: true
           stopOnFailure: true
+          osCompletionTimeoutMin: 240 # The OS completion timeout in minutes. Default: 240. Maximum: 720. Minimum: 60
     register: group_os_installation_result
     delegate_to: localhost
 
@@ -1549,13 +1622,19 @@
 
   # Remove server from temporary group 
 
-  - name: Unassign server '{{ serial_number }}' from temporary group '{{ temporary_server_group_name }}' 
+  - name: Remove server '{{ serial_number }}' from temporary group '{{ temporary_server_group_name }}' 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ temporary_group_id }}/devices/{{ server_id }}"
-      method: DELETE
-      status_code: 204
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ temporary_group_id }}/devices/unassign"
+      method: POST
+      status_code: 202
       headers:
         Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        devices:
+          # Only servers that are not part of a group can be assigned to a group.
+          - deviceId: "{{ server_id }}"        
     register: group_unassignment_result
     delegate_to: localhost
 
@@ -1585,7 +1664,7 @@
 
   - name: Delete operating system image server setting 'OS_Image_WIN2022_for_{{ inventory_hostname }}' 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings/{{ OS_image_server_setting_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ settings_API_version }}/settings/{{ OS_image_server_setting_id }}"
       method: DELETE
       status_code: 204
       headers:
@@ -1654,6 +1733,7 @@
   gather_facts: no
   vars_files:
     - vars/GLP_COM_API_credentials_encrypted.yml    
+    - vars/api_versions.yml
   vars:
     inventory_fqdn: "{{ inventory_hostname | lower }}.{{ domain }}"
     ansible_host_key_checking: false
@@ -1677,7 +1757,12 @@
 
     # - debug: msg='{{ iSUT_product_id.stdout }}'`
   
-  - name: Copy HPE SUT package '{{ iSUT_package }}' to '{{ inventory_hostname }}
+  - name: Ensure C:\HPE_Packages directory exists on '{{ inventory_hostname }}'
+    win_file:
+      path: C:\HPE_Packages
+      state: directory
+
+  - name: Copy HPE SUT package '{{ iSUT_package }}' to '{{ inventory_hostname }}'
     win_copy:
       src: files/{{ windows_version }}/{{ iSUT_package }}
       dest: C:\HPE_Packages\sut.exe
@@ -1800,7 +1885,7 @@
     set_fact:
       Gen10_10p_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
     vars:
-      query: "json.items[?releaseVersion=='{{ Gen10_10p_firmware_bundle_name }}'].id"
+      query: "json.items[?contains(releaseVersion, '{{ Gen10_10p_firmware_bundle_name }}') && contains(name, 'Gen10')].id"
     when: is_first_host and (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
 
   - name:  Exit if Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}' does not exist
@@ -1817,7 +1902,8 @@
     set_fact:
       Gen10_10p_patch_firmware_ID: "{{ (firmwarebundles | json_query(query) )[0] }}"
     vars:
-      query: "json.items[?releaseVersion=='{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}'].id"
+      # query: "json.items[?releaseVersion=='{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}'].id"
+      query: "json.items[?contains(releaseVersion, '{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}') && contains(name, 'Gen10')].id"
     when: is_first_host and (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
 
   - name: Exit if Gen10 associated patch '{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}' does not exist
@@ -1834,7 +1920,8 @@
     set_fact:
       Gen11_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
     vars:
-      query: "json.items[?releaseVersion=='{{ Gen11_firmware_bundle_name }}'].id"
+      # query: "json.items[?releaseVersion=='{{ Gen11_firmware_bundle_name }}'].id"
+      query: "json.items[?contains(releaseVersion, '{{ Gen11_firmware_bundle_name }}') && contains(name, 'Gen11')].id"
     when: is_first_host and (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
 
   - name: Exit if Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}' does not exist
@@ -1854,7 +1941,8 @@
     set_fact:
       Gen11_patch_firmware_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
     vars:
-      query: "json.items[?releaseVersion=='{{ Gen11_patch_name_associated_with_firmware_bundle }}'].id"
+      # query: "json.items[?releaseVersion=='{{ Gen11_patch_name_associated_with_firmware_bundle }}'].id"
+      query: "json.items[?contains(releaseVersion, '{{ Gen11_patch_name_associated_with_firmware_bundle }}') && contains(name, 'Gen11')].id"
     when: is_first_host and (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
 
   - name: Exit if Gen11 associated patch '{{ Gen11_patch_name_associated_with_firmware_bundle }}' does not exist
@@ -1913,7 +2001,7 @@
 
   - name: Check if the firmware server setting '{{ firmware_server_setting_name }}' exists
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings?filter={{ filter | urlencode }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ settings_API_version }}/settings?filter={{ filter | urlencode }}"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
@@ -1927,7 +2015,7 @@
 
   - name: Create the firmware server setting '{{ firmware_server_setting_name }}' 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ settings_API_version }}/settings"
       method: POST
       status_code: 201
       headers:
@@ -1938,7 +2026,6 @@
         name: "{{ firmware_server_setting_name }}"
         description: "Firmware baseline for Windows Server"
         category: "FIRMWARE"
-        platformFamily: "Any"
         settings:
           GEN10:
             id: "{{ Gen10_10p_firmware_bundle_ID }}"
@@ -1959,7 +2046,7 @@
 
   - name: Update the firmware server setting '{{ firmware_server_setting_name }}' 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/server-settings/{{ firmware_server_setting_id }}"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ settings_API_version }}/settings/{{ firmware_server_setting_id }}"
       method: PATCH
       status_code: 200
       headers:
@@ -1969,8 +2056,6 @@
       body:
         name: "{{ firmware_server_setting_name }}"
         description: "Firmware baseline for Windows Server"
-        category: "FIRMWARE"
-        platformFamily: "Any"
         settings:
           GEN10:
             id: "{{ Gen10_10p_firmware_bundle_ID }}"
@@ -2027,20 +2112,26 @@
       body:
         name: "{{ server_group_name }}"
         description: "Server group for Windows servers"
-        serverSettingsUris: 
+        deviceType: "DIRECT_CONNECT_SERVER"
+        settingsUris: 
           - "{{ bios_server_setting_resourceuri }}"     
           - "{{ firmware_server_setting_resourceuri }}"     
-        serverPolicies:
-          onServerAdd:
-            firmwareUpdate: false
+        policies:
+          onDeviceAdd:
             biosApplySettings: false
+            biosFactoryReset: false
+            firmwarePowerOff: false
+            firmwareUpdate: false
+            iloApplySettings: false
+            osInstall: false
             storageConfiguration: false
             storageVolumeDeletion: false
             storageVolumeName: ""
-            osInstall: false
-          onSettingsApply:
+            externalStorageConfiguration: false
+            osCompletionTimeoutMin: 240
+          onDeviceApply:
             firmwareDowngrade: "{{ firmware_downgrade_policy }}"
-        # autoAddServerTags:
+        # autoAddTags: 
     register: definitive_server_group_result
     when: is_first_host and definitive_server_group.json.count == 0
     delegate_to: localhost
@@ -2068,21 +2159,26 @@
       body_format: json
       body:
         name: "{{ server_group_name }}"
-        description: "Server group for Windows servers"
-        serverSettingsUris: 
+        description: "Server group for Windows server"
+        settingsUris: 
           - "{{ bios_server_setting_resourceuri }}"   
           - "{{ firmware_server_setting_resourceuri }}"     
-        serverPolicies:
-          onServerAdd:
-            firmwareUpdate: false
+        policies:
+          onDeviceAdd:
             biosApplySettings: false
+            biosFactoryReset: false
+            firmwarePowerOff: false
+            firmwareUpdate: false
+            iloApplySettings: false
+            osInstall: false
             storageConfiguration: false
             storageVolumeDeletion: false
             storageVolumeName: ""
-            osInstall: false
-          onSettingsApply:
+            externalStorageConfiguration: false
+            osCompletionTimeoutMin: 240
+          onDeviceApply:
             firmwareDowngrade: "{{ firmware_downgrade_policy }}"
-        # autoAddServerTags:
+        # autoAddTags:  
     vars: 
       group_id: "{{ definitive_server_group  | json_query('json.items[0].id') }}"
     register: definitive_server_group_result
@@ -2106,7 +2202,7 @@
     when: is_first_host
 
 
-#--------------------------------------Adding server to definitive server group and starting firmware update ----------------------------------------------------------
+#--------------------------------------Adding server to definitive server group and starting group firmware update (including HPE drivers and software) ---------------------
       
   # Capture the start time of the firmware update
   - name: Gather subset facts on localhost
@@ -2147,20 +2243,39 @@
     when: definitive_server_group.json.count == 1
       
   # - debug: var=server_found_in_definitive_group
+  
+  # Remove the server from the definitive server group if it's already part of it (which shouldn't be the case, unless the playbook has failed and been rerun)
+
+  # - name: Remove server '{{ serial_number }}' from definitive server group '{{ server_group_name }}' if it is already a member
+  #   uri:
+  #     url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ definitive_group_id }}/devices/{{ server_id }}"
+  #     method: DELETE
+  #     status_code: 204
+  #     headers:
+  #       Authorization: "Bearer {{ access_token }}"
+  #   when: server_found_in_definitive_group is defined and server_found_in_definitive_group | length != 0
+  #   register: group_unassignment_result
+  #   delegate_to: localhost
+
+  # - name: Wait for deletion to complete
+  #   pause:
+  #     seconds: 15
+  #   when: server_found_in_definitive_group is defined and server_found_in_definitive_group | length != 0
     
   # Add server to the definitive server group 
 
-  - name: Assign server '{{ serial_number }}' to definitive server group '{{ server_group_name }}'
+  - name: Add server '{{ serial_number }}' to definitive server group '{{ server_group_name }}'
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ definitive_group_id }}/devices"
       method: POST
+      status_code: 202
       headers:
         Authorization: "Bearer {{ access_token }}"
         Content-Type: "application/json"
       body_format: json
       body:
         devices:
-          - serverId: "{{ server_id }}"
+          - deviceId: "{{ server_id }}"
     register: group_assignment_result
     when: server_found_in_definitive_group is not defined or server_found_in_definitive_group | length == 0
     delegate_to: localhost
@@ -2339,9 +2454,10 @@
       msg: "{{ last_firmware_update }}"  
     when: last_firmware_update is defined and last_firmware_update.attemptedAt > firmware_update_start_time
 
+
   # # Wait until the Windows host is accessible again if a reboot was necessary to activate some firmware components
 
-  # - name: Waiting for Windows Server '{{ os_ip_address }}' to respond...
+  # - name: Wait for Windows Server '{{ os_ip_address }}' to respond...
   #   wait_for:
   #     timeout: 2000
   #     host: "{{ os_ip_address }}"
