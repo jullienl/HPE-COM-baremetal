@@ -19,5 +19,5 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 # interactive step, enabling automated processes to run without manual intervention.
 
 [All]
-RHEL92-1 os_ip_address=192.168.3.176 serial_number=CZ2311004H        # DL360 Gen10 Plus (MR active - NS204i disabled)     [iLO: 192.168.0.20]
-RHEL92-2 os_ip_address=192.168.3.177 serial_number=CZ2311004G        # DL360 Gen10 Plus (MR disabled - NS204i active)     [iLO: 192.168.0.21]
+RHEL92-1 os_ip_address=192.168.3.176 serial_number=CZ2311004H        # DL360 Gen10 Plus (MR enabled - NS204i enabled)     [iLO: 192.168.0.21]
+RHEL92-2 os_ip_address=192.168.3.177 serial_number=CZ2311004G        # DL360 Gen10 Plus (MR disabled - NS204i enabled)    [iLO: 192.168.0.20]

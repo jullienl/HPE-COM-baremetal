@@ -89,13 +89,17 @@
 #--------------------------------------Ensure hostname is supported -----------------------------------------------------------------------------------------------------
 
 # This task ensures the playbook stops if the hostname does not match the required pattern.
-# An RHEL hostname must only contain letters, digits, and hyphens.
-  - name: Validate hostname format for RHEL server '{{ inventory_hostname }}'
+# The hostname must be compliant with the RHEL NetBIOS naming conventions.
+  - name: Ensure hostname is supported for RHEL server '{{ inventory_hostname }}'
     assert:
       that:
-        - inventory_hostname is match("^[a-zA-Z0-9-]+$")
-      fail_msg: "Invalid hostname '{{ inventory_hostname }}'. Hostname must only contain letters, digits, and hyphens."
-
+        - inventory_hostname is match("^[a-zA-Z][a-zA-Z0-9-]*$") # Starts with a letter and can contain letters, digits, and hyphens
+        - not (inventory_hostname is match('^-')) # Not start with hyphen
+        - not (inventory_hostname.endswith('-')) # Not end with hyphen
+        - not (inventory_hostname is match('^[0-9]+$'))  # Not all numeric
+        - not (inventory_hostname | regex_search('[ _.$!@#%^&*()+=|;:\'",<>?`~\[\]{}\\/]')) # No spaces/special chars
+      fail_msg: "Invalid hostname '{{ inventory_hostname }}'. Hostname must start with a letter and can only contain letters, digits, and hyphens."
+# This task ensures the playbook stops if the hostname does not match the required pattern.
 
 #--------------------------------------Capture server information -----------------------------------------------------------------------------------------------------
 
