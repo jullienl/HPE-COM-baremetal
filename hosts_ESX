@@ -19,7 +19,6 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 # interactive step, enabling automated processes to run without manual intervention.
 
 [All]
-; ESX-1 os_ip_address=192.168.3.174 serial_number=CZ2311004H           # DL360 Gen10 Plus (MR enabled - NS204i enabled)     [iLO: 192.168.0.21]
-ESX-001 os_ip_address=192.168.3.175 serial_number=CZ2311004G           # DL360 Gen10 Plus (MR enabled - NS204i disabled)    [iLO: 192.168.0.20]
-; ESX-002 os_ip_address=192.168.3.176 serial_number=CZJ3100GD9         # ProLiant DL365 Gen11 (MR disabled - NS204i disabled)    [iLO: 192.168.0.20]
+ESX-001 os_ip_address=192.168.3.174 serial_number=CZ2311004H           # DL360 Gen10 Plus (MR enabled - NS204i enabled)     [iLO: 192.168.0.21]
+ESX-002 os_ip_address=192.168.3.175 serial_number=CZ2311004G           # DL360 Gen10 Plus (MR disabled - NS204i enabled)    [iLO: 192.168.0.20]
 
