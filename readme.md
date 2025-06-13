@@ -28,18 +28,6 @@ Here are some benefits of automatic bare metal provisioning:
 - **Integration with DevOps practices**: Automated bare metal provisioning integrates well with other DevOps practices, such as infrastructure as code (IaC) and configuration management. It enables organizations to manage infrastructure as code, version control server configurations, and easily replicate environments, thus facilitating collaboration and improving overall agility.
 
 
-## Supported operating systems
-
-For automating the provisioning of operating systems, three main playbooks are available, one for each type of operating system:
-- VMware ESXi 7 and 8
-- Red Hat Enterprise Linux and equivalent 
-- Windows Server 2022 and equivalent
-
-> **Note**: UEFI secure boot is not supported but can be enabled at a later date once the operating system has been installed.
-
-> **Note**: iLO Security in FIPS or CAC mode is not supported.
-
-
 ## Demo videos
 
 For a concise understanding of the possibilities offered by this bare metal provisioning project with HPE Compute Ops Management and Ansible, you can watch the following videos:
@@ -57,6 +45,59 @@ For a concise understanding of the possibilities offered by this bare metal prov
 **Efficient Bare Metal Provisioning for ESXi with HPE Compute Ops Management and Ansible**: 
 
 [![Efficient Bare Metal Provisioning for ESXi with HPE Compute Ops Management and Ansible](https://img.youtube.com/vi/_ySgROdd_Bw/0.jpg)](https://www.youtube.com/watch?v=_ySgROdd_Bw)
+
+
+## Supported operating systems
+
+For automating the provisioning of operating systems, three main playbooks are available, one for each type of operating system:
+- VMware ESXi 8
+- Red Hat Enterprise Linux and equivalent 
+- Windows Server 2022 and equivalent
+
+> **Note**: UEFI secure boot is not supported but can be enabled at a later date once the operating system has been installed.
+
+> **Note**: iLO Security in FIPS or CAC mode is not supported.
+
+## Supported storage configuration
+
+The operating system boot volume is only supported when configured with internal local storage using either an HPE NS204i-x NVMe Boot Controller or HPE MegaRAID (MR) or SmartRaid (SR) Storage Controller.
+
+ > **Note**: Internal storage policies are used to create the RAID configuration for the OS volume. This requires storage controllers with firmware that support DMTF Redfish storage APIs. Refer to the [storage controller firmware requirements](https://internal.support.hpe.com/hpesc/docDisplay?docId=a00115739en_us&docLocale=en_US&page=GUID-91880D5C-C0CD-421F-B5E7-C474CD9BA017.html) (access requires authentication with your HPE GreenLake account)
+
+Booting from a SAN (Storage Area Network) is currently not supported by this project.
+
+### Storage Controller selection 
+
+To avoid data loss or other issues, the playbooks include some logic to ensure that the target disk for OS installation is correctly identified. To do this, the size of the volume detected by Compute Ops Management and presented by the internal local storage (NS204i or MR or SR controller) is used to make this selection. In addition, when multiple controllers are detected, disk selection is determined by the following conditions:
+
+1. If an HPE NS204i-x NVMe Boot Controller is detected, the automatic RAID1 volume associated with it will be used for installing the OS.
+2. If there is no HPE NS204i-x NVMe Boot Controller found, the first available HPE MegaRAID (MR) or SmartRaid (SR) Storage Controller with at least 2 disks will be utilized for the OS installation.
+3. If neither an HPE NS204i-x NVMe Boot Controller nor an MR/SR controller is detected, the playbooks will check for the presence of a local disk. If a local disk is available, it will be selected as the target volume for the OS installation.
+
+
+### OS boot volume RAID type and size
+
+- When an HPE NS204i-x NVMe Boot Controller is present, it automatically creates a RAID1 (mirror) between the two NVMe drives and allocates the entire disk for the operating system volume. In this scenario, the playbooks in this project skip the OS boot volume creation step, as the NS204i controller manages it automatically. The same approach applies when only a local disk is used.
+
+- With MR/SR Storage controller, the creation of the operating system boot volume is managed by the playbooks of this project and in this case, you can define the volume settings in the OS variable file located in /vars using:
+  - `raid_type`: Defines the RAID level (RAID0, RAID1 or RAID5) 
+  - `volume_size_in_GB`: Defines the OS volume size. It must be a number greater than 0 or equal to -1 to indicate that the entire disk should be used.
+
+> **Recommendation**: During the OS installation process, avoid presenting SAN volumes (such as VMFS datastores or cluster volumes) to the servers until the installation is complete. Even though the installer targets the internal logical drive, withholding SAN volumes during installation helps prevent accidental selection or modification, reducing the risk of data loss or corruption on existing SAN storage.
+
+### Network configuration
+
+- For ESXi, the network configuration during the OS installation starts by using the first available nic (vmnic0). Once the OS is installed, additional tasks take place to add the second nic (vmnic1) to the standard vSwitch0.
+
+- For RHEL, the kickstart file plays a crucial role during OS installation. It contains a script that is executed during the installation process. The configuration for NIC bonding is controlled by the `enable_nic_bonding` variable, which can be found in `vars/<Linux_OS>_vars.yml`.
+
+- For Windows Server, a `Post_installation_script.ps1` script located in `c:\Windows\Setup\Scripts` is executed when the OS installation is complete. This PowerShell script among other things, sets IP parameters and NIC teaming. The configuration for NIC teaming is controlled by the `enable_nic_bonding` variable, which can be found in `group_vars/<WINxxxx>/Windows_vars.yml`.
+
+With Linux and Windows:
+  - When `enable_nic_bonding` is set to `true`, NIC teaming will be established using the first two connected NICs. However, if only one NIC is connected, the bond will be created with just that single NIC.
+
+  - When `enable_nic_bonding` is set to `false`, no NIC teaming will be created. In this case, the network settings will be configured on the first connected NIC that is detected.
+
 
 ## Documentation
 
@@ -278,46 +319,6 @@ Upon running this command, Ansible will prompt you to enter the vault password a
 For example, running `ansible-playbook ESXi80_provisioning.yml -i hosts_ESX --ask-vault-pass --ask-become-pass` will provision all servers listed in `hosts_ESX` in the [All] inventory group, i.e. ESX-1 and ESX-2.
 
 
-## Supported storage configuration
-
-The operating system boot volume is only supported when configured with internal local storage using either an HPE NS204i-x NVMe Boot Controller or HPE MegaRAID (MR) or SmartRaid (SR) Storage Controller.
-
- > **Note**: Internal storage policies are used to create the RAID configuration for the OS volume. This requires storage controllers with firmware that support DMTF Redfish storage APIs. Refer to the [storage controller firmware requirements](https://internal.support.hpe.com/hpesc/docDisplay?docId=a00115739en_us&docLocale=en_US&page=GUID-91880D5C-C0CD-421F-B5E7-C474CD9BA017.html) (access requires authentication with your HPE GreenLake account)
-
-Booting from a SAN (Storage Area Network) is currently not supported by this project.
-
-### Storage Controller selection 
-
-To avoid data loss or other issues, the playbooks include some logic to ensure that the target disk for OS installation is correctly identified. To do this, the size of the volume detected by Compute Ops Management and presented by the internal local storage (NS204i or MR or SR controller) is used to make this selection. In addition, when multiple controllers are detected, disk selection is determined by the following conditions:
-
-1. If an HPE NS204i-x NVMe Boot Controller is detected, the automatic RAID1 volume associated with it will be used for installing the OS.
-2. If there is no HPE NS204i-x NVMe Boot Controller found, the first available HPE MegaRAID (MR) or SmartRaid (SR) Storage Controller with at least 2 disks will be utilized for the OS installation.
-3. If neither an HPE NS204i-x NVMe Boot Controller nor an MR/SR controller is detected, the playbooks will check for the presence of a local disk. If a local disk is available, it will be selected as the target volume for the OS installation.
-
-
-### OS boot volume RAID type and size
-
-- When an HPE NS204i-x NVMe Boot Controller is present, it automatically creates a RAID1 (mirror) between the two NVMe drives and allocates the entire disk for the operating system volume. In this scenario, the playbooks in this project skip the OS boot volume creation step, as the NS204i controller manages it automatically. The same approach applies when only a local disk is used.
-
-- With MR/SR Storage controller, the creation of the operating system boot volume is managed by the playbooks of this project and in this case, you can define the volume settings in the OS variable file located in /vars using:
-  - `raid_type`: Defines the RAID level (RAID0, RAID1 or RAID5) 
-  - `volume_size_in_GB`: Defines the OS volume size. It must be a number greater than 0 or equal to -1 to indicate that the entire disk should be used.
-
-> **Recommendation**: During the OS installation process, avoid presenting SAN volumes (such as VMFS datastores or cluster volumes) to the servers until the installation is complete. Even though the installer targets the internal logical drive, withholding SAN volumes during installation helps prevent accidental selection or modification, reducing the risk of data loss or corruption on existing SAN storage.
-
-### Network configuration
-
-- For ESXi, the network configuration during the OS installation starts by using the first available nic (vmnic0). Once the OS is installed, additional tasks take place to add the second nic (vmnic1) to the standard vSwitch0.
-
-- For RHEL, the kickstart file plays a crucial role during OS installation. It contains a script that is executed during the installation process. The configuration for NIC bonding is controlled by the `enable_nic_bonding` variable, which can be found in `vars/<Linux_OS>_vars.yml`.
-
-- For Windows Server, a `Post_installation_script.ps1` script located in `c:\Windows\Setup\Scripts` is executed when the OS installation is complete. This PowerShell script among other things, sets IP parameters and NIC teaming. The configuration for NIC teaming is controlled by the `enable_nic_bonding` variable, which can be found in `group_vars/<WINxxxx>/Windows_vars.yml`.
-
-With Linux and Windows:
-  - When `enable_nic_bonding` is set to `true`, NIC teaming will be established using the first two connected NICs. However, if only one NIC is connected, the bond will be created with just that single NIC.
-
-  - When `enable_nic_bonding` is set to `false`, no NIC teaming will be created. In this case, the network settings will be configured on the first connected NIC that is detected.
-
 
 ## Provisioning playbook output samples 
 
@@ -337,7 +338,6 @@ The resources in this repository have been tested with Ansible control node runn
   - Community.vmware 1.15.0
 
 The provisioned OS tested successfully are:
-  - VMware-ESXi-7.0.3-21930508-HPE-703.0.0.11.4.0.5-Sep2023.iso
   - VMware-ESXi-8.0.2-22380479-HPE-802.0.0.11.4.0.14-Sep2023.iso
   - rhel-9.3-x86_64-boot.iso
   - Windows Server 2022 using a custom WinPE image.
