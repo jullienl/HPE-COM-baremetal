@@ -80,10 +80,10 @@
     import_tasks: files/Create_COM_session.yml
 
 
-#--------------------------------------Capture Job Templates Resource Uri-----------------------------------------------------------------------------------------------
+#--------------------------------------Capture Job Templates IDs-----------------------------------------------------------------------------------------------
   
-  - name: Capture Job Templates ResourceUri
-    import_tasks: files/Get_job_templates_resourceuri.yml
+  - name: Capture Job Templates IDs
+    import_tasks: files/Get_job_templates_id.yml
 
 
 #--------------------------------------Ensure hostname is supported -----------------------------------------------------------------------------------------------------
@@ -144,15 +144,15 @@
         - "Make sure to connect the server's iLO to COM ! Go to iLO UI / Management / Compute Ops Management"
     when: server_connected_status == false
 
-  - name: Wait until the server '{{ serial_number }}' raw inventory information is available (necessary when the server has recently been added to COM) then capture the data
+  - name: Wait until the server '{{ serial_number }}' inventory information is available (necessary when the server has recently been added to COM) then capture the data
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/inventory"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
-    register: server_raw_inventory
-    failed_when: server_raw_inventory.status != 200 and server_raw_inventory.status != 404
-    until: server_raw_inventory.status == 200 
+    register: server_inventory
+    failed_when: server_inventory.status != 200 and server_inventory.status != 404
+    until: server_inventory.status == 200 
     retries: 30
     delay: 60
     delegate_to: localhost
@@ -175,18 +175,19 @@
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
       method: POST
-      status_code: 200
+      status_code: 201
       headers:
         Authorization: "Bearer {{ access_token }}"
         Content-Type: "application/json"
       body_format: json
       body:
-        resourceUri: "{{ server_resourceUri }}"
-        jobTemplateUri: "{{ PowerOn_New_job_template_resourceUri }}"
+        jobTemplate: "{{ PowerOn_New_job_template_id }}"
+        resourceId: "{{ server_id }}"
+        resourceType: "compute-ops-mgmt/server"
     register: power_on_job_result
     delegate_to: localhost
 
-  # - debug: var=inventory_job_result
+  # - debug: var=power_on_job_result
 
   - name: Set a variable for the job resource URI
     set_fact:
@@ -255,15 +256,14 @@
 
 #-------------------------------------- Run a server inventory job to collect the local storage information -----------------------------------------------------------------------------------------------
 
-  - name: Wait until PCI devices information is available then capture the server '{{ serial_number }}' raw inventory information 
+  - name: Wait until PCI devices information is available then capture the server '{{ serial_number }}' inventory information 
     uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/raw-inventory"
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/inventory"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
-    register: server_raw_inventory
-    # until: (server_raw_inventory.json.pciDevices | length>0)
-    until: server_raw_inventory.json.pciDevices is defined and server_raw_inventory.json.pciDevices is not none
+    register: server_inventory
+    until: server_inventory.json.device.data | default([]) | length > 0
     retries: 30
     delay: 60
     delegate_to: localhost
@@ -274,15 +274,16 @@
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
       method: POST
-      status_code: 200
+      status_code: 201
       headers:
         Authorization: "Bearer {{ access_token }}"
         Content-Type: "application/json"
       body_format: json
       body:
-        resourceUri: "{{ server_resourceUri }}"
-        jobTemplateUri: "{{ GetFullServerInventory_job_template_resourceUri }}"
-        data:
+        jobTemplate: "{{ GetFullServerInventory_job_template_id }}"
+        resourceId: "{{ server_id }}"
+        resourceType: "compute-ops-mgmt/server"
+        jobParams: 
           is_reports_call: true
     register: inventory_job_result
     delegate_to: localhost
@@ -358,7 +359,7 @@
     when: NS204i_data is undefined
 
 
-  # - debug: var=server_raw_inventory.json.storageInventory
+  # - debug: var=server_inventory.json.storage.data
 
   - name: Capture size of the NS204i RAID1 volume if any
     set_fact:
@@ -1271,15 +1272,16 @@
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
       method: POST
-      status_code: 200
+      status_code: 201
       headers:
         Authorization: "Bearer {{ access_token }}"
         Content-Type: "application/json"
       body_format: json
       body:
-        resourceUri: "{{ temporary_group_resourceuri }}"
-        jobTemplateUri: "{{ GroupOSInstallation_job_template_resourceUri }}"
-        data:
+        jobTemplate: "{{ GroupOSInstallation_job_template_id }}"
+        resourceId: "{{ temporary_group_id }}"
+        resourceType: "compute-ops-mgmt/group"
+        jobParams: 
           devices:
             - "{{ server_id }}"
           parallel: true
@@ -1993,15 +1995,16 @@
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
       method: POST
-      status_code: 200
+      status_code: 201
       headers:
         Authorization: "Bearer {{ access_token }}"
         Content-Type: "application/json"
       body_format: json
       body:
-        resourceUri: "{{ definitive_group_resourceuri }}"
-        jobTemplateUri: "{{ GroupFirmwareUpdate_job_template_resourceUri }}"
-        data:
+        jobTemplate: "{{ GroupFirmwareUpdate_job_template_id }}"
+        resourceId: "{{ definitive_group_id }}"
+        resourceType: "compute-ops-mgmt/group"
+        jobParams: 
           devices: "{{ server_ids }}"
           parallel: true
           stopOnFailure: false

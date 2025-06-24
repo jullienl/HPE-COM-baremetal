@@ -15,9 +15,8 @@ firmware_bundles_API_version: v1beta2
 groups_API_version: v1
 # groups_API_version: v1beta2
 job_templates_API_version: v1beta2
-jobs_API_version: v1beta3
-# jobs_API_version: v1beta2
-# jobs_API_version: v1
+# jobs_API_version: v1beta3 (deprecated)
+jobs_API_version: v1
 metrics_configurations_API_version: v1beta1
 # metrics_configurations_API_version: v1
 oneview_appliances_API_version: v1beta1
