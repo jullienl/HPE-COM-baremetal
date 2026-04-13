@@ -1897,24 +1897,6 @@
   - debug: var=Gen10_10p_firmware_bundle_ID
     when: is_first_host and (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0)
     
-  # Gen10 associated patch
-
-  - name: Set variable for '{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}' associated patch for Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}'
-    set_fact:
-      Gen10_10p_patch_firmware_ID: "{{ (firmwarebundles | json_query(query) )[0] }}"
-    vars:
-      # query: "json.items[?releaseVersion=='{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}'].id"
-      query: "json.items[?contains(releaseVersion, '{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}') && contains(name, 'Gen10')].id"
-    when: is_first_host and (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
-
-  - name: Exit if Gen10 associated patch '{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}' does not exist
-    fail:
-      msg: "Gen10 associated patch '{{ Gen10_10p_patch_name_associated_with_firmware_bundle }}' does not exist!"
-    when: is_first_host and (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0) and Gen10_10p_patch_firmware_ID is not defined
-
-  - debug: var=Gen10_10p_patch_firmware_ID
-    when: is_first_host and (Gen10_10p_patch_name_associated_with_firmware_bundle is defined) and (Gen10_10p_patch_name_associated_with_firmware_bundle|length > 0)
-
   # Gen11 firmware bundle
   
   - name: Set variable for Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}'
@@ -1933,38 +1915,23 @@
   - debug: var=Gen11_firmware_bundle_ID
     when: is_first_host and (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0)
 
-  # Gen11 associated patch
+  # Gen12 firmware bundle
   
-  - debug: var=Gen11_patch_name_associated_with_firmware_bundle
-    when: is_first_host and (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0)
-
-  - name: Set variable for '{{ Gen11_patch_name_associated_with_firmware_bundle }}' associated patch for Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}'
+  - name: Set variable for Gen12 firmware bundle '{{ Gen12_firmware_bundle_name }}'
     set_fact:
-      Gen11_patch_firmware_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
+      Gen12_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
     vars:
-      # query: "json.items[?releaseVersion=='{{ Gen11_patch_name_associated_with_firmware_bundle }}'].id"
-      query: "json.items[?contains(releaseVersion, '{{ Gen11_patch_name_associated_with_firmware_bundle }}') && contains(name, 'Gen11')].id"
-    when: is_first_host and (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+      # query: "json.items[?releaseVersion=='{{ Gen12_firmware_bundle_name }}'].id"
+      query: "json.items[?contains(releaseVersion, '{{ Gen12_firmware_bundle_name }}') && contains(name, 'Gen12')].id"
+    when: is_first_host and (Gen12_firmware_bundle_name is defined) and (Gen12_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
 
-  - name: Exit if Gen11 associated patch '{{ Gen11_patch_name_associated_with_firmware_bundle }}' does not exist
+  - name: Exit if Gen12 firmware bundle '{{ Gen12_firmware_bundle_name }}' does not exist
     fail:
-      msg: "Gen11 associated patch '{{ Gen11_patch_name_associated_with_firmware_bundle }}' does not exist!"
-    when: is_first_host and (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) and Gen11_patch_firmware_ID is not defined
+      msg: "Gen12 firmware bundle '{{ Gen12_firmware_bundle_name }}' does not exist!"
+    when: is_first_host and (Gen12_firmware_bundle_name is defined) and (Gen12_firmware_bundle_name|length > 0) and Gen12_firmware_bundle_ID is not defined
 
-  - debug: var=Gen11_patch_firmware_ID
-    when: is_first_host and (Gen11_patch_name_associated_with_firmware_bundle is defined) and (Gen11_patch_name_associated_with_firmware_bundle|length > 0) 
-
-  # Setting final SPP variables if a fw patch exists
-
-  - name: Set the final variable value for the Gen10 firmware bundle ID
-    set_fact:
-      Gen10_10p_firmware_bundle_ID: "{{ Gen10_10p_patch_firmware_ID }}"
-    when: is_first_host and Gen10_10p_patch_firmware_ID is defined
-
-  - name: Set the final variable value for the Gen11 firmware bundle ID
-    set_fact:
-      Gen11_firmware_bundle_ID: "{{ Gen11_patch_firmware_ID }}"
-    when: is_first_host and Gen11_patch_firmware_ID is defined
+  - debug: var=Gen12_firmware_bundle_ID
+    when: is_first_host and (Gen12_firmware_bundle_name is defined) and (Gen12_firmware_bundle_name|length > 0)
 
   # Failure if firmware bundles set are not found
 
@@ -1983,6 +1950,11 @@
       msg: 'The firmware bundle for Gen11 servers could not be found, check your firmware baseline variables.' 
     when: is_first_host and Gen11_firmware_bundle_ID is not defined 
 
+  - name: Fail if the firmware baseline for Gen12 servers could not be found.
+    fail:
+      msg: 'The firmware bundle for Gen12 servers could not be found, check your firmware baseline variables.' 
+    when: is_first_host and Gen12_firmware_bundle_ID is not defined     
+
   # Set firmware bundle id for the server generation
 
   - name: Set firmware bundle id for Gen10/Gen10+ server
@@ -1994,6 +1966,11 @@
     set_fact: 
       bundle_id: "{{ Gen11_firmware_bundle_ID }}"
     when: is_first_host and server_generation == "GEN_11"
+
+  - name: Set firmware bundle id for Gen12 server
+    set_fact: 
+      bundle_id: "{{ Gen12_firmware_bundle_ID }}"
+    when: is_first_host and server_generation == "GEN_12"    
 
   - debug: var=bundle_id
     when: is_first_host
@@ -2032,6 +2009,8 @@
             id: "{{ Gen10_10p_firmware_bundle_ID }}"
           GEN11:
             id: "{{ Gen11_firmware_bundle_ID }}"
+          GEN12:
+            id: "{{ Gen12_firmware_bundle_ID }}"
     register: firmware_server_setting_result
     when: is_first_host and firmware_server_setting.json.count == 0
     delegate_to: localhost
@@ -2062,6 +2041,8 @@
             id: "{{ Gen10_10p_firmware_bundle_ID }}"
           GEN11:
             id: "{{ Gen11_firmware_bundle_ID }}"
+          GEN12:
+            id: "{{ Gen12_firmware_bundle_ID }}"            
     vars: 
       firmware_server_setting_id: "{{ firmware_server_setting | json_query('json.items[0].id')  }}"
     register: firmware_server_setting_result
