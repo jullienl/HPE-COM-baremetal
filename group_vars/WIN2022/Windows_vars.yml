@@ -50,10 +50,9 @@ firmware_server_setting_name: "Windows Server firmware baseline"
 #    - It is mandatory to define at least one firmware baseline for Gen10/Gen10+ servers and one for Gen11 servers.
 #    - Only firmware baselines that are currently active and available in the COM UI can be specified here.
 #    - If you do not want to use a firmware baseline for a specific generation, set the value to "".
-Gen10_10p_firmware_bundle_name: "2024.09.00.00"
-Gen10_10p_patch_name_associated_with_firmware_bundle: "" 
-Gen11_firmware_bundle_name: "2024.09.01.00"
-Gen11_patch_name_associated_with_firmware_bundle: "" 
+Gen10_10p_firmware_bundle_name: "2025.11.00.00"
+Gen11_firmware_bundle_name: "2025.11.01.00"
+Gen12_firmware_bundle_name: "2025.11.01.00"
 
 # Downgrade components policy of the definitive server group to match baseline (boolean)
 # If "true", any component version higher than the baseline will be downgraded to match the baseline. 
