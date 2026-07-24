@@ -525,12 +525,25 @@ Want to see exactly what a run looks like before trying it yourself? Full, real 
 At a glance, here is the tail of a real HVM provisioning run — **two servers provisioned in parallel, from bare metal to a VME-managed cluster, in ~48 minutes with zero failures**:
 
 ```text
-TASK [Get total runtime (including second-NIC link redundancy)] ****************
-ok: [HVM-2] => "The provisioning task took 0:48:23."
+TASK [Final status of the HVM OS installation (with link redundancy)] **********
+ok: [HVM-2] => {
+    "msg": [
+        "HVM-2.lj.lab HVM provisioning fully completed, including second-NIC link redundancy (OVS bond).",
+        "To SSH to the new host from the Ansible control node, use: ssh hvmadmin@HVM-2.lj.lab",
+        "The provisioning task took 0:48:22."
+    ]
+}
+ok: [HVM-3] => {
+    "msg": [
+        "HVM-3.lj.lab HVM provisioning fully completed, including second-NIC link redundancy (OVS bond).",
+        "To SSH to the new host from the Ansible control node, use: ssh hvmadmin@HVM-3.lj.lab",
+        "The provisioning task took 0:48:23."
+    ]
+}
 
 PLAY RECAP *********************************************************************
-HVM-2                      : ok=122  changed=19   unreachable=0    failed=0    skipped=55   rescued=0    ignored=0
-HVM-3                      : ok=107  changed=18   unreachable=0    failed=0    skipped=60   rescued=0    ignored=0
+HVM-2                      : ok=122  changed=19   unreachable=0    failed=0    skipped=55   rescued=0    ignored=0   
+HVM-3                      : ok=107  changed=18   unreachable=0    failed=0    skipped=60   rescued=0    ignored=0   
 ```
 
 <!--
