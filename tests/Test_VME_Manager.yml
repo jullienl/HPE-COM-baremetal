@@ -1,0 +1,323 @@
+---
+# =====================================================================================================================
+# Standalone TEST / VALIDATION playbook for the HPE VM Essentials (VME) Manager
+#
+# Purpose: validate - BEFORE running a full HVM provisioning - that
+#   1. the required VME variables are defined (variable-definition validation),
+#   2. the VME Manager is reachable and the credentials work (connectivity + auth),
+#   3. the referenced VME 'group' and cluster 'layout' actually exist in the manager
+#      (this catches the most common cluster-creation failures: a typo in
+#      'vme_group_name' or 'vme_cluster_layout'),
+#   4. no cluster named '{{ cluster_name }}' exists yet,
+#   5. (optional) the cluster can actually be created via the VME Manager API.
+#
+# It reuses the exact same variables and session logic (files/Create_VME_session.yml) as
+# HVM_provisioning.yml, so a success here means the real playbook's cluster join will work.
+#
+# Run it from the repository root (the inventory and vault password file paths below assume that):
+#
+# Usage (read-only validation, safe - does NOT create anything):
+#   ansible-playbook tests/Test_VME_Manager.yml -i hosts_HVM --vault-password-file /path/to/vault_pass.txt
+#
+# Usage (also create the cluster '{{ cluster_name }}' with the test node below as first member):
+#   ansible-playbook tests/Test_VME_Manager.yml -i hosts_HVM --vault-password-file /path/to/vault_pass.txt -e create_cluster=true
+#
+# NOTE: leaving create_cluster=false (the default) preserves your scenario where deploying
+#       VME-2 is what creates the cluster. Set it to true only to exercise the create API now.
+# =====================================================================================================================
+
+- name: Validate VME Manager connectivity, variables and (optionally) cluster creation
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars_files:
+    - ../vars/VME_Manager_vars_encrypted.yml
+    - ../vars/HVM_vars.yml
+    - ../vars/api_versions.yml
+  vars:
+    # Set to true (e.g. '-e create_cluster=true') to actually create the cluster '{{ cluster_name }}'.
+    create_cluster: false
+    # Node used as the first cluster member when create_cluster is true.
+    # Defaults to the running VME Manager host (HVM-1); override with -e if needed.
+    test_node_name: "HVM-1"
+    test_node_ip: "192.168.3.180"
+    # Morpheus service plan used for the first (manual/existing-host) MVM node.
+    vme_service_plan_name: "Default Manual"
+    # HVM node disk layout (from the VME Manager cluster wizard: config.diskMode). 'lvm' matches the HVM OS install.
+    vme_disk_mode: "lvm"
+
+  tasks:
+
+    # ---------------------------------------------------------------------------------------------------------------
+    # 1. Validate that the required variables are defined
+    # ---------------------------------------------------------------------------------------------------------------
+
+    - name: Assert that all required VME variables are defined
+      ansible.builtin.assert:
+        that:
+          - vme_manager_url is defined and (vme_manager_url | length > 0)
+          - vme_manager_username is defined and (vme_manager_username | length > 0)
+          - vme_manager_password is defined and (vme_manager_password | length > 0)
+          - hvm_ssh_username is defined and (hvm_ssh_username | length > 0)
+          - hvm_ssh_password is defined and (hvm_ssh_password | length > 0)
+          - cluster_name is defined and (cluster_name | length > 0)
+          - vme_group_name is defined and (vme_group_name | length > 0)
+          - vme_cluster_layout is defined and (vme_cluster_layout | length > 0)
+          - vme_mgmt_net_interface is defined and (vme_mgmt_net_interface | length > 0)
+          - vme_compute_net_interface is defined and (vme_compute_net_interface | length > 0)
+          - vme_compute_vlans is defined and (vme_compute_vlans | length > 0)
+        fail_msg: "One or more required VME variables are missing. Check vars/VME_Manager_vars_encrypted.yml and vars/HVM_vars.yml."
+        success_msg: "All required VME variables are defined."
+
+    - name: Show the effective VME variable values (passwords hidden)
+      ansible.builtin.debug:
+        msg:
+          - "vme_manager_url          : {{ vme_manager_url }}"
+          - "vme_manager_username     : {{ vme_manager_username }}"
+          - "vme_manager_password     : (hidden, length {{ vme_manager_password | length }})"
+          - "hvm_ssh_username         : {{ hvm_ssh_username }}"
+          - "hvm_ssh_password         : (hidden, length {{ hvm_ssh_password | length }})"
+          - "cluster_name             : {{ cluster_name }}"
+          - "vme_group_name           : {{ vme_group_name }}"
+          - "vme_cluster_layout       : {{ vme_cluster_layout }}"
+          - "vme_mgmt_net_interface   : {{ vme_mgmt_net_interface }}"
+          - "vme_compute_net_interface: {{ vme_compute_net_interface }}"
+          - "vme_compute_vlans        : {{ vme_compute_vlans }}"
+          - "mgmt_vlan                : {{ mgmt_vlan }}"
+
+    # ---------------------------------------------------------------------------------------------------------------
+    # 2. Authenticate to the VME Manager (connectivity + credentials)
+    # ---------------------------------------------------------------------------------------------------------------
+
+    - name: Authenticate to the VME Manager (proves connectivity + credentials)
+      ansible.builtin.import_tasks: ../files/Create_VME_session.yml
+
+    - name: Confirm a bearer token was obtained
+      ansible.builtin.assert:
+        that:
+          - vme_access_token is defined and (vme_access_token | length > 0)
+        fail_msg: "Authentication to the VME Manager failed - no access token returned. Check the URL and credentials."
+        success_msg: "Successfully authenticated to the VME Manager at {{ vme_manager_url }}."
+
+    - name: Get the authenticated user (whoami)
+      ansible.builtin.uri:
+        url: "{{ vme_manager_url }}/api/whoami"
+        method: GET
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{ vme_access_token }}"
+          Accept: "application/json"
+      register: vme_whoami
+      failed_when: false
+      delegate_to: localhost
+
+    - name: Report the authenticated user
+      ansible.builtin.debug:
+        msg: "Authenticated as '{{ vme_whoami.json.user.username | default('unknown') }}' (whoami HTTP {{ vme_whoami.status }})."
+
+    # ---------------------------------------------------------------------------------------------------------------
+    # 3. Validate the referenced group and cluster layout exist in the manager
+    # ---------------------------------------------------------------------------------------------------------------
+
+    - name: Look up the VME group '{{ vme_group_name }}'
+      ansible.builtin.uri:
+        url: "{{ vme_manager_url }}/api/groups?name={{ vme_group_name | urlencode }}&max=100"
+        method: GET
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{ vme_access_token }}"
+          Accept: "application/json"
+      register: vme_groups
+      failed_when: false
+      delegate_to: localhost
+
+    - name: Set a fact for whether the group exists
+      ansible.builtin.set_fact:
+        vme_group_found: "{{ (vme_groups.json.groups | default([]) | selectattr('name', 'equalto', vme_group_name) | list | length) > 0 }}"
+        vme_group_id: "{{ (vme_groups.json.groups | default([]) | selectattr('name', 'equalto', vme_group_name) | list | first).id | default('') }}"
+        vme_cloud_id: "{{ ((vme_groups.json.groups | default([]) | selectattr('name', 'equalto', vme_group_name) | list | first).zones | default([]) | first).id | default('') }}"
+        vme_cloud_name: "{{ ((vme_groups.json.groups | default([]) | selectattr('name', 'equalto', vme_group_name) | list | first).zones | default([]) | first).name | default('') }}"
+
+    - name: Report the group validation result
+      ansible.builtin.debug:
+        msg: >-
+          VME group '{{ vme_group_name }}'
+          {{ 'FOUND (id ' ~ vme_group_id ~ ', cloud ' ~ vme_cloud_name ~ ' id ' ~ vme_cloud_id ~ ')' if (vme_group_found | bool) else 'NOT FOUND - cluster creation will fail. Available groups: '
+          ~ (vme_groups.json.groups | default([]) | map(attribute='name') | list) }}
+
+    - name: List the cluster layouts (to validate vme_cluster_layout)
+      ansible.builtin.uri:
+        url: "{{ vme_manager_url }}/api/library/cluster-layouts?max=200"
+        method: GET
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{ vme_access_token }}"
+          Accept: "application/json"
+      register: vme_layouts
+      failed_when: false
+      delegate_to: localhost
+
+    - name: Set a fact for whether the cluster layout exists
+      ansible.builtin.set_fact:
+        vme_layout_found: "{{ (vme_layouts.json.layouts | default([]) | selectattr('name', 'equalto', vme_cluster_layout) | list | length) > 0 }}"
+        vme_layout_id: "{{ (vme_layouts.json.layouts | default([]) | selectattr('name', 'equalto', vme_cluster_layout) | list | first).id | default('') }}"
+
+    - name: Report the cluster layout validation result
+      ansible.builtin.debug:
+        msg: >-
+          Cluster layout '{{ vme_cluster_layout }}'
+          {{ 'FOUND' if (vme_layout_found | bool) else 'NOT FOUND (endpoint HTTP '
+          ~ vme_layouts.status ~ '). Available HVM layouts: '
+          ~ (vme_layouts.json.layouts | default([]) | map(attribute='name') | select('search', '^HVM ') | list) }}
+
+    - name: Look up the service plan '{{ vme_service_plan_name }}'
+      ansible.builtin.uri:
+        url: "{{ vme_manager_url }}/api/service-plans?phrase={{ vme_service_plan_name | urlencode }}&max=100"
+        method: GET
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{ vme_access_token }}"
+          Accept: "application/json"
+      register: vme_plans
+      failed_when: false
+      delegate_to: localhost
+
+    - name: Set a fact for the service plan id
+      ansible.builtin.set_fact:
+        vme_plan_id: "{{ (vme_plans.json.servicePlans | default([]) | selectattr('name', 'equalto', vme_service_plan_name) | list | first).id | default('') }}"
+
+    - name: Report the service plan validation result
+      ansible.builtin.debug:
+        msg: >-
+          Service plan '{{ vme_service_plan_name }}'
+          {{ 'FOUND (id ' ~ vme_plan_id ~ ')' if (vme_plan_id | length > 0) else 'NOT FOUND. Available: '
+          ~ (vme_plans.json.servicePlans | default([]) | map(attribute='name') | list) }}
+
+    # ---------------------------------------------------------------------------------------------------------------
+    # 4. Check whether the cluster already exists
+    # ---------------------------------------------------------------------------------------------------------------
+
+    - name: Look up the HVM cluster '{{ cluster_name }}'
+      ansible.builtin.uri:
+        url: "{{ vme_manager_url }}/api/clusters?name={{ cluster_name | urlencode }}&max=1"
+        method: GET
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{ vme_access_token }}"
+          Accept: "application/json"
+      register: vme_cluster_lookup
+      failed_when: false
+      delegate_to: localhost
+
+    - name: Set a fact for whether the cluster already exists
+      ansible.builtin.set_fact:
+        hvm_cluster_exists: "{{ (vme_cluster_lookup.json.clusters | default([]) | length) > 0 }}"
+        hvm_cluster_id: "{{ (vme_cluster_lookup.json.clusters | default([]))[0].id | default('') }}"
+
+    - name: Report the existing-cluster check
+      ansible.builtin.debug:
+        msg: >-
+          Cluster '{{ cluster_name }}'
+          {{ 'ALREADY EXISTS (id ' ~ hvm_cluster_id ~ ')' if (hvm_cluster_exists | bool)
+          else 'does not exist yet - ready to be created.' }}
+
+    # ---------------------------------------------------------------------------------------------------------------
+    # 5. (Optional) Create the cluster - only when create_cluster=true and it does not exist yet
+    # ---------------------------------------------------------------------------------------------------------------
+
+    - name: Skip cluster creation (create_cluster is false)
+      ansible.builtin.debug:
+        msg: "create_cluster is false: read-only validation only. Re-run with '-e create_cluster=true' to create '{{ cluster_name }}'."
+      when: not (create_cluster | bool)
+
+    # Build the request body as a JSON string so the numeric ids (group/cloud/layout/plan) are sent as real
+    # integers. This project does not enable jinja2_native, so a bare "{{ x | int }}" YAML value would be sent as
+    # the string "1" and the VME Manager (Morpheus) rejects string ids with "not found or not allowed".
+    # Body structure follows the official Morpheus 'Create a Cluster' (addcluster) reference
+    # (https://apidocs.morpheusdata.com/reference/addcluster) and the gomorpheus terraform provider:
+    #   cluster: { name, type, autoRecoverPowerState, group{id}, cloud{id}, layout{id},
+    #              server: { name, plan{id}, networkInterfaces:[{network{...}}], config{...} } }
+    - name: Build the cluster create request body (with integer ids)
+      ansible.builtin.set_fact:
+        vme_cluster_body: >-
+          {{
+            {
+              'cluster': {
+                'name': cluster_name,
+                'type': 'mvm-cluster',
+                'autoRecoverPowerState': false,
+                'group': {'id': vme_group_id | int},
+                'cloud': {'id': vme_cloud_id | int},
+                'layout': {'id': vme_layout_id | int},
+                'server': {
+                  'name': test_node_name,
+                  'nodeCount': 1,
+                  'nodeType': 'worker',
+                  'computeServerType': {'code': 'mvmHost'},
+                  'sshHosts': [{'ip': test_node_ip, 'name': test_node_ip, 'sshUsername': hvm_ssh_username, 'sshPassword': hvm_ssh_password}],
+                  'sshPort': 22,
+                  'sshUsername': hvm_ssh_username,
+                  'sshPassword': hvm_ssh_password,
+                  'cpuPlacementMode': 'unmanaged',
+                  'plan': {'id': vme_plan_id | int},
+                  'network': {'name': vme_mgmt_net_interface},
+                  'networkInterfaces': [
+                    {'network': {'name': vme_mgmt_net_interface}}
+                  ],
+                  'config': {
+                    'diskMode': vme_disk_mode,
+                    'computeInterfaceName': vme_compute_net_interface,
+                    'computeVlans': vme_compute_vlans | join(','),
+                    'overlayInterfaceName': '',
+                    'cpuArch': 'x86_64',
+                    'cpuModel': 'host-passthrough',
+                    'dynamicPlacementMode': 'off',
+                    'drsAggressiveness': 'conservative',
+                    'powerPolicy': 'balanced'
+                  }
+                }
+              }
+            } | to_json
+          }}
+      when: (create_cluster | bool) and not (hvm_cluster_exists | bool)
+
+    - name: Show the exact request body being sent to POST /api/clusters
+      ansible.builtin.debug:
+        msg: "{{ vme_cluster_body | from_json }}"
+      when: (create_cluster | bool) and not (hvm_cluster_exists | bool)
+
+    - name: Create the HVM cluster '{{ cluster_name }}' with '{{ test_node_name }}' as the first node
+      ansible.builtin.uri:
+        url: "{{ vme_manager_url }}/api/clusters"
+        method: POST
+        status_code: 200, 201
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{ vme_access_token }}"
+          Content-Type: "application/json"
+        body: "{{ vme_cluster_body }}"
+      register: vme_cluster_create
+      failed_when: false
+      delegate_to: localhost
+      when: (create_cluster | bool) and not (hvm_cluster_exists | bool)
+
+    - name: Report the cluster creation result
+      ansible.builtin.debug:
+        msg:
+          - "Cluster create HTTP status: {{ vme_cluster_create.status }}"
+          - "Response: {{ vme_cluster_create.json | default(vme_cluster_create.content) | default('(no body)') }}"
+      when: (create_cluster | bool) and not (hvm_cluster_exists | bool)
+
+    # ---------------------------------------------------------------------------------------------------------------
+    # 6. Summary
+    # ---------------------------------------------------------------------------------------------------------------
+
+    - name: Validation summary
+      ansible.builtin.debug:
+        msg:
+          - "VME Manager URL          : {{ vme_manager_url }}"
+          - "Authentication           : {{ 'OK' if (vme_access_token | length > 0) else 'FAILED' }}"
+          - "Group '{{ vme_group_name }}'    : {{ 'OK' if (vme_group_found | bool) else 'NOT FOUND' }}"
+          - "Layout                   : {{ 'OK' if (vme_layout_found | bool) else 'NOT FOUND / could not verify' }}"
+          - "Cluster '{{ cluster_name }}'   : {{ 'EXISTS' if (hvm_cluster_exists | bool) else 'not present' }}"
+          - "Cluster creation         : {{ ('attempted (HTTP ' ~ vme_cluster_create.status ~ ')') if ((create_cluster | bool) and not (hvm_cluster_exists | bool)) else 'skipped' }}"

@@ -1,162 +1,266 @@
+$ ansible-playbook -i "CZ2311004H,CZJ3100GD9" ESXi_unprovisioning.yml --ask-vault-password
 
-PLAY [Deleting provisioned compute module(s)] **********************************
+PLAY [Deleting provisioned compute module(s)] ****************************************************************************************************************************************************************************************************************************************
 
-TASK [Gather subset facts on localhost] ****************************************
-ok: [ESX-3 -> localhost]
-ok: [ESX-2 -> localhost]
+TASK [Gather subset facts on localhost] **********************************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H -> localhost]
+ok: [CZJ3100GD9 -> localhost]
 
-TASK [Capture the start time] ***
-ok: [ESX-2]
-ok: [ESX-3]
+TASK [Capture the start time] ********************************************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H]
+ok: [CZJ3100GD9]
 
-TASK [debug] *******************************************************************
-ok: [ESX-2] => {
-    "start_time": "2023-11-06T17:50:57Z"
+TASK [debug] *************************************************************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H] => {
+    "start_time": "2026-07-23T16:08:33Z"
 }
-ok: [ESX-3] => {
-    "start_time": "2023-11-06T17:50:56Z"
-}
-
-TASK [Create HPE Compute Ops Management session] *******************************
-ok: [ESX-2 -> localhost]
-ok: [ESX-3 -> localhost]
-
-TASK [Set variable access_token for the bearer token] **************************
-ok: [ESX-2]
-ok: [ESX-3]
-
-TASK [Capture resource API versions from the COM API reference] ****************
-ok: [ESX-3 -> localhost]
-ok: [ESX-2 -> localhost]
-
-TASK [Set a variable for the COM API reference content] ************************
-ok: [ESX-2]
-ok: [ESX-3]
-
-TASK [Set a variable for items property of the COM API reference content] ******
-ok: [ESX-2]
-ok: [ESX-3]
-
-TASK [Set variables for each API version] **************************************
-ok: [ESX-2] => (item=Variable set: user_preferences_API_version = v1beta1)
-ok: [ESX-2] => (item=Variable set: servers_API_version = v1beta2)
-ok: [ESX-3] => (item=Variable set: user_preferences_API_version = v1beta1)
-ok: [ESX-2] => (item=Variable set: server_settings_API_version = v1beta1)
-ok: [ESX-3] => (item=Variable set: servers_API_version = v1beta2)
-ok: [ESX-2] => (item=Variable set: schedules_API_version = v1beta2)
-ok: [ESX-3] => (item=Variable set: server_settings_API_version = v1beta1)
-ok: [ESX-2] => (item=Variable set: reports_API_version = v1beta1)
-ok: [ESX-3] => (item=Variable set: schedules_API_version = v1beta2)
-ok: [ESX-2] => (item=Variable set: jobs_API_version = v1beta2)
-ok: [ESX-3] => (item=Variable set: reports_API_version = v1beta1)
-ok: [ESX-2] => (item=Variable set: jobs_API_version = v1beta3)
-ok: [ESX-3] => (item=Variable set: jobs_API_version = v1beta2)
-ok: [ESX-2] => (item=Variable set: job_templates_API_version = v1beta2)
-ok: [ESX-3] => (item=Variable set: jobs_API_version = v1beta3)
-ok: [ESX-2] => (item=Variable set: groups_API_version = v1beta2)
-ok: [ESX-3] => (item=Variable set: job_templates_API_version = v1beta2)
-ok: [ESX-2] => (item=Variable set: firmware_bundles_API_version = v1beta2)
-ok: [ESX-3] => (item=Variable set: groups_API_version = v1beta2)
-ok: [ESX-2] => (item=Variable set: filters_API_version = v1beta1)
-ok: [ESX-3] => (item=Variable set: firmware_bundles_API_version = v1beta2)
-ok: [ESX-2] => (item=Variable set: external_services_API_version = v1beta1)
-ok: [ESX-3] => (item=Variable set: filters_API_version = v1beta1)
-ok: [ESX-2] => (item=Variable set: activities_API_version = v1beta2)
-ok: [ESX-3] => (item=Variable set: external_services_API_version = v1beta1)
-ok: [ESX-3] => (item=Variable set: activities_API_version = v1beta2)
-
-TASK [Capture server 'ESX-2' information] **************************************
-ok: [ESX-2 -> localhost]
-ok: [ESX-3 -> localhost]
-
-TASK [Exit if server 'ESX-2' does not exist] ***********************************
-skipping: [ESX-2]
-skipping: [ESX-3]
-
-TASK [Capture server 'ESX-2' uri] **********************************************
-ok: [ESX-2]
-ok: [ESX-3]
-
-TASK [debug] *******************************************************************
-ok: [ESX-2] => {
-    "server_uri": "/compute-ops-mgmt/v1beta2/servers/P28948-B21+CZ2311004G"
-}
-ok: [ESX-3] => {
-    "server_uri": "/compute-ops-mgmt/v1beta2/servers/P28948-B21+CZ2311004H"
+ok: [CZJ3100GD9] => {
+    "start_time": "2026-07-23T16:08:33Z"
 }
 
-TASK [Exit if server 'ESX-2' is not connected to COM] **************************
-skipping: [ESX-2]
-skipping: [ESX-3]
+TASK [Create HPE Compute Ops Management session] *************************************************************************************************************************************************************************************************************************************
+ok: [CZJ3100GD9 -> localhost]
+ok: [CZ2311004H -> localhost]
 
-TASK [Capture server 'ESX-2' raw inventory information] ************************
-ok: [ESX-2 -> localhost]
-ok: [ESX-3 -> localhost]
+TASK [Set variable access_token for the bearer token] ********************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H]
+ok: [CZJ3100GD9]
 
-TASK [Taking "esx-2.lj.lab" to maintenance mode] *******************************
-changed: [ESX-2 -> localhost]
-changed: [ESX-3 -> localhost]
+TASK [Capture all job templates] *****************************************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H -> localhost]
+ok: [CZJ3100GD9 -> localhost]
 
-TASK [Removing ESXi host "ESX-2" from vCenter "vcenter.lj.lab"] ****************
-changed: [ESX-2 -> localhost]
-changed: [ESX-3 -> localhost]
+TASK [Set a variable for all job templates items] ************************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H]
+ok: [CZJ3100GD9]
 
-TASK [Check if server 'ESX-2' is already member of a server group] *************
-ok: [ESX-2 -> localhost]
-ok: [ESX-3 -> localhost]
+TASK [Set variables for each job template id] ****************************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H] => (item=Variable set: AnalyzeFirmwareUpdate_job_template_id = 5a657c6f-777d-4c7e-874a-1650b95b37f2)
+ok: [CZ2311004H] => (item=Variable set: AnalyzeFirmwareUpdateOrchestrator_job_template_id = 87f47eff-7245-4788-bf58-5b6af361d1ba)
+ok: [CZ2311004H] => (item=Variable set: ApplianceUpdate_job_template_id = 1c4ac4be-8eeb-49f2-a86a-fd8c9182616c)
+ok: [CZJ3100GD9] => (item=Variable set: AnalyzeFirmwareUpdate_job_template_id = 5a657c6f-777d-4c7e-874a-1650b95b37f2)
+ok: [CZ2311004H] => (item=Variable set: ApplySettingsTemplate_job_template_id = 2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
+ok: [CZJ3100GD9] => (item=Variable set: AnalyzeFirmwareUpdateOrchestrator_job_template_id = 87f47eff-7245-4788-bf58-5b6af361d1ba)
+ok: [CZ2311004H] => (item=Variable set: CalculateiLOSettingsCompliance_job_template_id = 497a5418-cbc2-4870-a1e7-1fc30c885f2f)
+ok: [CZJ3100GD9] => (item=Variable set: ApplianceUpdate_job_template_id = 1c4ac4be-8eeb-49f2-a86a-fd8c9182616c)
+ok: [CZ2311004H] => (item=Variable set: ColdBoot_job_template_id = aacfb3e0-6575-4d4f-a711-1ee1ae768407)
+ok: [CZJ3100GD9] => (item=Variable set: ApplySettingsTemplate_job_template_id = 2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
+ok: [CZ2311004H] => (item=Variable set: CollectServerLogs_job_template_id = 2d744494-22d4-4d61-8c65-647ccadeb6b6)
+ok: [CZJ3100GD9] => (item=Variable set: CalculateiLOSettingsCompliance_job_template_id = 497a5418-cbc2-4870-a1e7-1fc30c885f2f)
+ok: [CZ2311004H] => (item=Variable set: CopyServerProfileTemplates_job_template_id = 7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
+ok: [CZJ3100GD9] => (item=Variable set: ColdBoot_job_template_id = aacfb3e0-6575-4d4f-a711-1ee1ae768407)
+ok: [CZ2311004H] => (item=Variable set: CreateOneviewComplianceReport_job_template_id = aae145a1-79a2-4516-b191-c98039c96542)
+ok: [CZJ3100GD9] => (item=Variable set: CollectServerLogs_job_template_id = 2d744494-22d4-4d61-8c65-647ccadeb6b6)
+ok: [CZ2311004H] => (item=Variable set: DeleteVCenter_job_template_id = 3f06fd6b-dfb1-4bad-bd04-939951797e97)
+ok: [CZJ3100GD9] => (item=Variable set: CopyServerProfileTemplates_job_template_id = 7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
+ok: [CZ2311004H] => (item=Variable set: FirmwareDownload_job_template_id = 0683ada8-1a89-49dd-bf04-6df715b708a6)
+ok: [CZJ3100GD9] => (item=Variable set: CreateOneviewComplianceReport_job_template_id = aae145a1-79a2-4516-b191-c98039c96542)
+ok: [CZ2311004H] => (item=Variable set: FirmwareUpdate_New_job_template_id = fd54a96c-cabc-42e3-aee3-374a2d009dba)
+ok: [CZJ3100GD9] => (item=Variable set: DeleteVCenter_job_template_id = 3f06fd6b-dfb1-4bad-bd04-939951797e97)
+ok: [CZ2311004H] => (item=Variable set: GatewayDiscoverIlos_job_template_id = d0afcc35-c6a9-4d05-adc8-f9e686b5fdfc)
+ok: [CZJ3100GD9] => (item=Variable set: FirmwareDownload_job_template_id = 0683ada8-1a89-49dd-bf04-6df715b708a6)
+ok: [CZ2311004H] => (item=Variable set: GatewayReboot_job_template_id = 91afe709-8b0d-4162-81d5-2a365e0359f3)
+ok: [CZJ3100GD9] => (item=Variable set: FirmwareUpdate_New_job_template_id = fd54a96c-cabc-42e3-aee3-374a2d009dba)
+ok: [CZ2311004H] => (item=Variable set: GetDeviceAndSoftwareInventory_job_template_id = ee5d8016-6b9f-4410-9d55-e05e3e86a0c8)
+ok: [CZJ3100GD9] => (item=Variable set: GatewayDiscoverIlos_job_template_id = d0afcc35-c6a9-4d05-adc8-f9e686b5fdfc)
+ok: [CZ2311004H] => (item=Variable set: GetFullServerInventory_job_template_id = d6595f1b-84e6-4587-ade5-656e2a5ea20d)
+ok: [CZJ3100GD9] => (item=Variable set: GatewayReboot_job_template_id = 91afe709-8b0d-4162-81d5-2a365e0359f3)
+ok: [CZ2311004H] => (item=Variable set: GetIloSecurityParams_job_template_id = e3fef4ec-eb72-43ff-bea5-13501353b501)
+ok: [CZJ3100GD9] => (item=Variable set: GetDeviceAndSoftwareInventory_job_template_id = ee5d8016-6b9f-4410-9d55-e05e3e86a0c8)
+ok: [CZ2311004H] => (item=Variable set: GetOneviewServerInventory_job_template_id = a0124cb1-00f1-46b7-818f-a9eb5f60591f)
+ok: [CZJ3100GD9] => (item=Variable set: GetFullServerInventory_job_template_id = d6595f1b-84e6-4587-ade5-656e2a5ea20d)
+ok: [CZ2311004H] => (item=Variable set: GetOneViewSettings_job_template_id = fc16aa48-c73c-4463-9112-e061383ebfa9)
+ok: [CZJ3100GD9] => (item=Variable set: GetIloSecurityParams_job_template_id = e3fef4ec-eb72-43ff-bea5-13501353b501)
+ok: [CZ2311004H] => (item=Variable set: GetPowerMeterData_job_template_id = 50fa7d05-5941-4e8e-90c3-5995f1d600a8)
+ok: [CZJ3100GD9] => (item=Variable set: GetOneviewServerInventory_job_template_id = a0124cb1-00f1-46b7-818f-a9eb5f60591f)
+ok: [CZ2311004H] => (item=Variable set: GetServerExternalStorage_job_template_id = 9310319e-7b7f-41ba-8b24-8b34eed1ca62)
+ok: [CZJ3100GD9] => (item=Variable set: GetOneViewSettings_job_template_id = fc16aa48-c73c-4463-9112-e061383ebfa9)
+ok: [CZ2311004H] => (item=Variable set: GetSettingsForTemplate_job_template_id = 6cd671db-ce6b-45ce-894e-7b5ae23e0399)
+ok: [CZJ3100GD9] => (item=Variable set: GetPowerMeterData_job_template_id = 50fa7d05-5941-4e8e-90c3-5995f1d600a8)
+ok: [CZ2311004H] => (item=Variable set: GetSSOUrl_job_template_id = 2c7de503-77af-4340-b68d-7a26e5359b8e)
+ok: [CZJ3100GD9] => (item=Variable set: GetServerExternalStorage_job_template_id = 9310319e-7b7f-41ba-8b24-8b34eed1ca62)
+ok: [CZ2311004H] => (item=Variable set: GetTelemetryDriveMetrics_job_template_id = ee46afcf-4f47-45b5-a958-cb9b02bb0e00)
+ok: [CZJ3100GD9] => (item=Variable set: GetSettingsForTemplate_job_template_id = 6cd671db-ce6b-45ce-894e-7b5ae23e0399)
+ok: [CZ2311004H] => (item=Variable set: GroupAddActions_job_template_id = 3eeff1ea-8419-4335-aaf3-796ef50789ba)
+ok: [CZJ3100GD9] => (item=Variable set: GetSSOUrl_job_template_id = 2c7de503-77af-4340-b68d-7a26e5359b8e)
+ok: [CZ2311004H] => (item=Variable set: GroupApplianceUpdate_job_template_id = f69f553a-5004-4a08-9283-5b60abd9eb4a)
+ok: [CZJ3100GD9] => (item=Variable set: GetTelemetryDriveMetrics_job_template_id = ee46afcf-4f47-45b5-a958-cb9b02bb0e00)
+ok: [CZ2311004H] => (item=Variable set: GroupApplyExternalStorage_job_template_id = fcb79270-5954-42e9-9374-6a065b6d494a)
+ok: [CZJ3100GD9] => (item=Variable set: GroupAddActions_job_template_id = 3eeff1ea-8419-4335-aaf3-796ef50789ba)
+ok: [CZ2311004H] => (item=Variable set: GroupApplyInternalStorageSettings_job_template_id = 54095626-3911-4fea-9741-816e2531994e)
+ok: [CZJ3100GD9] => (item=Variable set: GroupApplianceUpdate_job_template_id = f69f553a-5004-4a08-9283-5b60abd9eb4a)
+ok: [CZ2311004H] => (item=Variable set: GroupApplyOneviewSettings_job_template_id = a229a162-b43f-45b0-b7bb-692df77b9746)
+ok: [CZJ3100GD9] => (item=Variable set: GroupApplyExternalStorage_job_template_id = fcb79270-5954-42e9-9374-6a065b6d494a)
+ok: [CZ2311004H] => (item=Variable set: GroupApplyServerSettings_job_template_id = beff07ce-f36d-4699-9ac3-f872dcd63133)
+ok: [CZJ3100GD9] => (item=Variable set: GroupApplyInternalStorageSettings_job_template_id = 54095626-3911-4fea-9741-816e2531994e)
+ok: [CZ2311004H] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_id = db3620d4-19a4-4b54-9804-83f8f59d48a4)
+ok: [CZJ3100GD9] => (item=Variable set: GroupApplyOneviewSettings_job_template_id = a229a162-b43f-45b0-b7bb-692df77b9746)
+ok: [CZ2311004H] => (item=Variable set: GroupExternalStorageCompliance_job_template_id = 7177aa6a-e8f8-4e9b-ae31-e01dafcc81df)
+ok: [CZJ3100GD9] => (item=Variable set: GroupApplyServerSettings_job_template_id = beff07ce-f36d-4699-9ac3-f872dcd63133)
+ok: [CZ2311004H] => (item=Variable set: GroupFirmwareCompliance_job_template_id = 23b8ba2a-6c46-4223-b028-919382c7dcac)
+ok: [CZJ3100GD9] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_id = db3620d4-19a4-4b54-9804-83f8f59d48a4)
+ok: [CZ2311004H] => (item=Variable set: GroupFirmwareDownload_job_template_id = a17a7aa9-4540-4c21-bbf2-31af4ff65e98)
+ok: [CZJ3100GD9] => (item=Variable set: GroupExternalStorageCompliance_job_template_id = 7177aa6a-e8f8-4e9b-ae31-e01dafcc81df)
+ok: [CZ2311004H] => (item=Variable set: GroupFirmwareUpdate_job_template_id = 91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
+ok: [CZJ3100GD9] => (item=Variable set: GroupFirmwareCompliance_job_template_id = 23b8ba2a-6c46-4223-b028-919382c7dcac)
+ok: [CZ2311004H] => (item=Variable set: GroupGetIloSecurityParams_job_template_id = 08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
+ok: [CZJ3100GD9] => (item=Variable set: GroupFirmwareDownload_job_template_id = a17a7aa9-4540-4c21-bbf2-31af4ff65e98)
+ok: [CZ2311004H] => (item=Variable set: GroupIloFirmwareUpdate_job_template_id = 512fb1f2-516f-4bda-bc84-e623947858e4)
+ok: [CZJ3100GD9] => (item=Variable set: GroupFirmwareUpdate_job_template_id = 91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
+ok: [CZJ3100GD9] => (item=Variable set: GroupGetIloSecurityParams_job_template_id = 08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
+ok: [CZ2311004H] => (item=Variable set: GroupiLOSettingsCompliance_job_template_id = a55c8b26-3c57-4044-a4ee-1d0e3c108286)
+ok: [CZJ3100GD9] => (item=Variable set: GroupIloFirmwareUpdate_job_template_id = 512fb1f2-516f-4bda-bc84-e623947858e4)
+ok: [CZ2311004H] => (item=Variable set: GroupOSInstallation_job_template_id = e2952628-2629-4088-93db-91742304ef0c)
+ok: [CZJ3100GD9] => (item=Variable set: GroupiLOSettingsCompliance_job_template_id = a55c8b26-3c57-4044-a4ee-1d0e3c108286)
+ok: [CZ2311004H] => (item=Variable set: GroupServerInventoryReport_job_template_id = 2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
+ok: [CZJ3100GD9] => (item=Variable set: GroupOSInstallation_job_template_id = e2952628-2629-4088-93db-91742304ef0c)
+ok: [CZ2311004H] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_id = 94caa4ef-9ff8-4805-9e97-18a09e673b66)
+ok: [CZJ3100GD9] => (item=Variable set: GroupServerInventoryReport_job_template_id = 2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
+ok: [CZ2311004H] => (item=Variable set: iLOSecurity_job_template_id = e1d69e76-38cc-4079-9192-a380baea2973)
+ok: [CZJ3100GD9] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_id = 94caa4ef-9ff8-4805-9e97-18a09e673b66)
+ok: [CZ2311004H] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_id = abfda355-6e58-4c00-be0a-af35dbd70398)
+ok: [CZJ3100GD9] => (item=Variable set: iLOSecurity_job_template_id = e1d69e76-38cc-4079-9192-a380baea2973)
+ok: [CZ2311004H] => (item=Variable set: OrchestratorDriveMetrics_job_template_id = 1f3ca251-a008-4fed-b53e-6521cce61b97)
+ok: [CZJ3100GD9] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_id = abfda355-6e58-4c00-be0a-af35dbd70398)
+ok: [CZ2311004H] => (item=Variable set: PowerOff_New_job_template_id = d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
+ok: [CZJ3100GD9] => (item=Variable set: OrchestratorDriveMetrics_job_template_id = 1f3ca251-a008-4fed-b53e-6521cce61b97)
+ok: [CZ2311004H] => (item=Variable set: PowerOn_New_job_template_id = 0cbb2377-1834-488d-840c-d5bf788c34fb)
+ok: [CZJ3100GD9] => (item=Variable set: PowerOff_New_job_template_id = d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
+ok: [CZ2311004H] => (item=Variable set: ReconnectCredentialServer_job_template_id = d9713316-58f3-464e-bc69-1dd0728fa0d5)
+ok: [CZJ3100GD9] => (item=Variable set: PowerOn_New_job_template_id = 0cbb2377-1834-488d-840c-d5bf788c34fb)
+ok: [CZ2311004H] => (item=Variable set: ResetIlo_job_template_id = 394b492c-8d88-4e4e-a775-1a95cb5f1065)
+ok: [CZJ3100GD9] => (item=Variable set: ReconnectCredentialServer_job_template_id = d9713316-58f3-464e-bc69-1dd0728fa0d5)
+ok: [CZ2311004H] => (item=Variable set: Restart_New_job_template_id = 30110551-cad6-4069-95b8-dbce9bbd8525)
+ok: [CZJ3100GD9] => (item=Variable set: ResetIlo_job_template_id = 394b492c-8d88-4e4e-a775-1a95cb5f1065)
+ok: [CZ2311004H] => (item=Variable set: ServerMaintenanceModeDisable_job_template_id = 2798720f-b090-427d-b210-e48d33ce2f27)
+ok: [CZJ3100GD9] => (item=Variable set: Restart_New_job_template_id = 30110551-cad6-4069-95b8-dbce9bbd8525)
+ok: [CZ2311004H] => (item=Variable set: ServerMaintenanceModeEnable_job_template_id = 4eb92af1-1ce4-4cb0-8581-fb5a7dcdbf2b)
+ok: [CZJ3100GD9] => (item=Variable set: ServerMaintenanceModeDisable_job_template_id = 2798720f-b090-427d-b210-e48d33ce2f27)
+ok: [CZ2311004H] => (item=Variable set: ServerNetworkConnectivity_job_template_id = b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
+ok: [CZJ3100GD9] => (item=Variable set: ServerMaintenanceModeEnable_job_template_id = 4eb92af1-1ce4-4cb0-8581-fb5a7dcdbf2b)
+ok: [CZ2311004H] => (item=Variable set: SetIloSettings_job_template_id = cf4f929b-d44a-4a90-93a9-820955458fd4)
+ok: [CZJ3100GD9] => (item=Variable set: ServerNetworkConnectivity_job_template_id = b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
+ok: [CZ2311004H] => (item=Variable set: UidIndicatorOff_job_template_id = fd837434-a2f2-4bc8-b1b4-ec068bd036aa)
+ok: [CZJ3100GD9] => (item=Variable set: SetIloSettings_job_template_id = cf4f929b-d44a-4a90-93a9-820955458fd4)
+ok: [CZ2311004H] => (item=Variable set: UidIndicatorOn_job_template_id = a46b210a-b0c7-4223-ab43-c4c1e77e680c)
+ok: [CZJ3100GD9] => (item=Variable set: UidIndicatorOff_job_template_id = fd837434-a2f2-4bc8-b1b4-ec068bd036aa)
+ok: [CZ2311004H] => (item=Variable set: UpdateCredentialBasedServer_job_template_id = f399e08a-6fed-45ba-a646-88d20691ff0f)
+ok: [CZJ3100GD9] => (item=Variable set: UidIndicatorOn_job_template_id = a46b210a-b0c7-4223-ab43-c4c1e77e680c)
+ok: [CZ2311004H] => (item=Variable set: VcenterFirmwareBundlesSync_job_template_id = 0fe73adb-9d52-4f00-9540-6ec82f265d82)
+ok: [CZJ3100GD9] => (item=Variable set: UpdateCredentialBasedServer_job_template_id = f399e08a-6fed-45ba-a646-88d20691ff0f)
+ok: [CZJ3100GD9] => (item=Variable set: VcenterFirmwareBundlesSync_job_template_id = 0fe73adb-9d52-4f00-9540-6ec82f265d82)
 
-TASK [Capture the id of the server group of which the server 'ESX-2' is a member (if applicable)] ***
-ok: [ESX-2]
-ok: [ESX-3]
+TASK [Capture server 'CZ2311004H' information] ***************************************************************************************************************************************************************************************************************************************
+ok: [CZJ3100GD9 -> localhost]
+ok: [CZ2311004H -> localhost]
 
-TASK [debug] *******************************************************************
-ok: [ESX-2] => {
+TASK [Exit if server 'CZ2311004H' does not exist] ************************************************************************************************************************************************************************************************************************************
+skipping: [CZ2311004H]
+skipping: [CZJ3100GD9]
+
+TASK [Capture server 'CZ2311004H' facts] *********************************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H]
+ok: [CZJ3100GD9]
+
+TASK [debug] *************************************************************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H] => {
+    "server_id": "P28948-B21+CZ2311004H"
+}
+ok: [CZJ3100GD9] => {
+    "server_id": "P53933-B21+CZJ3100GD9"
+}
+
+TASK [debug] *************************************************************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H] => {
+    "server_name": "esx-1.lj.lab"
+}
+ok: [CZJ3100GD9] => {
+    "server_name": "esx-2.lj.lab"
+}
+
+TASK [Exit if server 'CZ2311004H' is not connected to COM] ***************************************************************************************************************************************************************************************************************************
+skipping: [CZ2311004H]
+skipping: [CZJ3100GD9]
+
+TASK [Check if ESXi host exists in cluster 'DL-Cluster-01' in vCenter 'vcenter.lj.lab'] **********************************************************************************************************************************************************************************************
+ok: [CZ2311004H -> localhost]
+ok: [CZJ3100GD9 -> localhost]
+
+TASK [Capture the presence of 'esx-1.lj.lab' in cluster 'DL-Cluster-01'] *************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H]
+ok: [CZJ3100GD9]
+
+TASK [debug] *************************************************************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H] => {
+    "msg": "esx-1.lj.lab is part of the cluster 'DL-Cluster-01' in vCenter 'vcenter.lj.lab'"
+}
+ok: [CZJ3100GD9] => {
+    "msg": "esx-2.lj.lab is part of the cluster 'DL-Cluster-01' in vCenter 'vcenter.lj.lab'"
+}
+
+TASK [debug] *************************************************************************************************************************************************************************************************************************************************************************
+skipping: [CZ2311004H]
+skipping: [CZJ3100GD9]
+
+TASK [Take 'esx-1.lj.lab' to maintenance mode if present] ****************************************************************************************************************************************************************************************************************************
+changed: [CZ2311004H -> localhost]
+changed: [CZJ3100GD9 -> localhost]
+
+TASK [Remove ESXi host 'esx-1.lj.lab' from vCenter 'vcenter.lj.lab'] *****************************************************************************************************************************************************************************************************************
+changed: [CZ2311004H -> localhost]
+changed: [CZJ3100GD9 -> localhost]
+
+TASK [Check if server 'CZ2311004H' is already member of a server group] **************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H -> localhost]
+ok: [CZJ3100GD9 -> localhost]
+
+TASK [Capture the id of the server group of which the server 'CZ2311004H' is a member (if applicable)] *******************************************************************************************************************************************************************************
+ok: [CZ2311004H]
+ok: [CZJ3100GD9]
+
+TASK [debug] *************************************************************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H] => {
     "server_group_name_found": "ESXi_group"
 }
-ok: [ESX-3] => {
+ok: [CZJ3100GD9] => {
     "server_group_name_found": "ESXi_group"
 }
 
-TASK [Remove server 'ESX-2' from the server group of which it is currently a member] ***
-ok: [ESX-2 -> localhost]
-ok: [ESX-3 -> localhost]
+TASK [Remove server 'CZ2311004H' from the server group of which it is currently a member] ********************************************************************************************************************************************************************************************
+ok: [CZJ3100GD9 -> localhost]
+ok: [CZ2311004H -> localhost]
 
-TASK [Wait for deletion to complete] *******************************************
+TASK [Wait for deletion to complete] *************************************************************************************************************************************************************************************************************************************************
 Pausing for 15 seconds
 (ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
-ok: [ESX-2]
+ok: [CZ2311004H]
 
-TASK [Capture all job templates] ***********************************************
-ok: [ESX-3 -> localhost]
-ok: [ESX-2 -> localhost]
+TASK [Power off server 'CZ2311004H'] *************************************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H -> localhost]
+ok: [CZJ3100GD9 -> localhost]
 
-TASK [Capture jobTemplateUri of PowerOff.New] **********************************
-ok: [ESX-2]
-ok: [ESX-3]
+TASK [Extract hostname from FQDN 'esx-1.lj.lab'] *************************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H]
+ok: [CZJ3100GD9]
 
-TASK [debug] *******************************************************************
-ok: [ESX-2] => {
-    "job_template_resourceuri": "/compute-ops-mgmt/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4"
-}
-ok: [ESX-3] => {
-    "job_template_resourceuri": "/compute-ops-mgmt/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4"
-}
+TASK [Resolve the OS management IP of 'esx-1.lj.lab' from DNS (for known_hosts cleanup)] *********************************************************************************************************************************************************************************************
+ok: [CZ2311004H -> localhost]
+ok: [CZJ3100GD9 -> localhost]
 
-TASK [Power off server ESX-2] **************************************************
-ok: [ESX-2 -> localhost]
-ok: [ESX-3 -> localhost]
+TASK [Remove any stale SSH host key for 'CZ2311004H' (IP, FQDN and short name) from known_hosts] *************************************************************************************************************************************************************************************
+ok: [CZJ3100GD9 -> localhost] => (item=192.168.3.175)
+ok: [CZ2311004H -> localhost] => (item=192.168.3.174)
+ok: [CZJ3100GD9 -> localhost] => (item=esx-2.lj.lab)
+ok: [CZ2311004H -> localhost] => (item=esx-1.lj.lab)
+ok: [CZJ3100GD9 -> localhost] => (item=esx-2)
+ok: [CZ2311004H -> localhost] => (item=esx-1)
 
-TASK [Removing ESX-2 SSH key from known_hosts file on Ansible control node] ****
-ok: [ESX-2 -> localhost]
-ok: [ESX-3 -> localhost]
+PLAY [Remove the DNS record from DNS server] *****************************************************************************************************************************************************************************************************************************************
 
-PLAY [Removing the DNS record from DNS server] *********************************
+TASK [Remove "esx-1" from "dc.lj.lab"] ***********************************************************************************************************************************************************************************************************************************************
+changed: [CZ2311004H -> dc.lj.lab]
+changed: [CZJ3100GD9 -> dc.lj.lab]
 
-TASK [Removing "ESX-2" from "dc.lj.lab"] ***************************************
-changed: [ESX-3 -> dc.lj.lab]
-changed: [ESX-2 -> dc.lj.lab]
-
-PLAY RECAP *********************************************************************
-ESX-2                      : ok=26   changed=3    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
-ESX-3                      : ok=25   changed=3    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
-
+PLAY RECAP ***************************************************************************************************************************************************************************************************************************************************************************
+CZ2311004H                 : ok=27   changed=3    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   
+CZJ3100GD9                 : ok=26   changed=3    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0   

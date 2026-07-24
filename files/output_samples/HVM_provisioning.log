@@ -1,0 +1,1174 @@
+$ ansible-playbook HVM_provisioning.yml -i hosts_HVM --ask-vault-password --ask-become-pass
+
+PLAY [DNS record for the bare metal HVM server] ********************************
+
+TASK [Add 'HVM-2' with '192.168.3.181' on 'dc.lj.lab' in 'lj.lab' DNS domain] ***
+ok: [HVM-3 -> dc.lj.lab]
+ok: [HVM-2 -> dc.lj.lab]
+
+PLAY [Automated HVM OS (Ubuntu 24.04) installation on HPE Compute Ops Management server(s)] ***
+
+TASK [Gather subset facts on localhost] ****************************************
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Capture the start time (used later to filter COM activities and compute the playbook runtime)] ***
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [debug] *******************************************************************
+ok: [HVM-2] => {
+    "start_time": "2026-07-23T13:02:51Z"
+}
+ok: [HVM-3] => {
+    "start_time": "2026-07-23T13:02:51Z"
+}
+
+TASK [Set fact for the first host in inventory] ********************************
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Create HPE Compute Ops Management session] *******************************
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Set variable access_token for the bearer token] **************************
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Capture all job templates] ***********************************************
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Set a variable for all job templates items] ******************************
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Set variables for each job template id] **********************************
+ok: [HVM-2] => (item=Variable set: AnalyzeFirmwareUpdate_job_template_id = 5a657c6f-777d-4c7e-874a-1650b95b37f2)
+ok: [HVM-3] => (item=Variable set: AnalyzeFirmwareUpdate_job_template_id = 5a657c6f-777d-4c7e-874a-1650b95b37f2)
+ok: [HVM-2] => (item=Variable set: AnalyzeFirmwareUpdateOrchestrator_job_template_id = 87f47eff-7245-4788-bf58-5b6af361d1ba)
+ok: [HVM-3] => (item=Variable set: AnalyzeFirmwareUpdateOrchestrator_job_template_id = 87f47eff-7245-4788-bf58-5b6af361d1ba)
+ok: [HVM-2] => (item=Variable set: ApplianceUpdate_job_template_id = 1c4ac4be-8eeb-49f2-a86a-fd8c9182616c)
+ok: [HVM-3] => (item=Variable set: ApplianceUpdate_job_template_id = 1c4ac4be-8eeb-49f2-a86a-fd8c9182616c)
+ok: [HVM-2] => (item=Variable set: ApplySettingsTemplate_job_template_id = 2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
+ok: [HVM-3] => (item=Variable set: ApplySettingsTemplate_job_template_id = 2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
+ok: [HVM-2] => (item=Variable set: CalculateiLOSettingsCompliance_job_template_id = 497a5418-cbc2-4870-a1e7-1fc30c885f2f)
+ok: [HVM-3] => (item=Variable set: CalculateiLOSettingsCompliance_job_template_id = 497a5418-cbc2-4870-a1e7-1fc30c885f2f)
+ok: [HVM-2] => (item=Variable set: ColdBoot_job_template_id = aacfb3e0-6575-4d4f-a711-1ee1ae768407)
+ok: [HVM-3] => (item=Variable set: ColdBoot_job_template_id = aacfb3e0-6575-4d4f-a711-1ee1ae768407)
+ok: [HVM-2] => (item=Variable set: CollectServerLogs_job_template_id = 2d744494-22d4-4d61-8c65-647ccadeb6b6)
+ok: [HVM-2] => (item=Variable set: CopyServerProfileTemplates_job_template_id = 7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
+ok: [HVM-3] => (item=Variable set: CollectServerLogs_job_template_id = 2d744494-22d4-4d61-8c65-647ccadeb6b6)
+ok: [HVM-2] => (item=Variable set: CreateOneviewComplianceReport_job_template_id = aae145a1-79a2-4516-b191-c98039c96542)
+ok: [HVM-2] => (item=Variable set: DeleteVCenter_job_template_id = 3f06fd6b-dfb1-4bad-bd04-939951797e97)
+ok: [HVM-3] => (item=Variable set: CopyServerProfileTemplates_job_template_id = 7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
+ok: [HVM-2] => (item=Variable set: FirmwareDownload_job_template_id = 0683ada8-1a89-49dd-bf04-6df715b708a6)
+ok: [HVM-3] => (item=Variable set: CreateOneviewComplianceReport_job_template_id = aae145a1-79a2-4516-b191-c98039c96542)
+ok: [HVM-2] => (item=Variable set: FirmwareUpdate_New_job_template_id = fd54a96c-cabc-42e3-aee3-374a2d009dba)
+ok: [HVM-3] => (item=Variable set: DeleteVCenter_job_template_id = 3f06fd6b-dfb1-4bad-bd04-939951797e97)
+ok: [HVM-2] => (item=Variable set: GatewayDiscoverIlos_job_template_id = d0afcc35-c6a9-4d05-adc8-f9e686b5fdfc)
+ok: [HVM-3] => (item=Variable set: FirmwareDownload_job_template_id = 0683ada8-1a89-49dd-bf04-6df715b708a6)
+ok: [HVM-2] => (item=Variable set: GatewayReboot_job_template_id = 91afe709-8b0d-4162-81d5-2a365e0359f3)
+ok: [HVM-3] => (item=Variable set: FirmwareUpdate_New_job_template_id = fd54a96c-cabc-42e3-aee3-374a2d009dba)
+ok: [HVM-2] => (item=Variable set: GetDeviceAndSoftwareInventory_job_template_id = ee5d8016-6b9f-4410-9d55-e05e3e86a0c8)
+ok: [HVM-3] => (item=Variable set: GatewayDiscoverIlos_job_template_id = d0afcc35-c6a9-4d05-adc8-f9e686b5fdfc)
+ok: [HVM-2] => (item=Variable set: GetFullServerInventory_job_template_id = d6595f1b-84e6-4587-ade5-656e2a5ea20d)
+ok: [HVM-3] => (item=Variable set: GatewayReboot_job_template_id = 91afe709-8b0d-4162-81d5-2a365e0359f3)
+ok: [HVM-2] => (item=Variable set: GetIloSecurityParams_job_template_id = e3fef4ec-eb72-43ff-bea5-13501353b501)
+ok: [HVM-3] => (item=Variable set: GetDeviceAndSoftwareInventory_job_template_id = ee5d8016-6b9f-4410-9d55-e05e3e86a0c8)
+ok: [HVM-2] => (item=Variable set: GetOneviewServerInventory_job_template_id = a0124cb1-00f1-46b7-818f-a9eb5f60591f)
+ok: [HVM-3] => (item=Variable set: GetFullServerInventory_job_template_id = d6595f1b-84e6-4587-ade5-656e2a5ea20d)
+ok: [HVM-2] => (item=Variable set: GetOneViewSettings_job_template_id = fc16aa48-c73c-4463-9112-e061383ebfa9)
+ok: [HVM-3] => (item=Variable set: GetIloSecurityParams_job_template_id = e3fef4ec-eb72-43ff-bea5-13501353b501)
+ok: [HVM-2] => (item=Variable set: GetPowerMeterData_job_template_id = 50fa7d05-5941-4e8e-90c3-5995f1d600a8)
+ok: [HVM-3] => (item=Variable set: GetOneviewServerInventory_job_template_id = a0124cb1-00f1-46b7-818f-a9eb5f60591f)
+ok: [HVM-2] => (item=Variable set: GetServerExternalStorage_job_template_id = 9310319e-7b7f-41ba-8b24-8b34eed1ca62)
+ok: [HVM-2] => (item=Variable set: GetSettingsForTemplate_job_template_id = 6cd671db-ce6b-45ce-894e-7b5ae23e0399)
+ok: [HVM-3] => (item=Variable set: GetOneViewSettings_job_template_id = fc16aa48-c73c-4463-9112-e061383ebfa9)
+ok: [HVM-2] => (item=Variable set: GetSSOUrl_job_template_id = 2c7de503-77af-4340-b68d-7a26e5359b8e)
+ok: [HVM-3] => (item=Variable set: GetPowerMeterData_job_template_id = 50fa7d05-5941-4e8e-90c3-5995f1d600a8)
+ok: [HVM-2] => (item=Variable set: GetTelemetryDriveMetrics_job_template_id = ee46afcf-4f47-45b5-a958-cb9b02bb0e00)
+ok: [HVM-3] => (item=Variable set: GetServerExternalStorage_job_template_id = 9310319e-7b7f-41ba-8b24-8b34eed1ca62)
+ok: [HVM-2] => (item=Variable set: GroupAddActions_job_template_id = 3eeff1ea-8419-4335-aaf3-796ef50789ba)
+ok: [HVM-3] => (item=Variable set: GetSettingsForTemplate_job_template_id = 6cd671db-ce6b-45ce-894e-7b5ae23e0399)
+ok: [HVM-2] => (item=Variable set: GroupApplianceUpdate_job_template_id = f69f553a-5004-4a08-9283-5b60abd9eb4a)
+ok: [HVM-3] => (item=Variable set: GetSSOUrl_job_template_id = 2c7de503-77af-4340-b68d-7a26e5359b8e)
+ok: [HVM-2] => (item=Variable set: GroupApplyExternalStorage_job_template_id = fcb79270-5954-42e9-9374-6a065b6d494a)
+ok: [HVM-3] => (item=Variable set: GetTelemetryDriveMetrics_job_template_id = ee46afcf-4f47-45b5-a958-cb9b02bb0e00)
+ok: [HVM-2] => (item=Variable set: GroupApplyInternalStorageSettings_job_template_id = 54095626-3911-4fea-9741-816e2531994e)
+ok: [HVM-3] => (item=Variable set: GroupAddActions_job_template_id = 3eeff1ea-8419-4335-aaf3-796ef50789ba)
+ok: [HVM-2] => (item=Variable set: GroupApplyOneviewSettings_job_template_id = a229a162-b43f-45b0-b7bb-692df77b9746)
+ok: [HVM-3] => (item=Variable set: GroupApplianceUpdate_job_template_id = f69f553a-5004-4a08-9283-5b60abd9eb4a)
+ok: [HVM-2] => (item=Variable set: GroupApplyServerSettings_job_template_id = beff07ce-f36d-4699-9ac3-f872dcd63133)
+ok: [HVM-3] => (item=Variable set: GroupApplyExternalStorage_job_template_id = fcb79270-5954-42e9-9374-6a065b6d494a)
+ok: [HVM-3] => (item=Variable set: GroupApplyInternalStorageSettings_job_template_id = 54095626-3911-4fea-9741-816e2531994e)
+ok: [HVM-2] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_id = db3620d4-19a4-4b54-9804-83f8f59d48a4)
+ok: [HVM-3] => (item=Variable set: GroupApplyOneviewSettings_job_template_id = a229a162-b43f-45b0-b7bb-692df77b9746)
+ok: [HVM-2] => (item=Variable set: GroupExternalStorageCompliance_job_template_id = 7177aa6a-e8f8-4e9b-ae31-e01dafcc81df)
+ok: [HVM-3] => (item=Variable set: GroupApplyServerSettings_job_template_id = beff07ce-f36d-4699-9ac3-f872dcd63133)
+ok: [HVM-2] => (item=Variable set: GroupFirmwareCompliance_job_template_id = 23b8ba2a-6c46-4223-b028-919382c7dcac)
+ok: [HVM-3] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_id = db3620d4-19a4-4b54-9804-83f8f59d48a4)
+ok: [HVM-2] => (item=Variable set: GroupFirmwareDownload_job_template_id = a17a7aa9-4540-4c21-bbf2-31af4ff65e98)
+ok: [HVM-3] => (item=Variable set: GroupExternalStorageCompliance_job_template_id = 7177aa6a-e8f8-4e9b-ae31-e01dafcc81df)
+ok: [HVM-2] => (item=Variable set: GroupFirmwareUpdate_job_template_id = 91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
+ok: [HVM-3] => (item=Variable set: GroupFirmwareCompliance_job_template_id = 23b8ba2a-6c46-4223-b028-919382c7dcac)
+ok: [HVM-2] => (item=Variable set: GroupGetIloSecurityParams_job_template_id = 08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
+ok: [HVM-3] => (item=Variable set: GroupFirmwareDownload_job_template_id = a17a7aa9-4540-4c21-bbf2-31af4ff65e98)
+ok: [HVM-2] => (item=Variable set: GroupIloFirmwareUpdate_job_template_id = 512fb1f2-516f-4bda-bc84-e623947858e4)
+ok: [HVM-3] => (item=Variable set: GroupFirmwareUpdate_job_template_id = 91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
+ok: [HVM-2] => (item=Variable set: GroupiLOSettingsCompliance_job_template_id = a55c8b26-3c57-4044-a4ee-1d0e3c108286)
+ok: [HVM-3] => (item=Variable set: GroupGetIloSecurityParams_job_template_id = 08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
+ok: [HVM-2] => (item=Variable set: GroupOSInstallation_job_template_id = e2952628-2629-4088-93db-91742304ef0c)
+ok: [HVM-3] => (item=Variable set: GroupIloFirmwareUpdate_job_template_id = 512fb1f2-516f-4bda-bc84-e623947858e4)
+ok: [HVM-2] => (item=Variable set: GroupServerInventoryReport_job_template_id = 2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
+ok: [HVM-3] => (item=Variable set: GroupiLOSettingsCompliance_job_template_id = a55c8b26-3c57-4044-a4ee-1d0e3c108286)
+ok: [HVM-2] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_id = 94caa4ef-9ff8-4805-9e97-18a09e673b66)
+ok: [HVM-3] => (item=Variable set: GroupOSInstallation_job_template_id = e2952628-2629-4088-93db-91742304ef0c)
+ok: [HVM-2] => (item=Variable set: iLOSecurity_job_template_id = e1d69e76-38cc-4079-9192-a380baea2973)
+ok: [HVM-3] => (item=Variable set: GroupServerInventoryReport_job_template_id = 2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
+ok: [HVM-2] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_id = abfda355-6e58-4c00-be0a-af35dbd70398)
+ok: [HVM-3] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_id = 94caa4ef-9ff8-4805-9e97-18a09e673b66)
+ok: [HVM-2] => (item=Variable set: OrchestratorDriveMetrics_job_template_id = 1f3ca251-a008-4fed-b53e-6521cce61b97)
+ok: [HVM-3] => (item=Variable set: iLOSecurity_job_template_id = e1d69e76-38cc-4079-9192-a380baea2973)
+ok: [HVM-2] => (item=Variable set: PowerOff_New_job_template_id = d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
+ok: [HVM-3] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_id = abfda355-6e58-4c00-be0a-af35dbd70398)
+ok: [HVM-2] => (item=Variable set: PowerOn_New_job_template_id = 0cbb2377-1834-488d-840c-d5bf788c34fb)
+ok: [HVM-3] => (item=Variable set: OrchestratorDriveMetrics_job_template_id = 1f3ca251-a008-4fed-b53e-6521cce61b97)
+ok: [HVM-2] => (item=Variable set: ReconnectCredentialServer_job_template_id = d9713316-58f3-464e-bc69-1dd0728fa0d5)
+ok: [HVM-3] => (item=Variable set: PowerOff_New_job_template_id = d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
+ok: [HVM-2] => (item=Variable set: ResetIlo_job_template_id = 394b492c-8d88-4e4e-a775-1a95cb5f1065)
+ok: [HVM-3] => (item=Variable set: PowerOn_New_job_template_id = 0cbb2377-1834-488d-840c-d5bf788c34fb)
+ok: [HVM-2] => (item=Variable set: Restart_New_job_template_id = 30110551-cad6-4069-95b8-dbce9bbd8525)
+ok: [HVM-3] => (item=Variable set: ReconnectCredentialServer_job_template_id = d9713316-58f3-464e-bc69-1dd0728fa0d5)
+ok: [HVM-2] => (item=Variable set: ServerMaintenanceModeDisable_job_template_id = 2798720f-b090-427d-b210-e48d33ce2f27)
+ok: [HVM-3] => (item=Variable set: ResetIlo_job_template_id = 394b492c-8d88-4e4e-a775-1a95cb5f1065)
+ok: [HVM-2] => (item=Variable set: ServerMaintenanceModeEnable_job_template_id = 4eb92af1-1ce4-4cb0-8581-fb5a7dcdbf2b)
+ok: [HVM-3] => (item=Variable set: Restart_New_job_template_id = 30110551-cad6-4069-95b8-dbce9bbd8525)
+ok: [HVM-2] => (item=Variable set: ServerNetworkConnectivity_job_template_id = b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
+ok: [HVM-3] => (item=Variable set: ServerMaintenanceModeDisable_job_template_id = 2798720f-b090-427d-b210-e48d33ce2f27)
+ok: [HVM-2] => (item=Variable set: SetIloSettings_job_template_id = cf4f929b-d44a-4a90-93a9-820955458fd4)
+ok: [HVM-3] => (item=Variable set: ServerMaintenanceModeEnable_job_template_id = 4eb92af1-1ce4-4cb0-8581-fb5a7dcdbf2b)
+ok: [HVM-2] => (item=Variable set: UidIndicatorOff_job_template_id = fd837434-a2f2-4bc8-b1b4-ec068bd036aa)
+ok: [HVM-3] => (item=Variable set: ServerNetworkConnectivity_job_template_id = b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
+ok: [HVM-2] => (item=Variable set: UidIndicatorOn_job_template_id = a46b210a-b0c7-4223-ab43-c4c1e77e680c)
+ok: [HVM-3] => (item=Variable set: SetIloSettings_job_template_id = cf4f929b-d44a-4a90-93a9-820955458fd4)
+ok: [HVM-2] => (item=Variable set: UpdateCredentialBasedServer_job_template_id = f399e08a-6fed-45ba-a646-88d20691ff0f)
+ok: [HVM-3] => (item=Variable set: UidIndicatorOff_job_template_id = fd837434-a2f2-4bc8-b1b4-ec068bd036aa)
+ok: [HVM-2] => (item=Variable set: VcenterFirmwareBundlesSync_job_template_id = 0fe73adb-9d52-4f00-9540-6ec82f265d82)
+ok: [HVM-3] => (item=Variable set: UidIndicatorOn_job_template_id = a46b210a-b0c7-4223-ab43-c4c1e77e680c)
+ok: [HVM-3] => (item=Variable set: UpdateCredentialBasedServer_job_template_id = f399e08a-6fed-45ba-a646-88d20691ff0f)
+ok: [HVM-3] => (item=Variable set: VcenterFirmwareBundlesSync_job_template_id = 0fe73adb-9d52-4f00-9540-6ec82f265d82)
+
+TASK [Ensure hostname is supported for HVM server 'HVM-2'] *********************
+ok: [HVM-2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [HVM-3] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [Capture server 'CZ2311004H' information] *********************************
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Exit if server 'CZ2311004H' does not exist] ******************************
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Capture server 'CZ2311004H' id, uri and connection status] ***************
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Exit if server 'CZ2311004H' is not connected to COM] *********************
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Wait until server 'CZ2311004H' hardware information (generation, model, power state) is populated] ***
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Capture server 'CZ2311004H' generation, model, power state and iLO IP] ***
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [debug] *******************************************************************
+ok: [HVM-2] => {
+    "msg": [
+        "Generation: GEN_10",
+        "Model: ProLiant DL360 Gen10 Plus",
+        "ID: P28948-B21+CZ2311004H",
+        "Connection status: True",
+        "iLO IP: 192.168.0.21",
+        "Power state: ON"
+    ]
+}
+ok: [HVM-3] => {
+    "msg": [
+        "Generation: GEN_11",
+        "Model: ProLiant DL365 Gen11",
+        "ID: P53933-B21+CZJ3100GD9",
+        "Connection status: True",
+        "iLO IP: 192.168.1.56",
+        "Power state: ON"
+    ]
+}
+
+TASK [Wait until the server 'CZ2311004H' inventory information is available then capture the data] ***
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Wait until the complete discovery of server 'CZ2311004H' is complete] ****
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Power on the server 'CZ2311004H' to get the storage inventory information (only if not already ON)] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Report that server 'CZ2311004H' is already powered on (skipping power on)] ***
+ok: [HVM-2] => {
+    "msg": "Server 'CZ2311004H' is already powered on (power state 'ON'). Skipping the power on job."
+}
+ok: [HVM-3] => {
+    "msg": "Server 'CZJ3100GD9' is already powered on (power state 'ON'). Skipping the power on job."
+}
+
+TASK [Set a variable for the job resource URI] *********************************
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Wait for the server power on job to complete] ****************************
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Exit when server power on job is failing] ********************************
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Check if workload profile 'Virtualization - Power Efficient' exists] *****
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Exit if workload profile 'Virtualization - Power Efficient' does not exist] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Set a variable for the resourceUri of workload profile 'Virtualization - Power Efficient'] ***
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Wait until the storage inventory of server 'CZ2311004H' is populated then capture the inventory] ***
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Capture the server 'CZ2311004H' inventory information] *******************
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Show the raw network adapter inventory for server 'CZ2311004H' (troubleshooting)] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Derive the mgmt bond member MAC addresses from the COM inventory of server 'CZ2311004H'] ***
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Show the mgmt bond member MAC addresses selected for server 'CZ2311004H'] ***
+ok: [HVM-2] => {
+    "msg": "Mgmt bond members (by MAC) for 'HVM-2': ['50:7c:6f:2b:aa:ee', '50:7c:6f:2b:aa:ef']"
+}
+ok: [HVM-3] => {
+    "msg": "Mgmt bond members (by MAC) for 'HVM-3': ['00:62:0b:4e:17:48', '00:62:0b:4e:17:49']"
+}
+
+TASK [Fail if no Ethernet MAC could be derived from the COM inventory (auto mode)] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Derive the dedicated compute NIC MAC addresses from the COM inventory (separate compute network)] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Show the dedicated compute NIC MAC addresses selected for server 'CZ2311004H'] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Fail if a separate compute network was requested but no compute NIC MAC could be derived] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Capture the presence of a NS204i NVMe boot controller in server 'CZ2311004H'] ***
+ok: [HVM-2] => (item=never)
+skipping: [HVM-2] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+ok: [HVM-3] => (item=never)
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+
+TASK [debug] *******************************************************************
+ok: [HVM-2] => {
+    "msg": "NS204i found in server 'CZ2311004H'! NVMe RAID1 volume will be used as the OS boot volume."
+}
+ok: [HVM-3] => {
+    "msg": "NS204i found in server 'CZJ3100GD9'! NVMe RAID1 volume will be used as the OS boot volume."
+}
+
+TASK [Capture size of the NS204i RAID1 volume if any] **************************
+skipping: [HVM-3] => (item=never) 
+ok: [HVM-2] => (item=never)
+skipping: [HVM-2] => (item=never) 
+ok: [HVM-3] => (item=never)
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+
+TASK [Capture storage RAID controller information when an HPE MR or SR controller is used with available drives] ***
+skipping: [HVM-2] => (item=never) 
+skipping: [HVM-2] => (item=never) 
+skipping: [HVM-2]
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3]
+
+TASK [Set a variable for the name of the storage RAID controller found] ********
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Capture size of the HPE MR or SR RAID1 volume if any] ********************
+skipping: [HVM-2] => (item=never) 
+skipping: [HVM-2] => (item=never) 
+skipping: [HVM-2]
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3]
+
+TASK [Detect a local disk when no NS204i and no SR/MR controller with disks is available] ***
+skipping: [HVM-2] => (item=never) 
+skipping: [HVM-2] => (item=never) 
+skipping: [HVM-2]
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3]
+
+TASK [Exit if no NS204i and no SR/MR controller with disk and no local disk found] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Set a variable for the name of the local disk controller when used] ******
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Capture size of the local disk if any] ***********************************
+skipping: [HVM-2] => (item=never) 
+skipping: [HVM-2] => (item=never) 
+skipping: [HVM-2]
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3] => (item=never) 
+skipping: [HVM-3]
+
+TASK [Set a controller type variable when a NS204i controller or local disk is present] ***
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Set a controller type variable when there is no NS204i but an SR/MR controller is present] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [debug] *******************************************************************
+ok: [HVM-2] => {
+    "msg": "OS boot volume detected on controller 'NS204i' with size 447.1 GB"
+}
+ok: [HVM-3] => {
+    "msg": "OS boot volume detected on controller 'NS204i' with size 447.1 GB"
+}
+
+TASK [Check if settings 'RAID1' already exist] *********************************
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Create internal storage configuration 'RAID1' (-1 GB) for the OS boot volume when it does not exist] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Set the resourceUri of the internal storage configuration 'RAID1' just created] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Set the resourceUri of the internal storage configuration 'RAID1' when it already exists] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Create server group name 'HVM-2_server_group' variable] ******************
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Check if group 'HVM-2_server_group' already exists] **********************
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Create temporary group 'HVM-2_server_group' (no local storage definition) if it does not exist] ***
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Set the id and resourceUri of temporary group 'HVM-2_server_group' just created (no storage)] ***
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Set the id and resourceUri of temporary group 'HVM-2_server_group' when it already exists (no storage)] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Create temporary group 'HVM-2_server_group' (with local storage definition) if it does not exist] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Set the id and resourceUri of temporary group 'HVM-2_server_group' just created (with storage)] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Set the id and resourceUri of temporary group 'HVM-2_server_group' when it already exists (with storage)] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [debug] *******************************************************************
+ok: [HVM-2] => {
+    "temporary_group_id": "64ba5030-59fa-4633-9f91-226714e3658b"
+}
+ok: [HVM-3] => {
+    "temporary_group_id": "e8865393-9b27-457e-9dce-090e9ed02edc"
+}
+
+TASK [Check if server 'CZ2311004H' is already member of a server group] ********
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Capture the id of the server group of which the server 'CZ2311004H' is a member (if applicable)] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Remove server 'CZ2311004H' from the server group of which it is currently a member] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Wait for unassignment to complete] ***************************************
+skipping: [HVM-2]
+
+TASK [Assign server 'CZ2311004H' to temporary group 'HVM-2_server_group'] ******
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Check if HPE HVM Install ISO 'HPE_HVM_Install_24.04_S5Q83-11078.iso' exists in '/home/labrat/ISOs/hvmisosrc' on 'ansible.lj.lab'] ***
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Create the directory '/home/labrat/ISOs/hvmisosrc' to host the ISO file] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Check if the HVM ISO 'https://liogw.lj.lab/deployment/hvm24.04//HPE_HVM_Install_24.04_S5Q83-11078.iso' exists] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Download file 'HPE_HVM_Install_24.04_S5Q83-11078.iso' to '/home/labrat/ISOs/hvmisosrc' if not present] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Check if HPE HVM Install ISO 'HPE_HVM_Install_24.04_S5Q83-11078.iso' exists in '/home/labrat/ISOs/hvmisosrc' on 'ansible.lj.lab'] ***
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Create the directory '/home/labrat/ISOs/hvmisosrc' to host the ISO file] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Check if the HVM ISO 'https://liogw.lj.lab/deployment/hvm24.04//HPE_HVM_Install_24.04_S5Q83-11078.iso' exists] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Download file 'HPE_HVM_Install_24.04_S5Q83-11078.iso' to '/home/labrat/ISOs/hvmisosrc' if not present] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Create '/usr/share/nginx/html/isos/' if it does not exist] ***************
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Check if the shared prepared HVM boot ISO 'HPE_HVM_Install_24.04_prepared.iso' already exists on nginx] ***
+ok: [HVM-2 -> localhost]
+
+TASK [Create the staging directory for the prepared boot ISO] ******************
+skipping: [HVM-2]
+
+TASK [Extract the GRUB config '/boot/grub/grub.cfg' from the source ISO] *******
+skipping: [HVM-2]
+
+TASK [Set the GRUB boot timeout to 0 so the HVM install starts immediately (no 30s wait)] ***
+skipping: [HVM-2]
+
+TASK [Point the autoinstall datasource at the externally-attached CIDATA seed (drop the embedded /cdrom/server seed)] ***
+skipping: [HVM-2]
+
+TASK [Build the prepared boot ISO with xorriso (updates GRUB only, preserves the hybrid BIOS+UEFI boot records)] ***
+skipping: [HVM-2]
+
+TASK [Move the prepared boot ISO to the nginx html folder. ISO URL='http://ansible.lj.lab/isos/HPE_HVM_Install_24.04_prepared.iso'] ***
+skipping: [HVM-2]
+
+TASK [Create the seed staging directory '/home/labrat/staging/baremetal/HVM-2/seed'] ***
+changed: [HVM-2 -> localhost]
+changed: [HVM-3 -> localhost]
+
+TASK [Render the autoinstall user-data seed for 'HVM-2'] ***********************
+changed: [HVM-3 -> localhost]
+changed: [HVM-2 -> localhost]
+
+TASK [Render the autoinstall meta-data seed for 'HVM-2'] ***********************
+changed: [HVM-2 -> localhost]
+changed: [HVM-3 -> localhost]
+
+TASK [Add the bundled HPE amsd 'amsd_4.7.0-2151.6-ubuntu24_amd64.deb' to the seed so COM can detect OS install completion] ***
+changed: [HVM-2 -> localhost]
+changed: [HVM-3 -> localhost]
+
+TASK [Build the per-host cloud-init seed ISO (CIDATA) for 'HVM-2'] *************
+changed: [HVM-3 -> localhost]
+changed: [HVM-2 -> localhost]
+
+TASK [Move the per-host seed ISO to the nginx html folder. ISO URL='http://ansible.lj.lab/isos/HVM-2-seed.iso'] ***
+changed: [HVM-2 -> localhost]
+changed: [HVM-3 -> localhost]
+
+TASK [Update SELinux security contexts so that Nginx can serve the ISO directory] ***
+changed: [HVM-2 -> localhost]
+changed: [HVM-3 -> localhost]
+
+TASK [Check if the operating system image server setting 'OS_Image_HVM_for_HVM-2' exists] ***
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Create the operating system image server setting 'OS_Image_HVM_for_HVM-2' if it does not exist] ***
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Set the id and resourceUri of the OS Image configuration just created] ***
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Update the operating system image server setting if it already exists] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Set the id and resourceUri of the OS Image configuration when it already exists] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Update temporary group 'HVM-2_server_group' to add OS image installation settings with NS204i / local disk] ***
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Update temporary group 'HVM-2_server_group' to add OS image installation settings with storage controller (SR/MR)] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Start OS image installation in group 'HVM-2_server_group'] ***************
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Wait for the OS image installation of server 'CZ2311004H' to complete] ***
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (120 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (120 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (119 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (119 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (118 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (118 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (117 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (117 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (116 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (116 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (115 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (115 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (114 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (114 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (113 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (113 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (112 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (112 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (111 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (111 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (110 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (110 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (109 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (109 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (108 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (108 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (107 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (107 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (106 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (106 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (105 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (105 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (104 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (104 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (103 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (103 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (102 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (102 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (101 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (101 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (100 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (100 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (99 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (99 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (98 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (98 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (97 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (97 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (96 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (96 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (95 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (95 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (94 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (94 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (93 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (93 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (92 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (92 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (91 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (91 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (90 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (90 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (89 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (89 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (88 retries left).
+ok: [HVM-2 -> localhost]
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (87 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (86 retries left).
+FAILED - RETRYING: [HVM-3 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (85 retries left).
+ok: [HVM-3 -> localhost]
+
+TASK [Exit if the operating system image installation task of server 'CZ2311004H' failed to complete] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Remove server 'CZ2311004H' from temporary group 'HVM-2_server_group'] ****
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Wait for unassignment to complete] ***************************************
+Pausing for 15 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [HVM-2]
+
+TASK [Delete temporary group 'HVM-2_server_group'] *****************************
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Delete operating system image server setting 'OS_Image_HVM_for_HVM-2'] ***
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Wait for '192.168.3.181' to respond on SSH port 22 (HVM OS installed and rebooted)] ***
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Wait a little longer so the HVM host is truly ready] *********************
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Create an autoinstall backup directory if it does not exist] *************
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Backup the rendered user-data seed to '/home/labrat/staging/kickstarts_backup/HVM'] ***
+changed: [HVM-3 -> localhost]
+changed: [HVM-2 -> localhost]
+
+TASK [Delete related staging files and the per-host seed ISO from the nginx web server folder] ***
+changed: [HVM-3 -> localhost]
+changed: [HVM-2 -> localhost]
+
+TASK [Remove any stale SSH host key for 'HVM-2' from the control node known_hosts] ***
+changed: [HVM-3 -> localhost] => (item=192.168.3.182)
+changed: [HVM-2 -> localhost] => (item=192.168.3.181)
+ok: [HVM-3 -> localhost] => (item=HVM-3.lj.lab)
+ok: [HVM-2 -> localhost] => (item=HVM-2.lj.lab)
+ok: [HVM-3 -> localhost] => (item=HVM-3)
+ok: [HVM-2 -> localhost] => (item=HVM-2)
+
+PLAY [HVM host post-installation configuration (packages update and NTP)] ******
+
+TASK [Wait for SSH to be fully available on 'HVM-2'] ***************************
+ok: [HVM-3]
+ok: [HVM-2]
+
+TASK [Update apt cache and upgrade all packages to the latest HPE-curated versions] ***
+changed: [HVM-3]
+changed: [HVM-2]
+
+TASK [Copy the bundled HPE iSUT package 'sut-6.7.0-10_amd64.deb' to 'HVM-2'] ***
+changed: [HVM-3]
+changed: [HVM-2]
+
+TASK [Install HPE iSUT on 'HVM-2'] *********************************************
+changed: [HVM-3]
+changed: [HVM-2]
+
+TASK [Ensure the HPE iSUT service is enabled and running on 'HVM-2'] ***********
+FAILED - RETRYING: [HVM-3]: Ensure the HPE iSUT service is enabled and running on 'HVM-2' (12 retries left).
+FAILED - RETRYING: [HVM-2]: Ensure the HPE iSUT service is enabled and running on 'HVM-2' (12 retries left).
+FAILED - RETRYING: [HVM-3]: Ensure the HPE iSUT service is enabled and running on 'HVM-2' (11 retries left).
+FAILED - RETRYING: [HVM-2]: Ensure the HPE iSUT service is enabled and running on 'HVM-2' (11 retries left).
+FAILED - RETRYING: [HVM-3]: Ensure the HPE iSUT service is enabled and running on 'HVM-2' (10 retries left).
+FAILED - RETRYING: [HVM-2]: Ensure the HPE iSUT service is enabled and running on 'HVM-2' (10 retries left).
+FAILED - RETRYING: [HVM-3]: Ensure the HPE iSUT service is enabled and running on 'HVM-2' (9 retries left).
+FAILED - RETRYING: [HVM-2]: Ensure the HPE iSUT service is enabled and running on 'HVM-2' (9 retries left).
+FAILED - RETRYING: [HVM-3]: Ensure the HPE iSUT service is enabled and running on 'HVM-2' (8 retries left).
+FAILED - RETRYING: [HVM-2]: Ensure the HPE iSUT service is enabled and running on 'HVM-2' (8 retries left).
+FAILED - RETRYING: [HVM-3]: Ensure the HPE iSUT service is enabled and running on 'HVM-2' (7 retries left).
+changed: [HVM-2]
+changed: [HVM-3]
+
+TASK [Remove the copied HPE iSUT package from 'HVM-2'] *************************
+changed: [HVM-3]
+changed: [HVM-2]
+
+TASK [Configure the NTP servers for chrony (drop-in in /etc/chrony/sources.d)] ***
+changed: [HVM-3]
+changed: [HVM-2]
+
+TASK [Disable the default chrony pool so only the configured NTP servers are used] ***
+changed: [HVM-3]
+changed: [HVM-2]
+
+TASK [Ensure chrony is enabled and running] ************************************
+ok: [HVM-3]
+ok: [HVM-2]
+
+RUNNING HANDLER [Restart chrony] ***********************************************
+changed: [HVM-3]
+changed: [HVM-2]
+
+PLAY [HVM firmware update and cluster join] ************************************
+
+TASK [Create HPE Compute Ops Management session] *******************************
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Set variable access_token for the bearer token] **************************
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Capture all job templates] ***********************************************
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Set a variable for all job templates items] ******************************
+ok: [HVM-3]
+ok: [HVM-2]
+
+TASK [Set variables for each job template id] **********************************
+ok: [HVM-2] => (item=Variable set: AnalyzeFirmwareUpdate_job_template_id = 5a657c6f-777d-4c7e-874a-1650b95b37f2)
+ok: [HVM-2] => (item=Variable set: AnalyzeFirmwareUpdateOrchestrator_job_template_id = 87f47eff-7245-4788-bf58-5b6af361d1ba)
+ok: [HVM-2] => (item=Variable set: ApplianceUpdate_job_template_id = 1c4ac4be-8eeb-49f2-a86a-fd8c9182616c)
+ok: [HVM-2] => (item=Variable set: ApplySettingsTemplate_job_template_id = 2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
+ok: [HVM-3] => (item=Variable set: AnalyzeFirmwareUpdate_job_template_id = 5a657c6f-777d-4c7e-874a-1650b95b37f2)
+ok: [HVM-2] => (item=Variable set: CalculateiLOSettingsCompliance_job_template_id = 497a5418-cbc2-4870-a1e7-1fc30c885f2f)
+ok: [HVM-3] => (item=Variable set: AnalyzeFirmwareUpdateOrchestrator_job_template_id = 87f47eff-7245-4788-bf58-5b6af361d1ba)
+ok: [HVM-2] => (item=Variable set: ColdBoot_job_template_id = aacfb3e0-6575-4d4f-a711-1ee1ae768407)
+ok: [HVM-3] => (item=Variable set: ApplianceUpdate_job_template_id = 1c4ac4be-8eeb-49f2-a86a-fd8c9182616c)
+ok: [HVM-2] => (item=Variable set: CollectServerLogs_job_template_id = 2d744494-22d4-4d61-8c65-647ccadeb6b6)
+ok: [HVM-3] => (item=Variable set: ApplySettingsTemplate_job_template_id = 2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
+ok: [HVM-2] => (item=Variable set: CopyServerProfileTemplates_job_template_id = 7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
+ok: [HVM-3] => (item=Variable set: CalculateiLOSettingsCompliance_job_template_id = 497a5418-cbc2-4870-a1e7-1fc30c885f2f)
+ok: [HVM-2] => (item=Variable set: CreateOneviewComplianceReport_job_template_id = aae145a1-79a2-4516-b191-c98039c96542)
+ok: [HVM-3] => (item=Variable set: ColdBoot_job_template_id = aacfb3e0-6575-4d4f-a711-1ee1ae768407)
+ok: [HVM-2] => (item=Variable set: DeleteVCenter_job_template_id = 3f06fd6b-dfb1-4bad-bd04-939951797e97)
+ok: [HVM-3] => (item=Variable set: CollectServerLogs_job_template_id = 2d744494-22d4-4d61-8c65-647ccadeb6b6)
+ok: [HVM-2] => (item=Variable set: FirmwareDownload_job_template_id = 0683ada8-1a89-49dd-bf04-6df715b708a6)
+ok: [HVM-3] => (item=Variable set: CopyServerProfileTemplates_job_template_id = 7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
+ok: [HVM-2] => (item=Variable set: FirmwareUpdate_New_job_template_id = fd54a96c-cabc-42e3-aee3-374a2d009dba)
+ok: [HVM-3] => (item=Variable set: CreateOneviewComplianceReport_job_template_id = aae145a1-79a2-4516-b191-c98039c96542)
+ok: [HVM-2] => (item=Variable set: GatewayDiscoverIlos_job_template_id = d0afcc35-c6a9-4d05-adc8-f9e686b5fdfc)
+ok: [HVM-3] => (item=Variable set: DeleteVCenter_job_template_id = 3f06fd6b-dfb1-4bad-bd04-939951797e97)
+ok: [HVM-2] => (item=Variable set: GatewayReboot_job_template_id = 91afe709-8b0d-4162-81d5-2a365e0359f3)
+ok: [HVM-3] => (item=Variable set: FirmwareDownload_job_template_id = 0683ada8-1a89-49dd-bf04-6df715b708a6)
+ok: [HVM-2] => (item=Variable set: GetDeviceAndSoftwareInventory_job_template_id = ee5d8016-6b9f-4410-9d55-e05e3e86a0c8)
+ok: [HVM-3] => (item=Variable set: FirmwareUpdate_New_job_template_id = fd54a96c-cabc-42e3-aee3-374a2d009dba)
+ok: [HVM-2] => (item=Variable set: GetFullServerInventory_job_template_id = d6595f1b-84e6-4587-ade5-656e2a5ea20d)
+ok: [HVM-3] => (item=Variable set: GatewayDiscoverIlos_job_template_id = d0afcc35-c6a9-4d05-adc8-f9e686b5fdfc)
+ok: [HVM-2] => (item=Variable set: GetIloSecurityParams_job_template_id = e3fef4ec-eb72-43ff-bea5-13501353b501)
+ok: [HVM-3] => (item=Variable set: GatewayReboot_job_template_id = 91afe709-8b0d-4162-81d5-2a365e0359f3)
+ok: [HVM-2] => (item=Variable set: GetOneviewServerInventory_job_template_id = a0124cb1-00f1-46b7-818f-a9eb5f60591f)
+ok: [HVM-3] => (item=Variable set: GetDeviceAndSoftwareInventory_job_template_id = ee5d8016-6b9f-4410-9d55-e05e3e86a0c8)
+ok: [HVM-2] => (item=Variable set: GetOneViewSettings_job_template_id = fc16aa48-c73c-4463-9112-e061383ebfa9)
+ok: [HVM-3] => (item=Variable set: GetFullServerInventory_job_template_id = d6595f1b-84e6-4587-ade5-656e2a5ea20d)
+ok: [HVM-2] => (item=Variable set: GetPowerMeterData_job_template_id = 50fa7d05-5941-4e8e-90c3-5995f1d600a8)
+ok: [HVM-3] => (item=Variable set: GetIloSecurityParams_job_template_id = e3fef4ec-eb72-43ff-bea5-13501353b501)
+ok: [HVM-2] => (item=Variable set: GetServerExternalStorage_job_template_id = 9310319e-7b7f-41ba-8b24-8b34eed1ca62)
+ok: [HVM-3] => (item=Variable set: GetOneviewServerInventory_job_template_id = a0124cb1-00f1-46b7-818f-a9eb5f60591f)
+ok: [HVM-2] => (item=Variable set: GetSettingsForTemplate_job_template_id = 6cd671db-ce6b-45ce-894e-7b5ae23e0399)
+ok: [HVM-3] => (item=Variable set: GetOneViewSettings_job_template_id = fc16aa48-c73c-4463-9112-e061383ebfa9)
+ok: [HVM-2] => (item=Variable set: GetSSOUrl_job_template_id = 2c7de503-77af-4340-b68d-7a26e5359b8e)
+ok: [HVM-3] => (item=Variable set: GetPowerMeterData_job_template_id = 50fa7d05-5941-4e8e-90c3-5995f1d600a8)
+ok: [HVM-2] => (item=Variable set: GetTelemetryDriveMetrics_job_template_id = ee46afcf-4f47-45b5-a958-cb9b02bb0e00)
+ok: [HVM-3] => (item=Variable set: GetServerExternalStorage_job_template_id = 9310319e-7b7f-41ba-8b24-8b34eed1ca62)
+ok: [HVM-2] => (item=Variable set: GroupAddActions_job_template_id = 3eeff1ea-8419-4335-aaf3-796ef50789ba)
+ok: [HVM-3] => (item=Variable set: GetSettingsForTemplate_job_template_id = 6cd671db-ce6b-45ce-894e-7b5ae23e0399)
+ok: [HVM-2] => (item=Variable set: GroupApplianceUpdate_job_template_id = f69f553a-5004-4a08-9283-5b60abd9eb4a)
+ok: [HVM-3] => (item=Variable set: GetSSOUrl_job_template_id = 2c7de503-77af-4340-b68d-7a26e5359b8e)
+ok: [HVM-2] => (item=Variable set: GroupApplyExternalStorage_job_template_id = fcb79270-5954-42e9-9374-6a065b6d494a)
+ok: [HVM-3] => (item=Variable set: GetTelemetryDriveMetrics_job_template_id = ee46afcf-4f47-45b5-a958-cb9b02bb0e00)
+ok: [HVM-2] => (item=Variable set: GroupApplyInternalStorageSettings_job_template_id = 54095626-3911-4fea-9741-816e2531994e)
+ok: [HVM-3] => (item=Variable set: GroupAddActions_job_template_id = 3eeff1ea-8419-4335-aaf3-796ef50789ba)
+ok: [HVM-2] => (item=Variable set: GroupApplyOneviewSettings_job_template_id = a229a162-b43f-45b0-b7bb-692df77b9746)
+ok: [HVM-3] => (item=Variable set: GroupApplianceUpdate_job_template_id = f69f553a-5004-4a08-9283-5b60abd9eb4a)
+ok: [HVM-2] => (item=Variable set: GroupApplyServerSettings_job_template_id = beff07ce-f36d-4699-9ac3-f872dcd63133)
+ok: [HVM-3] => (item=Variable set: GroupApplyExternalStorage_job_template_id = fcb79270-5954-42e9-9374-6a065b6d494a)
+ok: [HVM-2] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_id = db3620d4-19a4-4b54-9804-83f8f59d48a4)
+ok: [HVM-3] => (item=Variable set: GroupApplyInternalStorageSettings_job_template_id = 54095626-3911-4fea-9741-816e2531994e)
+ok: [HVM-2] => (item=Variable set: GroupExternalStorageCompliance_job_template_id = 7177aa6a-e8f8-4e9b-ae31-e01dafcc81df)
+ok: [HVM-3] => (item=Variable set: GroupApplyOneviewSettings_job_template_id = a229a162-b43f-45b0-b7bb-692df77b9746)
+ok: [HVM-2] => (item=Variable set: GroupFirmwareCompliance_job_template_id = 23b8ba2a-6c46-4223-b028-919382c7dcac)
+ok: [HVM-3] => (item=Variable set: GroupApplyServerSettings_job_template_id = beff07ce-f36d-4699-9ac3-f872dcd63133)
+ok: [HVM-2] => (item=Variable set: GroupFirmwareDownload_job_template_id = a17a7aa9-4540-4c21-bbf2-31af4ff65e98)
+ok: [HVM-3] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_id = db3620d4-19a4-4b54-9804-83f8f59d48a4)
+ok: [HVM-2] => (item=Variable set: GroupFirmwareUpdate_job_template_id = 91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
+ok: [HVM-3] => (item=Variable set: GroupExternalStorageCompliance_job_template_id = 7177aa6a-e8f8-4e9b-ae31-e01dafcc81df)
+ok: [HVM-2] => (item=Variable set: GroupGetIloSecurityParams_job_template_id = 08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
+ok: [HVM-3] => (item=Variable set: GroupFirmwareCompliance_job_template_id = 23b8ba2a-6c46-4223-b028-919382c7dcac)
+ok: [HVM-2] => (item=Variable set: GroupIloFirmwareUpdate_job_template_id = 512fb1f2-516f-4bda-bc84-e623947858e4)
+ok: [HVM-2] => (item=Variable set: GroupiLOSettingsCompliance_job_template_id = a55c8b26-3c57-4044-a4ee-1d0e3c108286)
+ok: [HVM-3] => (item=Variable set: GroupFirmwareDownload_job_template_id = a17a7aa9-4540-4c21-bbf2-31af4ff65e98)
+ok: [HVM-2] => (item=Variable set: GroupOSInstallation_job_template_id = e2952628-2629-4088-93db-91742304ef0c)
+ok: [HVM-3] => (item=Variable set: GroupFirmwareUpdate_job_template_id = 91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
+ok: [HVM-2] => (item=Variable set: GroupServerInventoryReport_job_template_id = 2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
+ok: [HVM-3] => (item=Variable set: GroupGetIloSecurityParams_job_template_id = 08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
+ok: [HVM-2] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_id = 94caa4ef-9ff8-4805-9e97-18a09e673b66)
+ok: [HVM-3] => (item=Variable set: GroupIloFirmwareUpdate_job_template_id = 512fb1f2-516f-4bda-bc84-e623947858e4)
+ok: [HVM-2] => (item=Variable set: iLOSecurity_job_template_id = e1d69e76-38cc-4079-9192-a380baea2973)
+ok: [HVM-3] => (item=Variable set: GroupiLOSettingsCompliance_job_template_id = a55c8b26-3c57-4044-a4ee-1d0e3c108286)
+ok: [HVM-2] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_id = abfda355-6e58-4c00-be0a-af35dbd70398)
+ok: [HVM-3] => (item=Variable set: GroupOSInstallation_job_template_id = e2952628-2629-4088-93db-91742304ef0c)
+ok: [HVM-2] => (item=Variable set: OrchestratorDriveMetrics_job_template_id = 1f3ca251-a008-4fed-b53e-6521cce61b97)
+ok: [HVM-2] => (item=Variable set: PowerOff_New_job_template_id = d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
+ok: [HVM-3] => (item=Variable set: GroupServerInventoryReport_job_template_id = 2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
+ok: [HVM-2] => (item=Variable set: PowerOn_New_job_template_id = 0cbb2377-1834-488d-840c-d5bf788c34fb)
+ok: [HVM-3] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_id = 94caa4ef-9ff8-4805-9e97-18a09e673b66)
+ok: [HVM-2] => (item=Variable set: ReconnectCredentialServer_job_template_id = d9713316-58f3-464e-bc69-1dd0728fa0d5)
+ok: [HVM-3] => (item=Variable set: iLOSecurity_job_template_id = e1d69e76-38cc-4079-9192-a380baea2973)
+ok: [HVM-2] => (item=Variable set: ResetIlo_job_template_id = 394b492c-8d88-4e4e-a775-1a95cb5f1065)
+ok: [HVM-3] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_id = abfda355-6e58-4c00-be0a-af35dbd70398)
+ok: [HVM-2] => (item=Variable set: Restart_New_job_template_id = 30110551-cad6-4069-95b8-dbce9bbd8525)
+ok: [HVM-3] => (item=Variable set: OrchestratorDriveMetrics_job_template_id = 1f3ca251-a008-4fed-b53e-6521cce61b97)
+ok: [HVM-2] => (item=Variable set: ServerMaintenanceModeDisable_job_template_id = 2798720f-b090-427d-b210-e48d33ce2f27)
+ok: [HVM-2] => (item=Variable set: ServerMaintenanceModeEnable_job_template_id = 4eb92af1-1ce4-4cb0-8581-fb5a7dcdbf2b)
+ok: [HVM-3] => (item=Variable set: PowerOff_New_job_template_id = d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
+ok: [HVM-2] => (item=Variable set: ServerNetworkConnectivity_job_template_id = b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
+ok: [HVM-3] => (item=Variable set: PowerOn_New_job_template_id = 0cbb2377-1834-488d-840c-d5bf788c34fb)
+ok: [HVM-2] => (item=Variable set: SetIloSettings_job_template_id = cf4f929b-d44a-4a90-93a9-820955458fd4)
+ok: [HVM-3] => (item=Variable set: ReconnectCredentialServer_job_template_id = d9713316-58f3-464e-bc69-1dd0728fa0d5)
+ok: [HVM-2] => (item=Variable set: UidIndicatorOff_job_template_id = fd837434-a2f2-4bc8-b1b4-ec068bd036aa)
+ok: [HVM-3] => (item=Variable set: ResetIlo_job_template_id = 394b492c-8d88-4e4e-a775-1a95cb5f1065)
+ok: [HVM-2] => (item=Variable set: UidIndicatorOn_job_template_id = a46b210a-b0c7-4223-ab43-c4c1e77e680c)
+ok: [HVM-3] => (item=Variable set: Restart_New_job_template_id = 30110551-cad6-4069-95b8-dbce9bbd8525)
+ok: [HVM-2] => (item=Variable set: UpdateCredentialBasedServer_job_template_id = f399e08a-6fed-45ba-a646-88d20691ff0f)
+ok: [HVM-3] => (item=Variable set: ServerMaintenanceModeDisable_job_template_id = 2798720f-b090-427d-b210-e48d33ce2f27)
+ok: [HVM-2] => (item=Variable set: VcenterFirmwareBundlesSync_job_template_id = 0fe73adb-9d52-4f00-9540-6ec82f265d82)
+ok: [HVM-3] => (item=Variable set: ServerMaintenanceModeEnable_job_template_id = 4eb92af1-1ce4-4cb0-8581-fb5a7dcdbf2b)
+ok: [HVM-3] => (item=Variable set: ServerNetworkConnectivity_job_template_id = b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
+ok: [HVM-3] => (item=Variable set: SetIloSettings_job_template_id = cf4f929b-d44a-4a90-93a9-820955458fd4)
+ok: [HVM-3] => (item=Variable set: UidIndicatorOff_job_template_id = fd837434-a2f2-4bc8-b1b4-ec068bd036aa)
+ok: [HVM-3] => (item=Variable set: UidIndicatorOn_job_template_id = a46b210a-b0c7-4223-ab43-c4c1e77e680c)
+ok: [HVM-3] => (item=Variable set: UpdateCredentialBasedServer_job_template_id = f399e08a-6fed-45ba-a646-88d20691ff0f)
+ok: [HVM-3] => (item=Variable set: VcenterFirmwareBundlesSync_job_template_id = 0fe73adb-9d52-4f00-9540-6ec82f265d82)
+
+TASK [Collect firmware bundles (first host only)] ******************************
+skipping: [HVM-3]
+ok: [HVM-2 -> localhost]
+
+TASK [Set variable for Gen10 firmware bundle '2025.11.00.00'] ******************
+skipping: [HVM-3]
+ok: [HVM-2]
+
+TASK [Set variable for Gen11 firmware bundle '2025.11.01.00'] ******************
+ok: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Set variable for Gen12 firmware bundle '2025.11.01.00'] ******************
+ok: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Create the firmware server setting 'HVM firmware baseline' (first host only)] ***
+skipping: [HVM-3]
+ok: [HVM-2 -> localhost]
+
+TASK [Create the firmware server setting 'HVM firmware baseline'] **************
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Set the resourceUri of the firmware server setting (just created)] *******
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Set the resourceUri of the firmware server setting (already exists)] *****
+skipping: [HVM-3]
+ok: [HVM-2]
+
+TASK [Check if definitive group 'HVM_group' already exists (first host only)] ***
+skipping: [HVM-3]
+ok: [HVM-2 -> localhost]
+
+TASK [Create definitive group 'HVM_group' if it does not exist] ****************
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Set id/resourceUri of the definitive group (just created)] ***************
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Set id/resourceUri of the definitive group (already exists)] *************
+skipping: [HVM-3]
+ok: [HVM-2]
+
+TASK [Get definitive group 'HVM_group' id (all hosts)] *************************
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Set definitive group id (all hosts)] *************************************
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Check if server 'CZ2311004H' is already a member of definitive group 'HVM_group'] ***
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Add server 'CZ2311004H' to definitive group 'HVM_group'] *****************
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Wait for assignment to truly complete] ***********************************
+Pausing for 15 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [HVM-2]
+
+TASK [Capture the firmware update start time] **********************************
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Build the list of device ids for the servers being provisioned in this run (first host only)] ***
+ok: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Display the device ids targeted by the firmware update job (first host only)] ***
+ok: [HVM-2] => {
+    "msg": "Firmware update will target these 2 server(s): ['P28948-B21+CZ2311004H', 'P53933-B21+CZJ3100GD9']"
+}
+skipping: [HVM-3]
+
+TASK [Start a group firmware update job using the defined firmware baseline (first host only)] ***
+skipping: [HVM-3]
+ok: [HVM-2 -> localhost]
+
+TASK [Wait for the group firmware update job to complete (first host only)] ****
+skipping: [HVM-3]
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the group firmware update job to complete (first host only) (600 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the group firmware update job to complete (first host only) (599 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the group firmware update job to complete (first host only) (598 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the group firmware update job to complete (first host only) (597 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the group firmware update job to complete (first host only) (596 retries left).
+FAILED - RETRYING: [HVM-2 -> localhost]: Wait for the group firmware update job to complete (first host only) (595 retries left).
+ok: [HVM-2 -> localhost]
+
+TASK [Wait for '192.168.3.181' to be reachable again on SSH after firmware activation (may reboot)] ***
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Create HPE VM Essentials Manager session] ********************************
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Set variable vme_access_token for the VME Manager bearer token] **********
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Fail early if the VME Manager is not reachable but auto-deploy is disabled (first host)] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Look up the VME group 'VME_Group'] ***************************************
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Set the group and cloud id facts] ****************************************
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [List the cluster layouts] ************************************************
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Set the layout id fact] **************************************************
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Look up the service plan 'Default Manual'] *******************************
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Set the service plan id fact] ********************************************
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Look up the HVM cluster 'HVM-Cluster-01' in the VME Manager] *************
+ok: [HVM-2 -> localhost]
+ok: [HVM-3 -> localhost]
+
+TASK [Set facts for cluster existence and whether this host will create it] ****
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Fail if the ids needed to create the cluster could not be resolved (first host, creating cluster)] ***
+skipping: [HVM-2]
+skipping: [HVM-3]
+
+TASK [Build the cluster-create request body (integer ids required — jinja2_native is off)] ***
+skipping: [HVM-3]
+ok: [HVM-2]
+
+TASK [Create the HVM cluster 'HVM-Cluster-01' with 'HVM-2' as the first member] ***
+skipping: [HVM-3]
+ok: [HVM-2 -> localhost]
+
+TASK [Re-look up the HVM cluster 'HVM-Cluster-01' id] **************************
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Update the cluster id fact] **********************************************
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Build the add-host request body (integer ids required — jinja2_native is off)] ***
+skipping: [HVM-2]
+ok: [HVM-3]
+
+TASK [Add HVM host 'HVM-2' to cluster 'HVM-Cluster-01'] ************************
+skipping: [HVM-2]
+ok: [HVM-3 -> localhost]
+
+TASK [Force update of current timestamp] ***************************************
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Get runtime] *************************************************************
+ok: [HVM-3]
+ok: [HVM-2]
+
+TASK [Status of the HVM OS installation] ***************************************
+ok: [HVM-2] => {
+    "msg": [
+        "HVM-2.lj.lab HVM OS installation completed successfully!",
+        "The host has been updated (apt), NTP configured and firmware updated.",
+        "The HVM cluster HVM-Cluster-01 was created in the VME Manager with this host as its first member.",
+        "To SSH to the new host from the Ansible control node, use: ssh hvmadmin@HVM-2.lj.lab",
+        "The provisioning task took 0:47:36."
+    ]
+}
+ok: [HVM-3] => {
+    "msg": [
+        "HVM-3.lj.lab HVM OS installation completed successfully!",
+        "The host has been updated (apt), NTP configured and firmware updated.",
+        "The host has been added to the HVM cluster HVM-Cluster-01 in the VME Manager.",
+        "To SSH to the new host from the Ansible control node, use: ssh hvmadmin@HVM-3.lj.lab",
+        "The provisioning task took 0:47:36."
+    ]
+}
+
+PLAY [HVM management/compute link redundancy (second NIC OVS bond)] ************
+
+TASK [End play for this host when NIC teaming is disabled or the cluster was not joined] ***
+skipping: [HVM-2]
+
+TASK [End play for this host when NIC teaming is disabled or the cluster was not joined] ***
+skipping: [HVM-3]
+
+TASK [Wait for SSH to be available on 'HVM-2'] *********************************
+ok: [HVM-3]
+ok: [HVM-2]
+
+TASK [Wait for the VME Manager to create the OVS 'mgmt' bridge] ****************
+FAILED - RETRYING: [HVM-3]: Wait for the VME Manager to create the OVS 'mgmt' bridge (30 retries left).
+FAILED - RETRYING: [HVM-2]: Wait for the VME Manager to create the OVS 'mgmt' bridge (30 retries left).
+FAILED - RETRYING: [HVM-3]: Wait for the VME Manager to create the OVS 'mgmt' bridge (29 retries left).
+FAILED - RETRYING: [HVM-2]: Wait for the VME Manager to create the OVS 'mgmt' bridge (29 retries left).
+FAILED - RETRYING: [HVM-3]: Wait for the VME Manager to create the OVS 'mgmt' bridge (28 retries left).
+FAILED - RETRYING: [HVM-2]: Wait for the VME Manager to create the OVS 'mgmt' bridge (28 retries left).
+ok: [HVM-3]
+ok: [HVM-2]
+
+TASK [End play for this host if the OVS 'mgmt' bridge never appeared] **********
+skipping: [HVM-2]
+
+TASK [End play for this host if the OVS 'mgmt' bridge never appeared] **********
+skipping: [HVM-3]
+
+TASK [Team each cabled secondary NIC into an active-backup OVS bond on its bridge (self-healing)] ***
+ok: [HVM-3] => (item=mgmtbond (mgmt0 + mgmt1))
+changed: [HVM-2] => (item=mgmtbond (mgmt0 + mgmt1))
+
+TASK [Report the NIC-team results] *********************************************
+ok: [HVM-2] => (item=mgmtbond) => {
+    "msg": "CREATED: mgmtbond (mgmt0 + mgmt1, active-backup) on mgmt"
+}
+ok: [HVM-3] => (item=mgmtbond) => {
+    "msg": "SKIP: mgmt1 no carrier"
+}
+
+TASK [Force update of current timestamp] ***************************************
+ok: [HVM-3 -> localhost]
+ok: [HVM-2 -> localhost]
+
+TASK [Get total runtime (including second-NIC link redundancy)] ****************
+ok: [HVM-2]
+ok: [HVM-3]
+
+TASK [Final status of the HVM OS installation (with link redundancy)] **********
+ok: [HVM-2] => {
+    "msg": [
+        "HVM-2.lj.lab HVM provisioning fully completed, including second-NIC link redundancy (OVS bond).",
+        "To SSH to the new host from the Ansible control node, use: ssh hvmadmin@HVM-2.lj.lab",
+        "The provisioning task took 0:48:22."
+    ]
+}
+ok: [HVM-3] => {
+    "msg": [
+        "HVM-3.lj.lab HVM provisioning fully completed, including second-NIC link redundancy (OVS bond).",
+        "To SSH to the new host from the Ansible control node, use: ssh hvmadmin@HVM-3.lj.lab",
+        "The provisioning task took 0:48:23."
+    ]
+}
+
+PLAY RECAP *********************************************************************
+HVM-2                      : ok=122  changed=19   unreachable=0    failed=0    skipped=55   rescued=0    ignored=0   
+HVM-3                      : ok=107  changed=18   unreachable=0    failed=0    skipped=60   rescued=0    ignored=0   

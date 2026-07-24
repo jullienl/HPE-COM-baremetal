@@ -16,7 +16,9 @@
 
 # Adding a DNS record for the server that will be provisioned in the defined DNS server
 
-#-------------------------------------- DNS record (WinRM Mode) -------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
+#  Play 0 - DNS record (WinRM Mode)
+# ---------------------------------------------------------------------------------------------------------------------
 
 - name: DNS record for the bare metal ESXi server
   hosts: All
@@ -27,7 +29,7 @@
     - vars/Windows_DNS_vars_encrypted.yml
   tasks:
     - name: Add '{{ inventory_hostname }}' with '{{ os_ip_address }}' on '{{ dns_server }}' in '{{ domain }}' DNS domain
-      community.windows.win_dns_record:
+      ansible.windows.win_dns_record:
         name: "{{ inventory_hostname }}"
         type: "A"
         value: "{{ os_ip_address }}"
@@ -35,7 +37,9 @@
         state: present
       delegate_to: "{{ dns_server }}"
 
-#-------------------------------------- Bare Metal Provisioning -------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
+#  Play 1 - Bare metal provisioning (COM orchestration, runs from the Ansible control node)
+# ---------------------------------------------------------------------------------------------------------------------
 
 - name: Automated ESXi 8.0 U2 installation on HPE Compute Ops Managmeent server(s) using an auto-generated ISO file with customized kickstart.
   hosts: All
@@ -72,7 +76,7 @@
   
   - name: Set fact for the first host in inventory
     set_fact:
-      is_first_host: "{{ play_hosts[0] == inventory_hostname }}"
+      is_first_host: "{{ ansible_play_batch[0] == inventory_hostname }}"
       
 
 #--------------------------------------Authentication with COM---------------------------------------------------------------------------------------------------------
@@ -120,14 +124,43 @@
       msg: "Server '{{ serial_number }}' cannot be found in COM!"
     when: server.json.count == 0
 
-  - name: Capture server '{{ serial_number }}' generation, id, uri, connection status and iLO IP
+  - name: Capture server '{{ serial_number }}' id, uri and connection status
     set_fact:
-      server_generation:  "{{ server | json_query('json.items[0].serverGeneration') }}"
-      server_model:  "{{ server | json_query('json.items[0].hardware.model') }}"
       server_id:  "{{ server | json_query('json.items[0].id') }}"
       server_resourceUri:  "{{ server | json_query('json.items[0].resourceUri') }}"
       server_connected_status:  "{{ server | json_query('json.items[0].state.connected') }}"
+
+  - name: Exit if server '{{ serial_number }}' is not connected to COM
+    fail:
+      msg: 
+        - "Server '{{ serial_number }}' is not connected to COM!" 
+        - "Make sure to connect the server's iLO to COM ! Go to iLO UI / Management / Compute Ops Management"
+    when: server_connected_status == false
+
+  # When a server has just been added to COM or is rebooting/re-discovering, the hardware fields (serverGeneration,
+  # model, powerState, iLO IP) are transiently reported as 'UNKNOWN' or empty. Wait until they are populated before
+  # capturing them, otherwise the power-on logic below (which keys off 'server_power_state') runs on bogus data.
+  - name: Wait until server '{{ serial_number }}' hardware information (generation, model, power state) is populated
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ serial_number }}'"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server
+    until:
+      - (server | json_query('json.items[0].serverGeneration') | default('UNKNOWN', true)) not in ['UNKNOWN', '']
+      - (server | json_query('json.items[0].hardware.model') | default('', true)) | length > 0
+      - (server | json_query('json.items[0].hardware.powerState') | default('UNKNOWN', true)) not in ['UNKNOWN', '']
+    retries: 30
+    delay: 20
+    delegate_to: localhost
+
+  - name: Capture server '{{ serial_number }}' generation, model, power state and iLO IP
+    set_fact:
+      server_generation:  "{{ server | json_query('json.items[0].serverGeneration') }}"
+      server_model:  "{{ server | json_query('json.items[0].hardware.model') }}"
       server_ilo_ip:  "{{ server | json_query('json.items[0].hardware.bmc.ip') }}"
+      server_power_state:  "{{ server | json_query('json.items[0].hardware.powerState') }}"
 
   - debug: 
       msg:
@@ -137,13 +170,7 @@
         - "URI: {{ server_resourceUri }}"
         - "Connection status: {{ server_connected_status }}"
         - "iLO IP: {{ server_ilo_ip }}"
-
-  - name: Exit if server '{{ serial_number }}' is not connected to COM
-    fail:
-      msg: 
-        - "Server '{{ serial_number }}' is not connected to COM!" 
-        - "Make sure to connect the server's iLO to COM ! Go to iLO UI / Management / Compute Ops Management"
-    when: server_connected_status == false
+        - "Power state: {{ server_power_state }}"
 
   - name: Wait until the server '{{ serial_number }}' inventory information is available (necessary when the server has recently been added to COM) then capture the data
     uri:
@@ -167,12 +194,12 @@
       headers:
         Authorization: "Bearer {{ access_token }}"
     register: server_inventory_from_ui_doorway
-    until: server_inventory_from_ui_doorway.json.state_ != "Retrieving server information in progress" 
+    until: server_inventory_from_ui_doorway.json.get('state_') != "Retrieving server information in progress" 
     retries: 30
     delay: 60
     delegate_to: localhost
 
-  - name: Power on the server '{{ serial_number }}' to get the storage inventory information 
+  - name: Power on the server '{{ serial_number }}' to get the storage inventory information (only if not already ON)
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
       method: POST
@@ -188,13 +215,20 @@
         # resourceUri: "{{ server_resourceUri }}"
         # jobTemplateUri: "{{ PowerOn_New_job_template_resourceUri }}"
     register: power_on_job_result
+    when: server_power_state != "ON"
     delegate_to: localhost
 
   # - debug: var=power_on_job_result
 
+  - name: Report that server '{{ serial_number }}' is already powered on (skipping power on)
+    debug:
+      msg: "Server '{{ serial_number }}' is already powered on (power state '{{ server_power_state }}'). Skipping the power on job."
+    when: server_power_state == "ON"
+
   - name: Set a variable for the job resource URI
     set_fact:
       job_resourceUri: "{{ power_on_job_result.json.resourceUri }}"
+    when: server_power_state != "ON"
 
   # - debug: var=job_resourceUri
 
@@ -211,6 +245,7 @@
       (server_power_on_job_status.json.state == "COMPLETE" or 
       server_power_on_job_status.json.state == "ERROR")
     register: server_power_on_job_status
+    when: server_power_state != "ON"
     delegate_to: localhost
 
   # - debug: var=server_power_on_job_status
@@ -221,11 +256,14 @@
         - "State: {{ server_power_on_job_status.json.state }}"
         - "ResultCode: {{ server_power_on_job_status.json.resultCode }}"
         - "Status: {{ server_power_on_job_status.json.status }}"
+    when: server_power_state != "ON"
 
   - name: Exit when server power on job is failing
     fail: 
       msg: "Error ! Server power on job has failed !"
-    when: server_power_on_job_status.json.state == "ERROR" 
+    when:
+      - server_power_state != "ON"
+      - server_power_on_job_status.json.state == "ERROR" 
 
 
 #--------------------------------------Check BIOS/Workload profile settings -------------------------------------------------------------------------------------------
@@ -257,76 +295,30 @@
   # - debug: var=bios_server_setting_resourceuri
 
 
-#-------------------------------------- Run a server inventory job to collect the local storage information -----------------------------------------------------------------------------------------------
+#-------------------------------------- Collect the local storage information -----------------------------------------------------------------------------------------------
 
-  - name: Wait until PCI devices information is available then capture the server '{{ serial_number }}' inventory information 
+  # COM populates the PCI device inventory ('device.data') and the storage inventory ('storage.data') INDEPENDENTLY, and
+  # the storage array can lag well behind the PCI one (observed on Gen10 Plus: 'device.data' full while 'storage.data'
+  # was still empty). The storage-controller detection below relies on 'storage.data', so we must wait until it is
+  # actually populated - i.e. at least one controller reports Drives or Volumes - not just until 'device.data' appears.
+  # Waiting on the wrong array made the playbook run the detection against empty storage data and wrongly fail with
+  # "No storage controller with drives available found in the server".
+  - name: Wait until the storage inventory of server '{{ serial_number }}' is populated then capture the inventory
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/inventory"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
     register: server_inventory
-    until: server_inventory.json.device.data | default([]) | length > 0
+    until:
+      - (server_inventory.json.device.data | default([]) | length) > 0
+      - ((server_inventory.json.storage.data | default([]) | selectattr('Drives', 'defined') | map(attribute='Drives') | map('length') | sum)
+         + (server_inventory.json.storage.data | default([]) | selectattr('Volumes', 'defined') | map(attribute='Volumes') | map('length') | sum)) > 0
     retries: 30
     delay: 60
     delegate_to: localhost
 
-  # Run a server inventory job to collect the local storage information
-
-  - name: Run a server inventory job to collect the local storage information
-    uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
-      method: POST
-      status_code: 201
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-        Content-Type: "application/json"
-      body_format: json
-      body:
-        jobTemplate: "{{ GetFullServerInventory_job_template_id }}"
-        resourceId: "{{ server_id }}"
-        resourceType: "compute-ops-mgmt/server"
-        jobParams: 
-          is_reports_call: true
-    register: inventory_job_result
-    delegate_to: localhost
-
-  # - debug: var=inventory_job_result
-
-  - name: Set a variable for the job resource URI
-    set_fact:
-      job_resourceUri: "{{ inventory_job_result.json.resourceUri }}"
-
-  # - debug: var=job_resourceUri
-
-  - name: Wait for the server inventory job to complete
-    uri:
-      url: "{{ ConnectivityEndpoint }}{{ job_resourceUri }}"
-      method: GET
-      return_content: yes
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    retries: 60
-    delay: 5
-    until: >
-      (server_inventory_job_status.json.state == "COMPLETE" or 
-      server_inventory_job_status.json.state == "ERROR")
-    register: server_inventory_job_status
-    delegate_to: localhost
-
-  # - debug: var=server_inventory_job_status
-
-  - name: Display the server inventory job result 
-    debug: 
-      msg:
-        - "State: {{ server_inventory_job_status.json.state }}"
-        - "ResultCode: {{ server_inventory_job_status.json.resultCode }}"
-        - "Status: {{ server_inventory_job_status.json.status }}"
-
-  - name: Exit when server inventory job is failing
-    fail: 
-      msg: "Error ! Server inventory job to collect the local storage information has failed!"
-    when: server_inventory_job_status.json.state == "ERROR" 
+  # Server storage inventory is now collected automatically by COM, so a dedicated inventory job is no longer required.
 
   - name: Capture the server '{{ serial_number }}' inventory information 
     uri:
@@ -845,10 +837,10 @@
     set_fact:
       server_group_id_found: "{{ server_info_from_ui_doorway.json.group_.id }}"
       server_group_name_found: "{{ server_info_from_ui_doorway.json.group_.name }}"
-    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+    when: server_info_from_ui_doorway.json.get('group_') is not none
 
   - debug: var=server_group_name_found
-    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+    when: server_info_from_ui_doorway.json.get('group_') is not none
 
   - name: Remove server '{{ serial_number }}' from the server group of which it is currently a member
     uri:
@@ -863,14 +855,14 @@
         devices:
           # Only servers that are not part of a group can be assigned to a group.
           - deviceId: "{{ server_id }}"
-    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+    when: server_info_from_ui_doorway.json.get('group_') is not none
     register: group_unassignment_result
     delegate_to: localhost
 
   - name: Wait for deletion to complete
     pause:
       seconds: 15
-    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+    when: server_info_from_ui_doorway.json.get('group_') is not none
     
   # Add server to the temporary server group 
 
@@ -914,7 +906,7 @@
   #     filter: "associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"      
   #     query: "json.items[? name=='Server automatic configuration' && (contains(message,'Automatic configuration of server is complete') || contains(message,'failed'))]"
   #   register: server_activities
-  #   until: server_activities | json_query(query) 
+  #   until: server_activities | json_query(jq) 
   #   retries: 30
   #   delay: 60
   #   delegate_to: localhost
@@ -924,7 +916,7 @@
   #     msg: "The configuration of server '{{ serial_number }}' failed to complete! Refer to the individual server activity entries in GLP UI for details."
   #   vars:
   #     query: "json.items[? name=='Server automatic configuration' && contains(message,'failed')]"
-  #   when: server_activities | json_query(query) 
+  #   when: server_activities | json_query(jq) 
 
 
 #--------------------------------------Build ISO image with customized kickstart --------------------------------------------------------------------------------------
@@ -959,77 +951,6 @@
     when: ISO_Present.stat.exists == False
     delegate_to: localhost
 
-  - name: Create '/mnt/{{ inventory_hostname }}' on '{{lookup("pipe","hostname")}}' if it does not exist
-    become: yes
-    file:
-      path: /mnt/{{ inventory_hostname }}
-      state: directory
-      mode: "0755"
-    delegate_to: localhost
-
-  - name: Create '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/' on '{{lookup("pipe","hostname")}}' if it does not exist
-    file:
-      path: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}"
-      state: directory
-    delegate_to: localhost
-
-  - name: Mount ESXi ISO '{{ src_iso_directory }}/{{ src_iso_file }}' to '/mnt/{{ inventory_hostname }}/' 
-    become: yes
-    shell: 
-      mount -o loop -t iso9660 --read-only {{ src_iso_directory }}/{{ src_iso_file }} /mnt/{{ inventory_hostname }}/
-    delegate_to: localhost
-
-  - name: Copy ISO files to '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/' on '{{lookup("pipe","hostname")}}' 
-    shell: |
-      rsync -a /mnt/{{ inventory_hostname }}/. {{ staging_directory }}/baremetal/{{ inventory_hostname }}/
-    delegate_to: localhost
-
-  - name: Set permissions to allow the user running the Ansible playbook to delete the folder '{{ staging_directory }}/baremetal/{{ inventory_hostname }}'
-    become: yes
-    file:
-      path: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}"
-      mode: ug+w
-      owner: "{{ user }}"
-      group: "{{ user }}"
-      recurse: yes
-      state: directory
-    delegate_to: localhost
-
-  - name: Unmount directory '/mnt/{{ inventory_hostname }}'
-    become: yes
-    shell: 
-      umount /mnt/{{ inventory_hostname }}
-    delegate_to: localhost
-
-  - name: Modify UEFI bootloader for kickstart installation from CDROM
-    shell: 
-      sed -i 's/kernelopt=runweasel cdromBoot/kernelopt=runweasel ks=cdrom:\/KS.CFG/' {{ staging_directory }}/baremetal/{{ inventory_hostname }}/efi/boot/boot.cfg
-    delegate_to: localhost
-
-  # Creation of the KS.CFG kickstart file
-
-  - name: Create kickstart file in '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/' on '{{lookup("pipe","hostname")}}' with variable substitution
-    template:
-      src: files/{{ esxi_build }}/{{ kickstart }}
-      dest: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/KS.CFG"
-    delegate_to: localhost
-
-  # Creation of the new ESXi ISO image with unattended installation
-
-  - name: Create customized bootable ISO in '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/'
-    # become: yes
-    shell: >
-      mkisofs
-      -relaxed-filenames
-      -J
-      -R
-      -b isolinux.bin -iso-level 2
-      -c boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table
-      -eltorito-alt-boot -eltorito-boot efiboot.img -no-emul-boot
-      -o {{ staging_directory }}/baremetal/{{ inventory_hostname }}.iso
-      {{ staging_directory }}/baremetal/{{ inventory_hostname }}/
-    delegate_to: localhost
-
   - name: Create '/usr/share/nginx/html/isos/' on '{{lookup("pipe","hostname")}}' if it does not exist
     become: yes
     file:
@@ -1038,10 +959,106 @@
       mode: "0755"
     delegate_to: localhost
 
-  - name: Move created ISO to the nginx default html folder. ISO URL='http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}.iso'
+  # ---- Shared prepared boot ISO (built once, reused by all hosts) ----
+  # Only the boot.cfg is customized (ks=cdrom:/KS.CFG) so ESXi searches the attached CD-ROM
+  # devices for the kickstart. The per-host KS.CFG is delivered on a small separate seed ISO
+  # (see below) attached via the COM 'unattendedInstallationFileUrl' field, which avoids a
+  # full multi-GB ISO rebuild and copy per host.
+
+  - name: Check if the shared prepared ESXi boot ISO '{{ prepared_iso_file }}' already exists on nginx
+    stat:
+      path: "/usr/share/nginx/html/isos/{{ prepared_iso_file }}"
+    register: prepared_iso_present
+    run_once: true
+    delegate_to: localhost
+
+  - name: Build the shared prepared ESXi boot ISO (done once for all hosts)
+    when: not prepared_iso_present.stat.exists
+    run_once: true
+    delegate_to: localhost
+    block:
+
+      - name: Create '/mnt/_prepared_iso_esxi' if it does not exist
+        become: yes
+        file:
+          path: /mnt/_prepared_iso_esxi
+          state: directory
+          mode: "0755"
+
+      - name: Create the staging directory for the prepared boot ISO
+        file:
+          path: "{{ staging_directory }}/baremetal/_prepared_iso"
+          state: directory
+
+      - name: Mount the source ESXi ISO '{{ src_iso_directory }}/{{ src_iso_file }}'
+        become: yes
+        shell: mount -o loop -t iso9660 --read-only {{ src_iso_directory }}/{{ src_iso_file }} /mnt/_prepared_iso_esxi/
+
+      - name: Copy the ISO files to the prepared staging directory
+        shell: |
+          rsync -a /mnt/_prepared_iso_esxi/. {{ staging_directory }}/baremetal/_prepared_iso/
+
+      - name: Set permissions so the Ansible user can modify the prepared staging directory
+        become: yes
+        file:
+          path: "{{ staging_directory }}/baremetal/_prepared_iso"
+          mode: ug+w
+          owner: "{{ user }}"
+          group: "{{ user }}"
+          recurse: yes
+          state: directory
+
+      - name: Unmount '/mnt/_prepared_iso_esxi'
+        become: yes
+        shell: umount /mnt/_prepared_iso_esxi
+
+      - name: Point the ESXi bootloader at the externally-attached kickstart (ks=cdrom:/KS.CFG)
+        shell:
+          sed -i 's/kernelopt=runweasel cdromBoot/kernelopt=runweasel ks=cdrom:\/KS.CFG/' {{ staging_directory }}/baremetal/_prepared_iso/efi/boot/boot.cfg
+
+      - name: Build the prepared boot ISO with mkisofs (host-agnostic, no per-host content)
+        shell: >
+          mkisofs
+          -relaxed-filenames
+          -J
+          -R
+          -b isolinux.bin -iso-level 2
+          -c boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table
+          -eltorito-alt-boot -eltorito-boot efiboot.img -no-emul-boot
+          -o {{ staging_directory }}/baremetal/{{ prepared_iso_file }}
+          {{ staging_directory }}/baremetal/_prepared_iso/
+
+      - name: Move the prepared boot ISO to the nginx html folder. ISO URL='http://{{ lookup("pipe","hostname") }}/isos/{{ prepared_iso_file }}'
+        become: yes
+        shell: |
+          mv {{ staging_directory }}/baremetal/{{ prepared_iso_file }} /usr/share/nginx/html/isos/
+
+  # ---- Per-host kickstart seed ISO (small, one per host) ----
+
+  - name: Create the seed staging directory '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed'
+    file:
+      path: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed"
+      state: directory
+    delegate_to: localhost
+
+  - name: Render the ESXi kickstart 'KS.CFG' seed for '{{ inventory_hostname }}' with variable substitution
+    template:
+      src: files/{{ esxi_build }}/{{ kickstart }}
+      dest: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed/KS.CFG"
+    delegate_to: localhost
+
+  - name: Build the per-host kickstart seed ISO for '{{ inventory_hostname }}'
+    shell: >
+      xorriso -as mkisofs
+      -output "{{ staging_directory }}/baremetal/{{ inventory_hostname }}-seed.iso"
+      -volid ESXI_KS -joliet -rock
+      "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed/"
+    delegate_to: localhost
+
+  - name: Move the per-host seed ISO to the nginx default html folder. ISO URL='http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}-seed.iso'
     become: yes
     shell: |
-      mv {{ staging_directory }}/baremetal/{{ inventory_hostname }}.iso /usr/share/nginx/html/isos/
+      mv {{ staging_directory }}/baremetal/{{ inventory_hostname }}-seed.iso /usr/share/nginx/html/isos/
     delegate_to: localhost
 
   - name: Update SELinux security contexts so that Nginx is allowed to serve content from the '/usr/share/nginx/html/isos/' directory.
@@ -1084,7 +1101,8 @@
         settings:
           DEFAULT:
             osType: "VMWARE_ESXI"
-            mediaUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}.iso'
+            mediaUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ prepared_iso_file }}'
+            unattendedInstallationFileUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}-seed.iso'
     register: OS_image_server_setting_result
     delegate_to: localhost
     when: OS_image_server_setting.json.count == 0
@@ -1114,7 +1132,8 @@
         settings:
           DEFAULT:
             osType: "VMWARE_ESXI"
-            mediaUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}.iso'
+            mediaUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ prepared_iso_file }}'
+            unattendedInstallationFileUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}-seed.iso'
     vars: 
       OS_image_server_setting_id: "{{ OS_image_server_setting  | json_query('json.items[0].id') }}"
     register: OS_image_server_setting_result
@@ -1165,7 +1184,10 @@
             firmwarePowerOff: false
             firmwareUpdate: false
             iloApplySettings: false
-            osInstall: true
+            # Keep the STANDING group policy OS install disabled. The OS install is triggered ONCE, explicitly, by
+            # the 'Start OS image installation' GroupOSInstallation job below. If 'true', COM re-applies the group
+            # policy when the installed server reconnects (agent/AMS) and reinstalls the OS in a loop.
+            osInstall: false
             storageConfiguration: false
             storageVolumeDeletion: false
             storageVolumeName: ""
@@ -1207,7 +1229,10 @@
             storageConfiguration: true
             storageVolumeDeletion: true
             storageVolumeName: "OS_boot_volume"
-            osInstall: true
+            # Keep the STANDING group policy OS install disabled - the OS install is triggered ONCE by the explicit
+            # GroupOSInstallation job below. If 'true', COM re-applies the policy when the installed server
+            # reconnects (agent/AMS) and reinstalls the OS in a loop.
+            osInstall: false
           onSettingsApply:
             firmwareDowngrade: false
         # autoAddServerTags:
@@ -1257,9 +1282,9 @@
         Authorization: "Bearer {{ access_token }}"
     vars: 
       filter: "associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"      
-      query: "json.items[?name=='Server OS Installation' && contains(message,'Operating system image installation task marked as complete')]"
+      jq: "json.items[?name=='Server OS Installation' && contains((message || ''),'Operating system image installation task marked as complete')]"
     register: server_activities
-    until: server_activities | json_query(query) 
+    until: (server_activities | json_query(jq) | length) > 0
     retries: 60
     delay: 60
     delegate_to: localhost
@@ -1370,7 +1395,7 @@
     become: yes
     shell: |
       rm -rf {{ inventory_hostname }}
-      rm -f /usr/share/nginx/html/isos/{{ inventory_hostname }}.iso
+      rm -f /usr/share/nginx/html/isos/{{ inventory_hostname }}-seed.iso
       rm -rf /mnt/{{ inventory_hostname }}
     args:
       chdir: "{{ staging_directory }}/baremetal"
@@ -1379,12 +1404,12 @@
   # vCenter and ESXi configuration
 
   - name: Check if ESXi cluster '{{ cluster_name }}' exists in vCenter '{{ vcenter_hostname }}'
-    community.vmware.vmware_cluster_info:
+    vmware.vmware.cluster_info:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
       datacenter: "{{ datacenter_name }}"
-      cluster_name: "{{ cluster_name }}"
+      cluster: "{{ cluster_name }}"
       validate_certs: false
     register: cluster_facts
     delegate_to: localhost
@@ -1393,12 +1418,12 @@
   # - debug: var=cluster_facts
 
   - name: Create ESXi cluster '{{ cluster_name }}' in vCenter '{{ vcenter_hostname }}' if not present 
-    community.vmware.vmware_cluster:
+    vmware.vmware.cluster:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
-      datacenter_name: "{{ datacenter_name }}"
-      cluster_name: "{{ cluster_name }}"
+      datacenter: "{{ datacenter_name }}"
+      cluster: "{{ cluster_name }}"
       state: present
       validate_certs: false
     when: is_first_host and (cluster_facts.clusters is not defined or cluster_name not in cluster_facts.clusters)
@@ -1411,12 +1436,12 @@
     when: cluster_facts.clusters is not defined or cluster_name not in cluster_facts.clusters
 
   - name: Enable HA without admission control on '{{ cluster_name }}' cluster
-    community.vmware.vmware_cluster_ha:
+    vmware.vmware.cluster_ha:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
-      datacenter_name: "{{ datacenter_name }}"
-      cluster_name: "{{ cluster_name }}"
+      datacenter: "{{ datacenter_name }}"
+      cluster: "{{ cluster_name }}"
       enable: true
       validate_certs: false
     ignore_errors: yes
@@ -1424,12 +1449,12 @@
     when: is_first_host
 
   - name: Enable DRS with VM distribution across hosts for availability on '{{ cluster_name }}' cluster
-    community.vmware.vmware_cluster_drs:
+    vmware.vmware.cluster_drs:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
       password: '{{ vcenter_password }}'
-      datacenter_name: "{{ datacenter_name }}"
-      cluster_name: "{{ cluster_name }}"
+      datacenter: "{{ datacenter_name }}"
+      cluster: "{{ cluster_name }}"
       enable: true
       advanced_settings:
         'TryBalanceVmsPerHost': '1'
@@ -1444,13 +1469,13 @@
     when: cluster_facts.clusters is not defined or cluster_name not in cluster_facts.clusters
   
   - name: Add ESXi host '{{ inventory_fqdn }}' to '{{ cluster_name }}' cluster 
-    community.vmware.vmware_host:
+    vmware.vmware.esxi_host:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
-      datacenter_name: "{{ datacenter_name }}"
-      cluster_name: "{{ cluster_name }}"
-      esxi_hostname: "{{ inventory_fqdn }}"
+      datacenter: "{{ datacenter_name }}"
+      cluster: "{{ cluster_name }}"
+      esxi_host_name: "{{ inventory_fqdn }}"
       esxi_username: "root"
       esxi_password: "{{ root_password }}"
       state: present
@@ -1469,7 +1494,28 @@
     ignore_errors: yes
     delegate_to: localhost
 
-  - name: Add vmnic1 to standard switch vSwitch0
+  - name: Gather vmnic info for ESXi host '{{ inventory_fqdn }}' (to check vmnic1 link state before teaming)
+    community.vmware.vmware_host_vmnic_info:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      esxi_hostname: "{{ inventory_fqdn }}"
+      validate_certs: false
+    register: esxi_vmnic_info
+    ignore_errors: yes
+    delegate_to: localhost
+    when: enable_nic_bonding | default(true) | bool
+
+  - name: Determine whether vmnic1 is physically connected
+    ansible.builtin.set_fact:
+      vmnic1_connected: >-
+        {{ (esxi_vmnic_info.hosts_vmnics_info[inventory_fqdn].vmnic_details
+            | default([]) | selectattr('device', 'equalto', 'vmnic1')
+            | selectattr('status', 'equalto', 'Connected') | list | length) > 0 }}
+    when: enable_nic_bonding | default(true) | bool
+    ignore_errors: yes
+
+  - name: Add vmnic1 to standard switch vSwitch0 (management-link redundancy, only if vmnic1 is connected)
     vmware_vswitch:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -1482,6 +1528,19 @@
       validate_certs: false
     ignore_errors: yes
     delegate_to: localhost
+    when:
+      - enable_nic_bonding | default(true) | bool
+      - vmnic1_connected | default(false) | bool
+
+  - name: Report the vSwitch0 uplink outcome for '{{ inventory_fqdn }}'
+    ansible.builtin.debug:
+      msg: >-
+        vSwitch0 uplinks for '{{ inventory_fqdn }}':
+        {{ 'vmnic0 + vmnic1 (redundant)'
+           if (enable_nic_bonding | default(true) | bool) and (vmnic1_connected | default(false) | bool)
+           else 'vmnic0 only ('
+                + ('vmnic1 not connected' if (enable_nic_bonding | default(true) | bool) else 'NIC bonding disabled')
+                + ')' }}
 
   - name: Pause for 10 seconds to give time for the vswitch0 configuration
     ansible.builtin.pause:
@@ -1504,13 +1563,13 @@
       seconds: 10
 
   - name: Re-add ESXi host '{{ inventory_fqdn }}' to '{{ cluster_name }}' cluster (sometimes the host disconnects for an unknown reason)
-    vmware_host:
+    vmware.vmware.esxi_host:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
-      datacenter_name: "{{ datacenter_name }}"
-      cluster_name: "{{ cluster_name }}"
-      esxi_hostname: "{{ inventory_fqdn }}"
+      datacenter: "{{ datacenter_name }}"
+      cluster: "{{ cluster_name }}"
+      esxi_host_name: "{{ inventory_fqdn }}"
       esxi_username: "root"
       esxi_password: "{{ root_password }}"
       state: present
@@ -1614,10 +1673,10 @@
 
   - name: Set variable for Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}'
     set_fact:
-      Gen10_10p_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
+      Gen10_10p_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(jq) )[0] }}"
     vars:
-      query: "json.items[?contains(releaseVersion, '{{ Gen10_10p_firmware_bundle_name }}') && contains(name, 'Gen10')].id"
-    when: is_first_host and (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+      jq: "json.items[?contains(releaseVersion, '{{ Gen10_10p_firmware_bundle_name }}') && contains(name, 'Gen10')].id"
+    when: is_first_host and (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(jq) )[0] | default([]) != []
 
   - name:  Exit if Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}' does not exist
     fail:
@@ -1631,11 +1690,11 @@
   
   - name: Set variable for Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}'
     set_fact:
-      Gen11_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
+      Gen11_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(jq) )[0] }}"
     vars:
       # query: "json.items[?releaseVersion=='{{ Gen11_firmware_bundle_name }}'].id"
-      query: "json.items[?contains(releaseVersion, '{{ Gen11_firmware_bundle_name }}') && contains(name, 'Gen11')].id"
-    when: is_first_host and (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+      jq: "json.items[?contains(releaseVersion, '{{ Gen11_firmware_bundle_name }}') && contains(name, 'Gen11')].id"
+    when: is_first_host and (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(jq) )[0] | default([]) != []
 
   - name: Exit if Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}' does not exist
     fail:
@@ -1649,11 +1708,11 @@
   
   - name: Set variable for Gen12 firmware bundle '{{ Gen12_firmware_bundle_name }}'
     set_fact:
-      Gen12_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
+      Gen12_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(jq) )[0] }}"
     vars:
       # query: "json.items[?releaseVersion=='{{ Gen12_firmware_bundle_name }}'].id"
-      query: "json.items[?contains(releaseVersion, '{{ Gen12_firmware_bundle_name }}') && contains(name, 'Gen12')].id"
-    when: is_first_host and (Gen12_firmware_bundle_name is defined) and (Gen12_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+      jq: "json.items[?contains(releaseVersion, '{{ Gen12_firmware_bundle_name }}') && contains(name, 'Gen12')].id"
+    when: is_first_host and (Gen12_firmware_bundle_name is defined) and (Gen12_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(jq) )[0] | default([]) != []
 
   - name: Exit if Gen12 firmware bundle '{{ Gen12_firmware_bundle_name }}' does not exist
     fail:
@@ -1917,13 +1976,13 @@
 #--------------------------------------Firmware update preparation: Put server in maintenance mode --------------------------------------------------------------------
   
   - name: Re-add ESXi host '{{ inventory_fqdn }}' to '{{ cluster_name }}' cluster (sometimes the host disconnects for an unknown reason)
-    vmware_host:
+    vmware.vmware.esxi_host:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
-      datacenter_name: "{{ datacenter_name }}"
-      cluster_name: "{{ cluster_name }}"
-      esxi_hostname: "{{ inventory_fqdn }}"
+      datacenter: "{{ datacenter_name }}"
+      cluster: "{{ cluster_name }}"
+      esxi_host_name: "{{ inventory_fqdn }}"
       esxi_username: "root"
       esxi_password: "{{ root_password }}"
       state: present
@@ -1944,15 +2003,15 @@
     until: host_facts.ansible_facts.ansible_host_connection_state == "connected"
 
   - name: Place ESXi host '{{ inventory_fqdn }}' into maintenance mode
-    community.vmware.vmware_maintenancemode:
+    vmware.vmware.esxi_maintenance_mode:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
-      esxi_hostname: "{{ inventory_fqdn }}"
+      esxi_host_name: "{{ inventory_fqdn }}"
       validate_certs: false
       evacuate: true
       timeout: 3600
-      state: present
+      enable_maintenance_mode: true
     delegate_to: localhost
 
 
@@ -1991,9 +2050,9 @@
 
   - name: Check if server '{{ serial_number }}' is already member of definitive server group '{{ server_group_name }}' 
     set_fact: 
-      server_found_in_definitive_group: "{{ definitive_server_group  | json_query(query) }}"
+      server_found_in_definitive_group: "{{ definitive_server_group  | json_query(jq) }}"
     vars:
-      query: "json.items[0].devices[?serial=='{{ serial_number }}']"
+      jq: "json.items[0].devices[?serial=='{{ serial_number }}']"
     when: definitive_server_group.json.count == 1
       
   # - debug: var=server_found_in_definitive_group  
@@ -2027,24 +2086,23 @@
 
   # Start an HPE drivers, software and firmware update job
 
-  # To run a firmware update in parallel on each host and save time, it is necessary to use the group firmware update job
-  # This job will only be executed on the first host in the Ansible inventory
+  # Firmware is updated in ONE group job that targets ONLY the servers being provisioned in THIS inventory run (in
+  # parallel), not per host and not every member of the definitive group. The tasks below are guarded with
+  # 'when: is_first_host' so the single job is submitted exactly ONCE instead of once per host.
+  #
+  # The device list is built from each play host's 'server_id' (already in the API device-id form
+  # '<partNumber>+<serialNumber>'), so servers added to the group by a PREVIOUS run are left untouched. These plays use
+  # Ansible's default 'linear' strategy (no 'serial:' / no 'strategy: free'), so every host is already in the group and
+  # has its 'server_id' fact by the time the first host submits the job; 'is_first_host' is just a "run once" selector.
+  # NOTE: this "run once" guarantee holds ONLY under the linear strategy. If you switch to 'strategy: free' or
+  #       'serial:', use 'run_once: true' instead.
 
-  # Get the list of devices in the definitive server group with the first host only
-
-  - name: Get definitive group '{{ server_group_name }}' information (first host only)
-    uri:
-      url:  "{{ ConnectivityEndpoint }}{{ definitive_group_resourceuri  }}"
-      method: GET
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    register: definitive_server_group
-    delegate_to: localhost
-    when: is_first_host
-
-  - name: Set fact for the list of server IDs member of the definitive server group (first host only)
+  - name: Build the list of device ids for the servers being provisioned in this run (first host only)
+    # Target ONLY the servers in THIS inventory run - each play host's 'server_id' (already in the API device-id form
+    # '<partNumber>+<serialNumber>', e.g. 'P28948-B21+CZ2311004H') - NOT every device currently in the definitive
+    # group. This leaves servers added by previous runs untouched when the single group firmware update job runs.
     set_fact:
-      server_ids: "{{ definitive_server_group.json.devices  | map(attribute='id') | list  }}"
+      server_ids: "{{ ansible_play_hosts | map('extract', hostvars, 'server_id') | list }}"
     when: is_first_host
 
   - name: Display the server IDs found (first host only)
@@ -2143,9 +2201,9 @@
 
   - name: Extract items containing 'Firmware update'  
     set_fact:
-      firmware_update_items: "{{ (Server_activity_status | json_query(query))[0] }}"
+      firmware_update_items: "{{ (Server_activity_status | json_query(jq))[0] }}"
     vars:
-      query: "json.items[? contains(name, 'Firmware update') && contains(groupDisplayName, '{{ server_group_name }}')]"
+      jq: "json.items[? contains(name, 'Firmware update') && contains(groupDisplayName, '{{ server_group_name }}')]"
 
   # - debug: var=firmware_update_items
 
@@ -2210,13 +2268,13 @@
     until: host_facts.ansible_facts.ansible_host_connection_state == "connected"
 
   - name: Take ESXi host '{{ inventory_fqdn }}' out of maintenance mode
-    community.vmware.vmware_maintenancemode:
+    vmware.vmware.esxi_maintenance_mode:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
-      esxi_hostname: "{{ inventory_fqdn }}"
+      esxi_host_name: "{{ inventory_fqdn }}"
       validate_certs: false
-      state: absent
+      enable_maintenance_mode: false
     ignore_errors: yes
     delegate_to: localhost
 
@@ -2230,8 +2288,10 @@
     delegate_to: localhost
 
   - name: Get runtime
+    # ansible-core 2.19 refuses to store native objects (a datetime subtraction yields a 'timedelta',
+    # which raises "Type 'timedelta' is unsupported for variable storage"). Cast to string for storage/display.
     set_fact:
-      runtime: "{{ ((ansible_date_time.iso8601[:19] | to_datetime('%Y-%m-%dT%H:%M:%S')) - (start_time[:19] | to_datetime('%Y-%m-%dT%H:%M:%S'))) }}"
+      runtime: "{{ ((ansible_date_time.iso8601[:19] | to_datetime('%Y-%m-%dT%H:%M:%S')) - (start_time[:19] | to_datetime('%Y-%m-%dT%H:%M:%S'))) | string }}"
 
   # Display server installation completed message
 
@@ -2261,5 +2321,11 @@
         - "Refer to the individual server activity entries in the HPE Compute Ops Management UI for more details."
         - "To SSH to the new host from Ansible control node, use: ssh root@{{ inventory_hostname }}.{{domain}}"
         - "The provisioning task took {{ runtime }}."
-    when: (firmware_update_items.message is search('Firmware update failed', ignorecase=True)) or (group_firmware_update_job_status.json.resultCode is none)
+    # 'group_firmware_update_job_status' is registered only on the first host (the group firmware update job runs
+    # once for the whole server group). Non-first hosts hold a skipped-result dict with no '.json', so gate that
+    # part on 'is_first_host' and use '.get()' (ansible-core 2.19 RAISES on missing dict attributes). Non-first
+    # hosts fall back to their own per-host 'firmware_update_items.message'.
+    when: >-
+      (firmware_update_items.message is search('Firmware update failed', ignorecase=True))
+      or (is_first_host and ((group_firmware_update_job_status.get('json') or {}).get('resultCode') is none))
 

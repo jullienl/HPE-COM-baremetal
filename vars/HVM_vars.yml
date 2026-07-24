@@ -1,0 +1,316 @@
+---
+# =====================================================================================================================
+# Variables for the HPE Morpheus VM Essentials - HVM OS (Ubuntu 24.04) bare metal provisioning playbook
+# (HVM_provisioning.yml)
+#
+# Host information (name, IP and Serial number) is provided by the Ansible inventory 'hosts_HVM' file:
+#   HVM-1 os_ip_address=192.168.3.180 serial_number=CZ2311004G
+#   HVM-2 os_ip_address=192.168.3.181 serial_number=CZ2311004H
+# =====================================================================================================================
+
+
+#---------------------- Network settings -------------------------------------------------------------------------------
+
+gateway: "192.168.1.1"
+nameserver: "192.168.2.1,192.168.2.3"   # Comma-separated list of DNS servers
+netmask: "255.255.252.0"                # Dotted-quad netmask (used for reference / DNS tasks)
+netmask_cidr: 22                        # Same netmask expressed as a CIDR prefix length (used by the autoinstall netplan)
+domain: "lj.lab"
+
+# --- Management NIC selection --------------------------------------------------------------------------------------
+# The management interface is selected in one of three ways, controlled by 'bond_member_selection'. NOTE: the HPE
+# 'hpe-vm' installer builds the VME management/compute networks as Open vSwitch (OVS) bridges from a *physical* NIC, so
+# the autoinstall seed assigns the management IP to a single plain NIC (renamed to 'mgmt0') and does NOT pre-build a
+# Linux bond (a pre-built kernel bond would make OVS fail to enslave the ports with "Device or resource busy"). The
+# variables below therefore select which physical port becomes 'mgmt0' (the FIRST derived MAC / interface is used):
+#
+#   'auto'   -> (recommended, generation-independent) the playbook derives the member MAC addresses from the COM
+#               server inventory. It picks the first 'bond_member_count' Ethernet ports of the adapter whose name
+#               matches 'bond_member_adapter_match' (e.g. the OCP/LOM). MAC matching is immune to the interface-name
+#               differences between ProLiant generations (eno1 vs ens10f0 vs ens1f0 ...).
+#   'mac'    -> use the explicit MAC list in 'bond_member_macs' below (also generation-independent).
+#   'manual' -> use the explicit interface NAMES in 'bond_interfaces' below (only works if the names are correct for
+#               the specific server model).
+bond_member_selection: "auto"
+
+# Number of Ethernet ports to derive when 'bond_member_selection' is 'auto'. Only the first is currently used for the
+# 'mgmt0' management interface (the extra port is reserved for a future native-OVS bond).
+bond_member_count: 2
+
+# Substring used to select the mgmt Ethernet adapter from the COM inventory when 'bond_member_selection' is 'auto'.
+# It is matched case-insensitively against the adapter Name + Model + Description (e.g. "OCP" matches the onboard
+# "Intel Eth Adptr I350T4 OCPv3" OCP/LOM adapter). Only true Ethernet ports are considered: Fibre Channel / non-Ethernet
+# ports are automatically excluded even when they expose a MAC-like address (WWN). Leave empty ("") to consider all
+# adapters (Ethernet ports are then taken in inventory order).
+bond_member_adapter_match: "OCP"
+
+# Explicit MAC addresses to enslave to the mgmt bond when 'bond_member_selection' is 'mac' (colon-separated, any case;
+# they are normalized to lower case). Also populated internally with the derived list when 'bond_member_selection' is
+# 'auto'. In 'auto' mode the netplan seed matches each port by MAC and renames it to a stable interface ('mgmt0'/'mgmt1',
+# and 'comp0'/'comp1' for a dedicated compute team).
+bond_member_macs: []
+
+# Physical NIC names to enslave to the mgmt bond when 'bond_member_selection' is 'manual'. Interface names depend on
+# the server model/generation (e.g. eno1/eno2 on some HPE ProLiant servers, ens10f0/ens10f1 on OCP adapters). Verify
+# with 'ip a' / 'ip link' on the target host. Prefer 'auto' or 'mac' to avoid a wrong name leaving the bond with no
+# members (NO-CARRIER/down, i.e. no network after install).
+bond_interfaces:
+  - ens10f0
+  - ens10f1
+
+# --- Management-link redundancy (second NIC teaming) ----------------------------------------------------------------
+# When true (default), if a SECOND management NIC is cabled (link/carrier up) the playbook adds it to an active-backup
+# Open vSwitch bond ('mgmtbond' = mgmt0 + mgmt1) on the VME 'mgmt' bridge, AFTER the host has joined the HVM cluster
+# (the OVS bridge is built by the VME Manager at join time). The second NIC is the second port derived by
+# 'bond_member_selection', so keep 'bond_member_count' >= 2. A host with a single cabled NIC is unaffected: the second
+# NIC (renamed to 'mgmt1' but with no carrier) simply stays unused and no bond is created. The team is a NATIVE OVS
+# bond (not a Linux/networkd bond), which is required so OVS can own the physical ports.
+hvm_second_nic_team: true
+
+# OVS bond mode used for the management team. 'active-backup' (default) needs NO switch-side configuration and is the
+# safe choice for management redundancy. Use 'balance-tcp' (LACP) or 'balance-slb' only if the upstream switch ports
+# are configured accordingly (e.g. an LACP port-channel), otherwise the link will break.
+hvm_mgmt_bond_mode: "active-backup"
+
+# --- Separate compute (VM) network (optional, future-proofing; default OFF = converged) -----------------------------
+# By default the compute (VM) network SHARES the same physical uplink and OVS bridge as management (the HPE
+# 'hpe-vm -i mgmt0 -c mgmt0' converged model). In that converged model, teaming the second management NIC also protects
+# all VM/compute VLAN traffic (they ride the same 'mgmt' bridge), so nothing else is needed - this is the validated path.
+#
+# Set 'hvm_separate_compute_network' to true ONLY on hosts that have DEDICATED compute NIC(s) and were deployed with a
+# separate compute interface ('hpe-vm ... -c comp0'). When true:
+#   * the autoinstall seed renames the dedicated compute port(s) to a stable 'comp0' (+ 'comp1'),
+#   * 'vme_compute_net_interface' becomes 'comp0' (passed to the VME Manager so it builds a separate compute bridge),
+#   * Play 4 teams a cabled 'comp1' with 'comp0' on whichever OVS bridge owns 'comp0' (discovered at run time with
+#     'ovs-vsctl port-to-br', so the compute bridge name never has to be known in advance).
+#
+# NIC-count requirement (physical ports that must be present/cabled on the host):
+#   * converged default (this flag OFF): 1 mgmt NIC minimum; a 2nd cabled mgmt NIC adds the 'mgmtbond' team.
+#   * separate compute, no redundancy: 2 NICs (1 mgmt + 1 compute) -> set 'bond_member_count: 1' and
+#     'hvm_compute_nic_count: 1'.
+#   * separate compute, FULLY redundant (the defaults 'bond_member_count: 2' + 'hvm_compute_nic_count: 2'):
+#     4 cabled NICs (2 mgmt + 2 compute). When 'hvm_compute_adapter_match' is empty those 4 ports must be on the
+#     SAME adapter (the compute ports are taken as [bond_member_count : bond_member_count + hvm_compute_nic_count]);
+#     use 'hvm_compute_adapter_match' to place the compute ports on a DIFFERENT adapter instead.
+# NOTE: This separate-compute path has not been tested.
+hvm_separate_compute_network: false
+
+# Number of physical NICs to dedicate to the compute team when 'hvm_separate_compute_network' is true (>=1; 2 = teamed).
+hvm_compute_nic_count: 2
+
+# Adapter name/model substring used to select the DEDICATED compute NIC(s) from the COM inventory (auto mode). Leave
+# empty ("") to reuse the management adapter and take the ports that FOLLOW the management ports on the same adapter
+# (i.e. ports [bond_member_count : bond_member_count + hvm_compute_nic_count]).
+hvm_compute_adapter_match: ""
+
+# NIC-team definitions consumed by Play 4 (management-link redundancy). Each entry pairs a primary uplink with a
+# secondary NIC and the OVS bond name to create; Play 4 discovers which OVS bridge owns the primary at run time. The
+# compute team is only added when a separate compute network is used, so the converged default yields the mgmt team only.
+hvm_nic_teams: >-
+  {{ [{'primary': 'mgmt0', 'secondary': 'mgmt1', 'bond': 'mgmtbond'}]
+     + ([{'primary': 'comp0', 'secondary': 'comp1', 'bond': 'compbond'}]
+        if (hvm_separate_compute_network | default(false) | bool) else []) }}
+
+# Optional management VLAN id. When set to a value > 0, the management IP is placed on a tagged VLAN interface
+# (mgmt0.<vlan>), which is the typical HPE VME configuration. Set to 0 (or comment out) for an untagged management network.
+mgmt_vlan: 0
+
+# Optional HTTP/HTTPS proxy used by the installer. Leave empty for no proxy.
+proxy_url: ""
+
+
+#---------------------- HVM host admin account -------------------------------------------------------------------------
+
+# The local administrative user created during the HVM OS installation is defined once, in the encrypted
+# 'vars/VME_Manager_vars_encrypted.yml' ('hvm_ssh_username' / 'hvm_ssh_password'). That single account is used by the
+# Ubuntu autoinstall seed to create the user, by the Ansible post-install play for SSH/sudo, and by the VME Manager to
+# add the host to an HVM cluster. This avoids duplicating the username here.
+
+# To change the password, update 'hvm_ssh_password' in the encrypted vars file (no separate hash to maintain):
+#   > ansible-vault edit vars/VME_Manager_vars_encrypted.yml
+hashed_root_password: "{{ hvm_ssh_password | password_hash('sha512') }}"
+
+
+#---------------------- Time synchronization (NTP) --------------------------------------------------------------------
+
+# NTP servers configured on the HVM host after installation via chrony (a drop-in in /etc/chrony/sources.d/), as
+# recommended by HPE. The HVM OS uses chrony for time synchronization.
+# NTP is crucial for HVM hosts to coordinate cluster operations.
+ntp_servers:
+  - pool.ntp.org
+  - time.google.com
+
+
+#---------------------- Storage settings -------------------------------------------------------------------------------
+
+# OS boot volume RAID type and size (used only when an HPE MR or SR controller is present, i.e. no NS204i and no
+# single local disk). With an NS204i controller the RAID1 volume is created automatically and this is ignored.
+raid_type: RAID1        # Supported RAID types: RAID0, RAID1, RAID5
+volume_size_in_GB: -1   # A number > 0, or -1 to use the entire disk.
+
+# Disk selection strategy for the Ubuntu autoinstall storage layout.
+# 'largest'  -> use the largest disk (typically the local NS204i/MR/SR OS boot volume when no SAN is presented).
+# 'smallest' -> use the smallest disk.
+# COM detects the boot volume size at runtime (boot_drive_bytes_size) and it is shown in the generated user-data for
+# reference. Keep SAN volumes unpresented during installation (see README) so the intended local volume is selected.
+install_disk_match: "largest"
+
+# Clear foreign/unreadable partition tables on NON-target disks before the OS installation (default true). The seed's
+# autoinstall 'early-commands' identify the OS boot disk (by controller type + COM-detected size) and always clear ITS
+# partition table (clearpart equivalent). When this is true, they ALSO clear the partition table of any OTHER disk
+# whose table is foreign/unreadable to the installer (blkid PTTYPE is neither 'gpt' nor 'dos') - e.g. a leftover VMFS
+# or foreign-RAID signature from a previous deployment. This is REQUIRED because such a disk makes the Ubuntu
+# Subiquity guided installer crash ("Disk(ptable='unsupported' ...)" -> "KeyError: 'unsupported'") while enumerating
+# all disks, even when it is not the install target. Disks carrying a valid GPT/DOS partition table (i.e. real data
+# disks) are LEFT UNTOUCHED. Set to false only if you are certain no disk has a foreign table (a foreign one will then
+# abort the installation).
+hvm_clear_foreign_partitions: true
+
+
+#---------------------- BIOS / Workload profile ------------------------------------------------------------------------
+
+workload_profile_name: "Virtualization - Power Efficient"
+  # Supported workload profiles:
+  # - Virtualization - Max Performance
+  # - Virtualization - Power Efficient
+  # - General Peak Frequency Compute
+  # - General Power Efficient Compute
+  # - General Throughput Compute
+  # - Low Latency
+
+
+#---------------------- HPE VM Essentials Manager / HVM cluster --------------------------------------------------------
+
+# When true, the playbook will (on the first inventory host only) create the HVM cluster in the VME Manager if it does
+# not already exist, then add the host to it. Subsequent hosts are added to the (now existing) cluster.
+join_hvm_cluster: true
+
+# Name of the HVM cluster in the VME Manager (created if not present when join_hvm_cluster is true).
+cluster_name: "HVM-Cluster-01"
+
+# VME Manager "Group" the cluster belongs to (a Morpheus concept). The group must already exist in the manager.
+vme_group_name: "VME_Group"
+
+# Cluster layout name shown in the VME Manager UI (leave at the documented default unless HPE changes it).
+vme_cluster_layout: "HVM 1.3 Cluster on HVM/Ubuntu 24.04"
+
+# Network interfaces passed to the VME Manager when creating/joining the cluster (see the HPE "Creating an HVM cluster"
+# procedure). The management interface references the single management NIC 'mgmt0' built by the seed: it is the TAGGED
+# VLAN sub-interface when 'mgmt_vlan' > 0, otherwise the plain 'mgmt0'. The compute interface is the untagged 'mgmt0' in
+# the converged model, or the dedicated 'comp0' when 'hvm_separate_compute_network' is true.
+vme_mgmt_net_interface: "{{ 'mgmt0.' ~ mgmt_vlan if (mgmt_vlan | int) > 0 else 'mgmt0' }}"
+vme_compute_net_interface: "{{ 'comp0' if (hvm_separate_compute_network | default(false) | bool) else 'mgmt0' }}"
+# Compute VLANs for which port groups will be created by the VME Manager.
+vme_compute_vlans:
+  - 100
+  - 101
+
+# Morpheus service plan used for the first (manual / existing-host) MVM node when creating or joining the cluster.
+# 'Default Manual' is the plan HPE provides for adding an already-installed host to an MVM cluster.
+vme_service_plan_name: "Default Manual"
+
+# HVM node disk layout passed to the VME Manager (config.diskMode in the cluster wizard). 'lvm' matches the HVM OS install.
+vme_disk_mode: "lvm"
+
+# ---- Optional VME Manager auto-deployment (hook, disabled by default) ------------------------------------------------
+# The VME Manager is a virtual appliance that must exist before a cluster can be created. Its deployment is performed
+# with the interactive 'sudo hpe-vm' console on one host (see the HPE guide) and is NOT fully automated here.
+# When 'deploy_vme_manager' is true, the playbook checks (on the first host) whether the manager URL is reachable and,
+# if not, fails early with guidance instead of silently continuing. Set to false when a manager already exists.
+deploy_vme_manager: false
+# ISO (containing the qcow2 appliance) used to deploy the VME Manager, downloaded from My HPE Software Center.
+vme_manager_image_url: "https://liogw.lj.lab/deployment/hvm24.04/HPE_VM_Essentials_SW_image_v8.0.12_S5Q83-11039.iso"
+
+
+#---------------------- COM server group settings ----------------------------------------------------------------------
+
+# Name of the definitive server group where to place the host at the end of provisioning (created if not already present)
+server_group_name: "HVM_group"
+# Name of the firmware server setting to be defined in the definitive server group (created if not already present)
+firmware_server_setting_name: "HVM firmware baseline"
+
+# Firmware baselines to be defined in the firmware server setting of the definitive server group.
+#  Note:
+#    - Only firmware baselines that are currently active and available in the COM UI can be specified here.
+#    - If you do not want to use a firmware baseline for a specific generation, set the value to "".
+Gen10_10p_firmware_bundle_name: "2025.11.00.00"
+Gen11_firmware_bundle_name: "2025.11.01.00"
+Gen12_firmware_bundle_name: "2025.11.01.00"
+
+# Downgrade components policy to match baseline (boolean).
+firmware_downgrade_policy: false
+
+# Install HPE drivers and software policy in the definitive server group (boolean).
+install_SWDrivers_policy: false
+
+# When false, the firmware update phase is skipped entirely (OS install + cluster join only).
+enable_firmware_update: true
+
+
+#------------------------ ISO settings -------------------------------------------------------------------------------
+
+# URL where the source HPE HVM Install ISO can be found
+src_iso_url: "https://liogw.lj.lab/deployment/hvm24.04/"
+# HPE HVM Install ISO file name (Ubuntu 24.04 based, downloaded from My HPE Software Center)
+src_iso_file: "HPE_HVM_Install_24.04_S5Q83-11078.iso"
+
+# Directory on the Ansible control node where the source ISO will be copied (created if not present).
+# Note: You must define a directory in your user home directory using {{ lookup('env','HOME') }}.
+src_iso_directory: "{{ lookup('env','HOME') }}/ISOs/hvmisosrc"
+
+# Directory on the Ansible control node used to stage the files to build the per-host ISO with the custom autoinstall
+# seed (created if not present).
+staging_directory: "{{ lookup('env','HOME') }}/staging"
+
+# Split-media model (recommended): the large HPE HVM boot ISO is prepared and copied to nginx only ONCE and reused as
+# the COM OS image 'mediaUrl' for every host, while only a small per-host cloud-init seed ISO (a few KB) is generated
+# per server and attached via the COM 'unattendedInstallationFileUrl' field. This avoids copying the multi-GB ISO for
+# each host. 'prepared_iso_file' is the shared boot ISO name built from '{{ src_iso_file }}' (GRUB timeout=0 + the
+# autoinstall datasource switched to an external CIDATA seed).
+prepared_iso_file: "HPE_HVM_Install_24.04_prepared.iso"
+
+
+#------------------------ Autoinstall seed --------------------------------------------------------------------------
+
+# Folder located in /files that stores the autoinstall seed templates (user-data.j2 and meta-data.j2).
+# Recommended naming: HVM_<ubuntu_release>.
+hvm_build: "HVM_24.04"
+
+# Name of the autoinstall user-data template (Jinja2).
+autoinstall_template: "user-data.j2"
+
+# COM operating system image type used for the OS image server setting.
+# HVM OS is Ubuntu 24.04 based; COM boots the custom ISO through iLO virtual media.
+com_os_type: "UBUNTU_LINUX"
+
+
+#------------------------ HPE Agentless Management Service (AMS) -----------------------------------------------------
+
+# COM only marks a Group OS Installation job as "complete" once the HPE management agent inside the freshly installed
+# OS checks in with iLO (which then reports completion to COM). ESXi ships AMS natively and RHEL installs the amsd rpm
+# in its kickstart %post; the stock HPE HVM ISO seed does NOT install it, so without the steps below COM never detects
+# the HVM install completion (the job times out).
+#
+# To avoid depending on the HPE SDR being reachable at install time, the amsd .deb is bundled in this project (see
+# 'files/{{ hvm_build }}/{{ AMS_package }}', same approach as the RHEL/Windows agents). The playbook adds it to the
+# per-host cloud-init seed ISO; the autoinstall seed copies it onto the installed system and installs it on first boot
+# with 'dpkg -i'. This is fully offline: all of amsd's dependencies (libc6, libgcc-s1, libjson-c5, libstdc++6,
+# libsystemd0, lsof) already ship in the minimal HVM install image, so nothing is downloaded. amsd then starts, iLO
+# reports the OS as up and COM marks the install complete.
+install_ams: true
+# Name of the bundled HPE Agentless Management Service (amsd) Debian package for Ubuntu 24.04 (noble).
+# Download it from https://support.hpe.com and place it in 'files/{{ hvm_build }}/'.
+AMS_package: "amsd_4.7.0-2151.6-ubuntu24_amd64.deb"
+
+
+#------------------------ HPE Integrated Smart Update Tools (iSUT) -----------------------------------------------------
+
+# HPE Integrated Smart Update Tools (iSUT / SUT) lets COM install HPE firmware and drivers online on the running HVM
+# host (used together with the COM firmware baseline and 'install_SWDrivers_policy'). Unlike amsd - which must be in
+# place during the OS install so COM can detect completion, hence it is bundled into the cloud-init seed - iSUT is only
+# needed afterwards, so the post-installation play copies it to the host over SSH and installs it with apt (which
+# resolves its dependencies from the HPE-curated repositories). Set 'install_sut' to false to skip it.
+install_sut: true
+# Name of the bundled HPE iSUT Debian package. The HVM OS is Ubuntu 24.04 based, so the '.deb' is REQUIRED - the RHEL
+# '.rpm' will NOT install on it. Download it from https://support.hpe.com and place it in 'files/{{ hvm_build }}/'.
+SUT_package: "sut-6.7.0-10_amd64.deb"

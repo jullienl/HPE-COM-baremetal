@@ -1,4 +1,16 @@
 ---
+# =====================================================================================================================
+# Create an HPE Compute Ops Management (COM) API session
+#
+# The COM API is based on OAuth2, which exposes a token endpoint. This task set obtains a bearer token used by the
+# COM API tasks in XXX_unprovisioning.yml and XXX_provisioning.yml
+# 
+# Requires (from vars/GLP_COM_API_credentials_encrypted.yml):
+#   - ClientID
+#   - ClientSecret
+# Sets the fact:
+#   - access_token
+# ===================================================================================================================== 
 
 - name: Create HPE Compute Ops Management session
   uri:

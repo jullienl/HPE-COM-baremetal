@@ -1,0 +1,397 @@
+---
+# =====================================================================================================================
+#   Playbook for HVM server unprovisioning:
+#     - Remove the host from its HVM cluster in the VME Manager (if present)
+#     - Remove the server from any COM server group
+#     - Power off the server
+#     - Remove the host SSH key from .ssh/known_hosts on the Ansible control node
+#     - Remove the DNS record
+#
+#   Commands that can be used to run this playbook:
+#
+#     $ ansible-playbook -i "CZ2311004G," HVM_unprovisioning.yml --ask-vault-password
+#     or
+#     $ ansible-playbook -i "CZ2311004G,CZ2311004H" HVM_unprovisioning.yml --ask-vault-password
+#
+#   With a pass file containing the vault/become password:
+#     $ ansible-playbook -i "CZ2311004G," HVM_unprovisioning.yml --become-password-file pass --vault-password-file pass
+#
+#   Note: the inventory is a comma-separated list of server serial numbers.
+# =====================================================================================================================
+
+
+- name: Deleting provisioned HVM host(s)
+  hosts: all
+  gather_facts: no
+  vars_files:
+    - vars/HVM_vars.yml
+    - vars/GLP_COM_API_credentials_encrypted.yml
+    - vars/VME_Manager_vars_encrypted.yml
+    - vars/api_versions.yml
+  vars:
+    ansible_forks: 5
+
+  tasks:
+
+#--------------------------------------Capture start time--------------------------------------------------------------
+
+  - name: Gather subset facts on localhost
+    setup:
+      gather_subset: [all]
+    delegate_to: localhost
+
+  - name: Capture the start time
+    set_fact:
+      start_time: "{{ ansible_date_time.iso8601 }}"
+
+  - debug: var=start_time
+
+
+#--------------------------------------Authentication with COM---------------------------------------------------------
+
+  - name: Create HPE Compute Ops Management session
+    import_tasks: files/Create_COM_session.yml
+
+
+#--------------------------------------Capture Job Templates IDs-------------------------------------------------------
+
+  - name: Capture Job Templates IDs
+    import_tasks: files/Get_job_templates_id.yml
+
+
+#--------------------------------------Capture server information -----------------------------------------------------
+
+  - name: Capture server '{{ inventory_hostname }}' information
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ inventory_hostname }}'"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server
+    delegate_to: localhost
+
+  - name: Exit if server '{{ inventory_hostname }}' does not exist
+    fail:
+      msg: "Server '{{ inventory_hostname }}' does not exist!"
+    when: server.json.count == 0
+
+  - name: Capture server '{{ inventory_hostname }}' facts
+    set_fact:
+      server_id: "{{ server | json_query('json.items[0].id') }}"
+      server_name: "{{ server | json_query('json.items[0].name') | lower }}"
+      server_uri: "{{ server | json_query('json.items[0].resourceUri') }}"
+      server_connected_status: "{{ server | json_query('json.items[0].state.connected') }}"
+      server_ilo_ip: "{{ server | json_query('json.items[0].hardware.bmc.ip') }}"
+
+  - debug: var=server_id
+  - debug: var=server_name
+
+  - name: Exit if server '{{ inventory_hostname }}' is not connected to COM
+    fail:
+      msg:
+        - "Server '{{ inventory_hostname }}' is not connected to COM!"
+        - "Make sure to connect the server's iLO to COM ! Go to iLO UI / Management / Compute Ops Management"
+    when: server_connected_status == false
+
+
+# =====================================================================================================================
+#   Remove host from the HVM cluster (VME Manager)
+#
+#   Removing an 'mvm-cluster' member is asymmetric with the join and needs three steps:
+#
+#     1. Locate the member : the cluster lookup ('GET /api/clusters?name=...') EMBEDS its members in
+#                            'clusters[0].servers[]'. A dedicated 'GET /api/clusters/{id}/servers' is NOT
+#                            supported for an 'mvm-cluster' (HTTP 400), so the embedded list is reused.
+#     2. Match the member  : members carry an 'id' and a 'name' but NO serial number. Both the cluster-create and the
+#                            add-worker paths now register the host under its host name (e.g. 'HVM-2'); older create
+#                            runs stored it under the OS management IP (e.g. '192.168.3.181'). To match either way we
+#                            resolve the host's OS IP from DNS and also try the FQDN and short host name (see below).
+#     3. Remove the member : verified behaviour for an 'mvm-cluster' of COM-managed ('manual') hosts:
+#                            - the cluster worker-delete endpoint 'DELETE /api/clusters/{cid}/servers/{id}' is
+#                              REJECTED (HTTP 400 "does not support direct removal of workers") - never used;
+#                            - a member is removed via the host-delete endpoint
+#                              'DELETE /api/servers/{id}?force=on&removeResources=off' ('force' is a STRING whose
+#                              default is "off"; 'removeResources=off' because COM - not Morpheus - owns the
+#                              hardware). This is ASYNCHRONOUS: it returns {'success': true} at once, the server
+#                              goes to 'deprovisioning' and disappears a few seconds later - so we POLL until gone;
+#                            - the LAST remaining member CANNOT be removed on its own; the only way is to DELETE THE
+#                              WHOLE CLUSTER 'DELETE /api/clusters/{cid}?force=on&removeResources=off' (also async).
+#                            So: if this teardown batch removes EVERY current member we delete the cluster once
+#                            (taking all members with it); otherwise each host removes itself as a worker (members
+#                            outside the batch always remain, so no host is ever "the last worker").
+#
+#   NOTE: the VME Manager (Morpheus) API schema can vary between versions. Validate the endpoints below against
+#   your deployed manager's API reference and adjust if needed. All steps are gated by 'join_hvm_cluster' and are
+#   a no-op when the host was never joined.
+# =====================================================================================================================
+
+  - name: Create a VME Manager session
+    import_tasks: files/Create_VME_session.yml
+    when: join_hvm_cluster | bool
+
+  - name: Look up the HVM cluster '{{ cluster_name }}' in the VME Manager
+    uri:
+      url: "{{ vme_manager_url }}/api/clusters?name={{ cluster_name | urlencode }}&max=1"
+      method: GET
+      validate_certs: false
+      headers:
+        Authorization: "Bearer {{ vme_access_token }}"
+        Accept: "application/json"
+    register: vme_cluster_lookup
+    delegate_to: localhost
+    when: join_hvm_cluster | bool
+
+  # The '/api/clusters?name=...' response embeds the cluster members in 'clusters[0].servers[]'. For an
+  # 'mvm-cluster' a separate 'GET /api/clusters/{id}/servers' is NOT supported (it returns HTTP 400
+  # "Cluster type 'mvm-cluster' does not support resource type 'server'"), so we reuse the embedded list.
+  - name: Set the cluster id and its member-server list from the lookup
+    set_fact:
+      hvm_cluster_id: "{{ (vme_cluster_lookup.json.clusters | default([]))[0].id | default('') }}"
+      vme_cluster_servers_list: "{{ (vme_cluster_lookup.json.clusters | default([]))[0].servers | default([]) }}"
+    when: join_hvm_cluster | bool
+
+  # The embedded member entries expose 'id' and 'name' but NOT a serial number. Both the create and add-worker paths
+  # now register the host under its host name ('HVM-2'); older create runs stored it under the OS management IP. The
+  # OS IP is not available here (the unprovisioning inventory is a list of serial numbers), so it is resolved from DNS
+  # using the A record the provisioning playbook created for the host, and used alongside the host name to match.
+  - name: Resolve the OS management IP of '{{ inventory_hostname }}' from DNS (VME stores the cluster member by its OS IP)
+    ansible.builtin.shell: "getent ahostsv4 {{ server_name }} | awk '{ print $1; exit }'"
+    register: os_ip_lookup
+    changed_when: false
+    failed_when: false
+    delegate_to: localhost
+    when: join_hvm_cluster | bool and hvm_cluster_id | string | length > 0
+
+  - name: Set the resolved OS management IP
+    set_fact:
+      os_mgmt_ip: "{{ os_ip_lookup.stdout | default('') | trim }}"
+    when: join_hvm_cluster | bool and hvm_cluster_id | string | length > 0
+
+  # Build the list of identifiers that could match the VME member 'name'. Depending on how the node was added, VME
+  # stores the member either by its OS management IP (older create path) or by its host name (add-worker path, which
+  # sends 'name'/'hostname' = inventory_hostname). We therefore try the resolved OS IP, the FQDN and the short host
+  # name. The comparison below is case-insensitive because VME preserves the original case (e.g. 'HVM-2') while the
+  # inventory host name may be lower-cased ('hvm-2').
+  - name: Build the set of identifiers that could match the VME cluster member
+    set_fact:
+      member_match_candidates: >-
+        {{ [ os_mgmt_ip | default('') , server_name , server_name.split('.')[0] ]
+           | select('string') | reject('equalto', '') | map('lower') | unique | list }}
+    when: join_hvm_cluster | bool and hvm_cluster_id | string | length > 0
+
+  - name: Find the VME server id of '{{ inventory_hostname }}' in cluster '{{ cluster_name }}' (matched by OS IP / host name)
+    set_fact:
+      vme_server_id: >-
+        {{ (vme_cluster_servers_list | default([])
+            | selectattr('name', 'defined')
+            | selectattr('name', 'match', '(?i)^(' ~ (member_match_candidates | map('regex_escape') | join('|')) ~ ')$')
+            | map(attribute='id') | list | first) | default('') }}
+    when: join_hvm_cluster | bool and hvm_cluster_id | string | length > 0
+
+  - name: Show the cluster member list and the matched VME server id (for troubleshooting)
+    debug:
+      msg:
+        - "Resolved OS management IP: '{{ os_mgmt_ip | default('') }}'"
+        - "Match candidates: {{ member_match_candidates | default([]) }}"
+        - "Cluster members (name -> id): {{ vme_cluster_servers_list | selectattr('name', 'defined') | map(attribute='name') | list }}"
+        - "Matched vme_server_id: '{{ vme_server_id | default('') }}'"
+    when: join_hvm_cluster | bool and hvm_cluster_id | string | length > 0
+
+  # --- Decide how to remove this host's cluster membership (see the header block for the verified API behaviour) ---
+  # 'vme_server_id' is now set on every batch host (or '' if the host is not a cluster member). Aggregate across the
+  # batch to learn whether EVERY current cluster member is being torn down in this run. Tasks run in lockstep across
+  # hosts, so by this point all hosts have computed 'vme_server_id' and the aggregation via hostvars is complete.
+  - name: Aggregate the teardown decision across the batch
+    set_fact:
+      hvm_torndown_member_ids: >-
+        {{ ansible_play_batch | map('extract', hostvars)
+           | map(attribute='vme_server_id', default='') | map('string')
+           | reject('equalto', '') | unique | list }}
+      hvm_all_member_ids: >-
+        {{ vme_cluster_servers_list | default([]) | selectattr('id', 'defined')
+           | map(attribute='id') | map('string') | list }}
+    when: join_hvm_cluster | bool and hvm_cluster_id | string | length > 0
+
+  - name: Determine whether the whole cluster is being torn down (last-worker case)
+    set_fact:
+      hvm_whole_cluster_teardown: "{{ (hvm_all_member_ids | difference(hvm_torndown_member_ids) | length) == 0 }}"
+    when: join_hvm_cluster | bool and hvm_cluster_id | string | length > 0
+
+  # --- Path A: cluster survives -> remove this host as a worker (async host-delete), then poll until it is gone ----
+  - name: Remove HVM host '{{ inventory_hostname }}' as a cluster worker (host delete, async)
+    uri:
+      url: "{{ vme_manager_url }}/api/servers/{{ vme_server_id }}?force=on&removeResources=off"
+      method: DELETE
+      status_code: 200, 202, 204
+      validate_certs: false
+      headers:
+        Authorization: "Bearer {{ vme_access_token }}"
+    delegate_to: localhost
+    when:
+      - join_hvm_cluster | bool
+      - hvm_cluster_id | string | length > 0
+      - vme_server_id | string | length > 0
+      - not (hvm_whole_cluster_teardown | bool)
+
+  - name: Wait until HVM host '{{ inventory_hostname }}' (server id {{ vme_server_id }}) has left the VME Manager
+    uri:
+      url: "{{ vme_manager_url }}/api/servers/{{ vme_server_id }}"
+      method: GET
+      status_code: 200, 404
+      validate_certs: false
+      headers:
+        Authorization: "Bearer {{ vme_access_token }}"
+        Accept: "application/json"
+    register: hvm_worker_gone
+    until: hvm_worker_gone.status == 404
+    retries: 30
+    delay: 10
+    failed_when: false
+    delegate_to: localhost
+    when:
+      - join_hvm_cluster | bool
+      - hvm_cluster_id | string | length > 0
+      - vme_server_id | string | length > 0
+      - not (hvm_whole_cluster_teardown | bool)
+
+  # --- Path B: whole cluster in the batch -> delete the cluster once (removes all members + cluster), then poll -----
+  - name: Delete the whole HVM cluster '{{ cluster_name }}' (removes all remaining members, async)
+    uri:
+      url: "{{ vme_manager_url }}/api/clusters/{{ hvm_cluster_id }}?force=on&removeResources=off"
+      method: DELETE
+      status_code: 200, 202, 204
+      validate_certs: false
+      headers:
+        Authorization: "Bearer {{ vme_access_token }}"
+    delegate_to: localhost
+    run_once: true
+    when:
+      - join_hvm_cluster | bool
+      - hvm_cluster_id | string | length > 0
+      - hvm_whole_cluster_teardown | bool
+
+  - name: Wait until the HVM cluster '{{ cluster_name }}' is fully removed
+    uri:
+      url: "{{ vme_manager_url }}/api/clusters?name={{ cluster_name | urlencode }}&max=1"
+      method: GET
+      validate_certs: false
+      headers:
+        Authorization: "Bearer {{ vme_access_token }}"
+        Accept: "application/json"
+    register: hvm_cluster_gone
+    until: (hvm_cluster_gone.json.clusters | default([]) | length) == 0
+    retries: 30
+    delay: 10
+    failed_when: false
+    delegate_to: localhost
+    run_once: true
+    when:
+      - join_hvm_cluster | bool
+      - hvm_cluster_id | string | length > 0
+      - hvm_whole_cluster_teardown | bool
+
+
+#--------------------------------------Remove the server from server group --------------------------------------------
+
+  - name: Check if server '{{ inventory_hostname }}' is a member of a server group
+    uri:
+      url: "{{ ConnectivityEndpoint }}/ui-doorway/compute/v2/servers/{{ server_id }}"
+      method: GET
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server_info_from_ui_doorway
+    delegate_to: localhost
+
+  - name: Capture the id of the server group of which the server is a member (if applicable)
+    set_fact:
+      server_group_id_found: "{{ server_info_from_ui_doorway.json.group_.id }}"
+      server_group_name_found: "{{ server_info_from_ui_doorway.json.group_.name }}"
+    when: server_info_from_ui_doorway.json.get('group_') is not none
+
+  - name: Remove server '{{ inventory_hostname }}' from its server group
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ server_group_id_found }}/devices/unassign"
+      method: POST
+      status_code: 202
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        devices:
+          - deviceId: "{{ server_id }}"
+    delegate_to: localhost
+    when: server_info_from_ui_doorway.json.get('group_') is not none
+
+  - name: Wait for unassignment to complete
+    pause:
+      seconds: 15
+    when: server_info_from_ui_doorway.json.get('group_') is not none
+
+
+#--------------------------------------Power off the server -----------------------------------------------------------
+
+  - name: Power off server '{{ inventory_hostname }}'
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        jobTemplate: "{{ PowerOff_New_job_template_id }}"
+        resourceId: "{{ server_id }}"
+        resourceType: "compute-ops-mgmt/server"
+    register: power_off_status
+    delegate_to: localhost
+
+
+#--------------------------------------Remove SSH key from Ansible control node ---------------------------------------
+
+  - name: Extract hostname from '{{ server_name }}'
+    set_fact:
+      hostname: "{{ server_name.split('.')[0] }}"
+
+  # During provisioning the post-install SSH play connected with 'ansible_host' set to the host's OS management IP,
+  # so its SSH host key was stored in known_hosts keyed by that IP (e.g. '192.168.3.182') - and possibly by the FQDN
+  # and short name as well. Removing only the name entries leaves the stale IP-keyed line behind (the reported issue),
+  # so resolve the OS IP from DNS and purge all three forms. The DNS record is still present at this point (it is
+  # deleted by the next play), so the lookup resolves. 'getent' is best-effort: if it returns nothing the IP is simply
+  # skipped.
+  - name: Resolve the OS management IP of '{{ server_name }}' from DNS (for known_hosts cleanup)
+    ansible.builtin.shell: "getent ahostsv4 {{ server_name }} | awk '{ print $1; exit }'"
+    register: known_hosts_ip_lookup
+    changed_when: false
+    failed_when: false
+    delegate_to: localhost
+
+  - name: Remove any stale SSH host key for '{{ inventory_hostname }}' (IP, FQDN and short name) from known_hosts
+    known_hosts:
+      name: "{{ item }}"
+      path: ~/.ssh/known_hosts
+      state: absent
+    loop: "{{ [ known_hosts_ip_lookup.stdout | default('') | trim, server_name, hostname ] | select('string') | reject('equalto', '') | unique | list }}"
+    delegate_to: localhost
+
+
+#-------------------------------------- Delete DNS record (WinRM mode) ------------------------------------------------
+
+- name: Remove the DNS record from DNS server
+  hosts: all
+  gather_facts: no
+  vars:
+    ansible_forks: 5
+  vars_files:
+    - vars/Windows_DNS_vars_encrypted.yml
+  tasks:
+
+    - name: Remove "{{ hostname }}" from "{{ dns_server }}"
+      ansible.windows.win_dns_record:
+        name: "{{ hostname }}"
+        type: "A"
+        zone: "{{ domain }}"
+        state: absent
+      delegate_to: "{{ dns_server }}"

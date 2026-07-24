@@ -1,10 +1,26 @@
 ---
 collections:  
   # Community.general collection (includes a wide variety of plugins, modules, and roles that are not part of the core Ansible distribution)
+  # Only 'json_query' is used from here. Unpinned: on the current control node (Python 3.11 + ansible-core 2.19) the
+  # latest release installs cleanly (community.general 13.x requires ansible-core >= 2.18). The previous < 8.0.0 pin was
+  # a leftover from the old Python 3.9 / ansible-core 2.15 stack and no longer applies.
   - name: community.general
-  # Community.vmware collection is required for vCenter
+  # ESXi provisioning/unprovisioning cluster + host + maintenance-mode tasks use the vmware.vmware collection (below).
+  # community.vmware is retained for the modules that have no vmware.vmware equivalent yet (e.g. vmware_host_facts,
+  # vmware_host_vmnic_info, vmware_vmkernel, vmware_vswitch, vmware_portgroup, vmware_host_ntp/service_manager, ...).
+  # Unpinned: the latest release (community.vmware 6.x, requires ansible-core >= 2.19) still ships all of these and
+  # installs cleanly on this control node. The previous < 6.0.0 pin was a leftover from the old ansible-core 2.15 stack.
   - name: community.vmware
-  # Community.windows collection is required to create a DNS record - Also install ansible.windows collection 
-  - name: community.windows
+  # VMware.vmware collection: the supported replacement for the (now deprecated) community.vmware cluster/host/
+  # maintenance-mode modules. Provides cluster, cluster_info, cluster_ha, cluster_drs, esxi_host and
+  # esxi_maintenance_mode used by ESXi80_provisioning.yml / ESXi_unprovisioning.yml. Requires ansible-core >= 2.16.
+  - name: vmware.vmware
+  # Ansible.windows collection provides win_dns_record, used to create/remove the DNS record (this module was moved
+  # here from community.windows, which deprecated it).
+  - name: ansible.windows
   # Microsoft AD collection is required to add a computer to a Microsoft Active Directory domain.
   - name: microsoft.ad
+
+# Note: HVM (HPE VM Essentials) provisioning uses only ansible.builtin modules (apt, systemd, copy, uri, template,
+#       wait_for/wait_for_connection) for host configuration and the Morpheus-based VME Manager REST API, plus
+#       ansible.windows for the DNS record. No additional collection is required for HVM.

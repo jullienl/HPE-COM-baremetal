@@ -11,8 +11,16 @@ nameserver: "192.168.2.1,192.168.2.3"
 netmask: "255.255.252.0"
 domain: "lj.lab"
 
+# When true, a second uplink (vmnic1) is added to vSwitch0 for management-link redundancy, but ONLY if vmnic1 is
+# physically connected (link up). vSwitch0 uses its default active/active failover (route based on originating port
+# ID), which needs NO switch-side LAG - safe on a non-LAG fabric. Set to false to keep vSwitch0 on vmnic0 only.
+enable_nic_bonding: true
 
-#---------------------- VMware vCenter settings ------------------------------------------------------------------------------
+# Optional HTTP/HTTPS corporate proxy configured on the installed ESXi host (persistent, for shell/CLI-driven
+# downloads such as 'esxcli software ... --proxy'). ESXi has no single global HTTP proxy; this exports the proxy
+# for interactive shells. Internal traffic (localhost and the local '{{ domain }}' domain) bypasses the proxy.
+# Full URL form, e.g. "http://proxy.example.com:8080". Leave empty for a direct connection.
+proxy_url: ""
 
 vcenter_hostname: "vcenter.lj.lab"
 cluster_name: "DL-Cluster-01" # created if not present
@@ -21,12 +29,12 @@ datacenter_name: "Mougins"
 
 #------------------------ kickstart file customization ----------------------------------------------------------------------
 
-# Password for root
-# To generate a hashed password, you can use the following command for SHA512: 
-# > openssl passwd -6 
-# or
-# > python3 -c 'import crypt,getpass;pw=getpass.getpass();print(crypt.crypt(pw) if (pw==getpass.getpass("Confirm: ")) else exit())'
-hashed_root_password: "$6$favewluG8Rlhfobq$16Hr369SUSEgVxjDQPUQOMuiFlhks40o4WrMO4CNqDiAXTmA0TSsx3Ew6Y8tOKugA/X/rZyvsA/2sAXqYv.Pp0"
+# To change the password, update 'root_password' in the encrypted vars file (no separate hash to maintain):
+#   > ansible-vault edit vars/VMware_vCenter_vars_encrypted.yml
+# Note: 'rounds=5000' is REQUIRED for ESXi. It forces the classic '$6$salt$hash' crypt form. Without it,
+# passlib (the backend once Python's built-in 'crypt' module is gone in 3.13) emits '$6$rounds=656000$...',
+# which the ESXi weasel installer rejects with "crypted password is not valid" while parsing the kickstart.
+hashed_root_password: "{{ root_password | password_hash('sha512', rounds=5000) }}"
 
 
 #---------------------- Server settings --------------------------------------------------------------------------------------
@@ -85,6 +93,13 @@ src_iso_directory: "{{ lookup('env','HOME') }}/ISOs/esxiisosrc"
 # Directory on the Ansible control node to stage all files to build and generate the new ISO image with the custom kickstart (will be created if not already present).
 # Note: You must define a directory in your user home directory using {{ lookup('env','HOME') }}. 
 staging_directory: "{{ lookup('env','HOME') }}/staging"
+
+# Split-media model (recommended): the ESXi boot ISO is prepared and copied to nginx only ONCE and reused as the COM OS
+# image 'mediaUrl' for every host, while only a small per-host kickstart seed ISO (a few KB, holding KS.CFG) is generated
+# per server and attached via the COM 'unattendedInstallationFileUrl' field. ESXi finds the kickstart because the shared
+# boot.cfg is set to 'ks=cdrom:/KS.CFG', which scans the attached CD-ROM devices. This avoids rebuilding and copying the
+# multi-GB ISO for each host. 'prepared_iso_file' is the shared boot ISO name built from '{{ src_iso_file }}'.
+prepared_iso_file: "VMware-ESXi-8.0.2-22380479-prepared.iso"
 
 
 #------------------------ Kickstart file --------------------------------------------------------------------------------

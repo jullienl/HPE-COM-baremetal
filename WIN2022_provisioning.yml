@@ -16,7 +16,9 @@
 
 
 
-#-------------------------------------- Bare Metal Provisioning -------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
+#  Play 1 - Bare metal provisioning (COM orchestration, runs from the Ansible control node)
+# ---------------------------------------------------------------------------------------------------------------------
 
 - name: Automated Windows Server 2022 installation on HPE Compute Ops Managmeent server(s) using an auto-generated ISO file with customized unattend file
   hosts: WIN2022
@@ -95,14 +97,43 @@
       msg: "Server '{{ serial_number }}' cannot be found in COM!"
     when: server.json.count == 0
 
-  - name: Capture server '{{ serial_number }}' generation, id, uri, connection status and iLO IP
+  - name: Capture server '{{ serial_number }}' id, uri and connection status
     set_fact:
-      server_generation:  "{{ server | json_query('json.items[0].serverGeneration') }}"
-      server_model:  "{{ server | json_query('json.items[0].hardware.model') }}"
       server_id:  "{{ server | json_query('json.items[0].id') }}"
       server_resourceUri:  "{{ server | json_query('json.items[0].resourceUri') }}"
       server_connected_status:  "{{ server | json_query('json.items[0].state.connected') }}"
+
+  - name: Exit if server '{{ serial_number }}' is not connected to COM
+    fail:
+      msg: 
+        - "Server '{{ serial_number }}' is not connected to COM!" 
+        - "Make sure to connect the server's iLO to COM ! Go to iLO UI / Management / Compute Ops Management"
+    when: server_connected_status == false
+
+  # When a server has just been added to COM or is rebooting/re-discovering, the hardware fields (serverGeneration,
+  # model, powerState, iLO IP) are transiently reported as 'UNKNOWN' or empty. Wait until they are populated before
+  # capturing them, otherwise the power-on logic below (which keys off 'server_power_state') runs on bogus data.
+  - name: Wait until server '{{ serial_number }}' hardware information (generation, model, power state) is populated
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ serial_number }}'"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server
+    until:
+      - (server | json_query('json.items[0].serverGeneration') | default('UNKNOWN', true)) not in ['UNKNOWN', '']
+      - (server | json_query('json.items[0].hardware.model') | default('', true)) | length > 0
+      - (server | json_query('json.items[0].hardware.powerState') | default('UNKNOWN', true)) not in ['UNKNOWN', '']
+    retries: 30
+    delay: 20
+    delegate_to: localhost
+
+  - name: Capture server '{{ serial_number }}' generation, model, power state and iLO IP
+    set_fact:
+      server_generation:  "{{ server | json_query('json.items[0].serverGeneration') }}"
+      server_model:  "{{ server | json_query('json.items[0].hardware.model') }}"
       server_ilo_ip:  "{{ server | json_query('json.items[0].hardware.bmc.ip') }}"
+      server_power_state:  "{{ server | json_query('json.items[0].hardware.powerState') }}"
 
   - debug: 
       msg:
@@ -112,13 +143,7 @@
         - "URI: {{ server_resourceUri }}"
         - "Connection status: {{ server_connected_status }}"
         - "iLO IP: {{ server_ilo_ip }}"
-
-  - name: Exit if server '{{ serial_number }}' is not connected to COM
-    fail:
-      msg: 
-        - "Server '{{ serial_number }}' is not connected to COM!" 
-        - "Make sure to connect the server's iLO to COM ! Go to iLO UI / Management / Compute Ops Management"
-    when: server_connected_status == false
+        - "Power state: {{ server_power_state }}"
 
   - name: Wait until the server '{{ serial_number }}' inventory information is available (necessary when the server has recently been added to COM) then capture the data
     uri:
@@ -142,12 +167,12 @@
       headers:
         Authorization: "Bearer {{ access_token }}"
     register: server_inventory_from_ui_doorway
-    until: server_inventory_from_ui_doorway.json.state_ != "Retrieving server information in progress" 
+    until: server_inventory_from_ui_doorway.json.get('state_') != "Retrieving server information in progress" 
     retries: 30
     delay: 60
     delegate_to: localhost
     
-  - name: Power on the server '{{ serial_number }}' to get the storage inventory information 
+  - name: Power on the server '{{ serial_number }}' to get the storage inventory information (only if not already ON)
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
       method: POST
@@ -161,13 +186,20 @@
         resourceId: "{{ server_id }}"
         resourceType: "compute-ops-mgmt/server"
     register: power_on_job_result
+    when: server_power_state != "ON"
     delegate_to: localhost
 
   # - debug: var=power_on_job_result
 
+  - name: Report that server '{{ serial_number }}' is already powered on (skipping power on)
+    debug:
+      msg: "Server '{{ serial_number }}' is already powered on (power state '{{ server_power_state }}'). Skipping the power on job."
+    when: server_power_state == "ON"
+
   - name: Set a variable for the job resource URI
     set_fact:
       job_resourceUri: "{{ power_on_job_result.json.resourceUri }}"
+    when: server_power_state != "ON"
 
   # - debug: var=job_resourceUri
 
@@ -184,6 +216,7 @@
       (server_power_on_job_status.json.state == "COMPLETE" or 
       server_power_on_job_status.json.state == "ERROR")
     register: server_power_on_job_status
+    when: server_power_state != "ON"
     delegate_to: localhost
 
   # - debug: var=server_power_on_job_status
@@ -194,11 +227,14 @@
         - "State: {{ server_power_on_job_status.json.state }}"
         - "ResultCode: {{ server_power_on_job_status.json.resultCode }}"
         - "Status: {{ server_power_on_job_status.json.status }}"
+    when: server_power_state != "ON"
 
   - name: Exit when server power on job is failing
     fail: 
       msg: "Error ! Server power on job has failed !"
-    when: server_power_on_job_status.json.state == "ERROR" 
+    when:
+      - server_power_state != "ON"
+      - server_power_on_job_status.json.state == "ERROR" 
 
 
 #--------------------------------------Check BIOS/Workload profile settings -------------------------------------------------------------------------------------------
@@ -230,76 +266,30 @@
   # - debug: var=bios_server_setting_resourceuri
 
 
-#-------------------------------------- Run a server inventory job to collect the local storage information -----------------------------------------------------------------------------------------------
+#-------------------------------------- Collect the local storage information -----------------------------------------------------------------------------------------------
 
-  - name: Wait until PCI devices information is available then capture the server '{{ serial_number }}' inventory information 
+  # COM populates the PCI device inventory ('device.data') and the storage inventory ('storage.data') INDEPENDENTLY, and
+  # the storage array can lag well behind the PCI one (observed on Gen10 Plus: 'device.data' full while 'storage.data'
+  # was still empty). The storage-controller detection below relies on 'storage.data', so we must wait until it is
+  # actually populated - i.e. at least one controller reports Drives or Volumes - not just until 'device.data' appears.
+  # Waiting on the wrong array made the playbook run the detection against empty storage data and wrongly fail with
+  # "No storage controller with drives available found in the server".
+  - name: Wait until the storage inventory of server '{{ serial_number }}' is populated then capture the inventory
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/inventory"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
     register: server_inventory
-    until: server_inventory.json.device.data | default([]) | length > 0
+    until:
+      - (server_inventory.json.device.data | default([]) | length) > 0
+      - ((server_inventory.json.storage.data | default([]) | selectattr('Drives', 'defined') | map(attribute='Drives') | map('length') | sum)
+         + (server_inventory.json.storage.data | default([]) | selectattr('Volumes', 'defined') | map(attribute='Volumes') | map('length') | sum)) > 0
     retries: 30
     delay: 60
     delegate_to: localhost
 
-  # Run a server inventory job to collect the local storage information
-
-  - name: Run a server inventory job to collect the local storage information
-    uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
-      method: POST
-      status_code: 201
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-        Content-Type: "application/json"
-      body_format: json
-      body:
-        jobTemplate: "{{ GetFullServerInventory_job_template_id }}"
-        resourceId: "{{ server_id }}"
-        resourceType: "compute-ops-mgmt/server"
-        jobParams: 
-          is_reports_call: true
-    register: inventory_job_result
-    delegate_to: localhost
-
-  # - debug: var=inventory_job_result
-
-  - name: Set a variable for the job resource URI
-    set_fact:
-      job_resourceUri: "{{ inventory_job_result.json.resourceUri }}"
-
-  # - debug: var=job_resourceUri
-
-  - name: Wait for the server inventory job to complete
-    uri:
-      url: "{{ ConnectivityEndpoint }}{{ job_resourceUri }}"
-      method: GET
-      return_content: yes
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    retries: 60
-    delay: 5
-    until: >
-      (server_inventory_job_status.json.state == "COMPLETE" or 
-      server_inventory_job_status.json.state == "ERROR")
-    register: server_inventory_job_status
-    delegate_to: localhost
-
-  # - debug: var=server_inventory_job_status
-
-  - name: Display the server inventory job result 
-    debug: 
-      msg:
-        - "State: {{ server_inventory_job_status.json.state }}"
-        - "ResultCode: {{ server_inventory_job_status.json.resultCode }}"
-        - "Status: {{ server_inventory_job_status.json.status }}"
-
-  - name: Exit when server inventory job is failing
-    fail: 
-      msg: "Error ! Server inventory job to collect the local storage information has failed!"
-    when: server_inventory_job_status.json.state == "ERROR" 
+  # Server storage inventory is now collected automatically by COM, so a dedicated inventory job is no longer required.
 
   - name: Capture the server '{{ serial_number }}' inventory information 
     uri:
@@ -818,10 +808,10 @@
     set_fact:
       server_group_id_found: "{{ server_info_from_ui_doorway.json.group_.id }}"
       server_group_name_found: "{{ server_info_from_ui_doorway.json.group_.name }}"
-    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+    when: server_info_from_ui_doorway.json.get('group_') is not none
 
   - debug: var=server_group_name_found
-    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+    when: server_info_from_ui_doorway.json.get('group_') is not none
 
   - name: Remove server '{{ serial_number }}' from the server group of which it is currently a member
     uri:
@@ -836,14 +826,14 @@
         devices:
           # Only servers that are not part of a group can be assigned to a group.
           - deviceId: "{{ server_id }}"
-    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+    when: server_info_from_ui_doorway.json.get('group_') is not none
     register: group_unassignment_result
     delegate_to: localhost
 
   - name: Wait for deletion to complete
     pause:
       seconds: 15
-    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+    when: server_info_from_ui_doorway.json.get('group_') is not none
     
   # Add server to the temporary server group 
 
@@ -887,7 +877,7 @@
   #     filter: "associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"      
   #     query: "json.items[? name=='Server automatic configuration' && (contains(message,'Automatic configuration of server is complete') || contains(message,'failed'))]"
   #   register: server_activities
-  #   until: server_activities | json_query(query) 
+  #   until: server_activities | json_query(jq) 
   #   retries: 30
   #   delay: 60
   #   delegate_to: localhost
@@ -897,7 +887,7 @@
   #     msg: "The configuration of server '{{ serial_number }}' failed to complete! Refer to the individual server activity entries in GLP UI for details."
   #   vars:
   #     query: "json.items[? name=='Server automatic configuration' && contains(message,'failed')]"
-  #   when: server_activities | json_query(query) 
+  #   when: server_activities | json_query(jq) 
   
 
 #--------------------------------------Customize WinPE ISO image --------------------------------------------------------------------------------------
@@ -1217,7 +1207,7 @@
                     '$nic1 = $connectedNICs[0].Name'
                     '$nic2 = $connectedNICs[1].Name'
                     '"NIC team will be configured with {0} and {1}" -f $nic1, $nic2 | Out-Host'
-                    'New-NetLbfoTeam -Name Mgmt_Network_team -TeamMembers $nic1, $nic2 -TeamingMode SwitchIndependent -LoadBalancingAlgorithm Dynamic -confirm:$false'
+                    'New-NetLbfoTeam -Name Mgmt_Network_team -TeamMembers $nic1, $nic2 -TeamingMode SwitchIndependent -LoadBalancingAlgorithm HyperVPort -confirm:$false'
                     'netsh interface ip set address Mgmt_Network_team static {{os_ip_address}} {{netmask}} {{gateway}}'
                     'netsh interface ip add dns Mgmt_Network_team "{{nameserver1}}"'
                     'netsh interface ip add dns Mgmt_Network_team "{{nameserver2}}"'
@@ -1230,7 +1220,7 @@
                     '# First management NIC is always the lowest mac and link speed' 
                     '$nic1 = $connectedNICs[0].Name'
                     '"NIC team will be configured with {0}" -f $nic1 | Out-Host'
-                    'New-NetLbfoTeam -Name Mgmt_Network_team -TeamMembers $nic1 -TeamingMode SwitchIndependent -LoadBalancingAlgorithm Dynamic -confirm:$false'
+                    'New-NetLbfoTeam -Name Mgmt_Network_team -TeamMembers $nic1 -TeamingMode SwitchIndependent -LoadBalancingAlgorithm HyperVPort -confirm:$false'
                     'netsh interface ip set address Mgmt_Network_team static {{os_ip_address}} {{netmask}} {{gateway}}'
                     'netsh interface ip add dns Mgmt_Network_team "{{nameserver1}}"'
                     'netsh interface ip add dns Mgmt_Network_team "{{nameserver2}}"'
@@ -1604,9 +1594,9 @@
         Authorization: "Bearer {{ access_token }}"
     vars: 
       filter: "associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"      
-      query: "json.items[?name=='Server OS Installation' && contains(message,'Operating system image installation task marked as complete')]"
+      jq: "json.items[?name=='Server OS Installation' && contains((message || ''),'Operating system image installation task marked as complete')]"
     register: server_activities
-    until: server_activities | json_query(query) 
+    until: (server_activities | json_query(jq) | length) > 0 
     retries: 60
     delay: 60
     delegate_to: localhost
@@ -1705,7 +1695,9 @@
     delegate_to: localhost
 
 
-#-------------------------------------- DNS record (WinRM Mode) -------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
+#  Play 2 - DNS record (WinRM Mode)
+# ---------------------------------------------------------------------------------------------------------------------
 
  # Adding a DNS record for the server that will be provisioned in the defined DNS server
 
@@ -1718,7 +1710,7 @@
     - vars/Windows_DNS_vars_encrypted.yml
   tasks:
     - name: Add '{{ inventory_hostname }}' with '{{ os_ip_address }}' on '{{ dns_server }}' in '{{ domain }}' DNS domain
-      community.windows.win_dns_record:
+      ansible.windows.win_dns_record:
         name: "{{ inventory_hostname }}"
         type: "A"
         value: "{{ os_ip_address }}"
@@ -1727,7 +1719,9 @@
       delegate_to: "{{ dns_server }}"
 
 
-# --------------------------------------Continue post-installation steps (WinRM Mode) -------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
+#  Play 3 - Post-installation: install SUT for online HPE drivers/software update (runs over WinRM on each host)
+# ---------------------------------------------------------------------------------------------------------------------
 
 - name: Installing SUT on the server for online installation of HPE drivers and software
   hosts: WIN2022
@@ -1781,7 +1775,7 @@
     ansible.builtin.win_shell:
       Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | ? displayname -eq "Integrated Smart Update Tools for Windows"
     register: SUT_Presence
-    until: SUT_Presence
+    until: (SUT_Presence.stdout | default('') | trim | length) > 0
     retries: 10
     delay: 5
  
@@ -1866,7 +1860,7 @@
 
   - name: Set fact for the first host in inventory
     set_fact:
-      is_first_host: "{{ play_hosts[0] == inventory_hostname }}"
+      is_first_host: "{{ ansible_play_batch[0] == inventory_hostname }}"
 
   - name: Collect firmware bundles
     uri:
@@ -1884,10 +1878,10 @@
 
   - name: Set variable for Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}'
     set_fact:
-      Gen10_10p_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
+      Gen10_10p_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(jq) )[0] }}"
     vars:
-      query: "json.items[?contains(releaseVersion, '{{ Gen10_10p_firmware_bundle_name }}') && contains(name, 'Gen10')].id"
-    when: is_first_host and (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+      jq: "json.items[?contains(releaseVersion, '{{ Gen10_10p_firmware_bundle_name }}') && contains(name, 'Gen10')].id"
+    when: is_first_host and (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(jq) )[0] | default([]) != []
 
   - name:  Exit if Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}' does not exist
     fail:
@@ -1901,11 +1895,11 @@
   
   - name: Set variable for Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}'
     set_fact:
-      Gen11_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
+      Gen11_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(jq) )[0] }}"
     vars:
       # query: "json.items[?releaseVersion=='{{ Gen11_firmware_bundle_name }}'].id"
-      query: "json.items[?contains(releaseVersion, '{{ Gen11_firmware_bundle_name }}') && contains(name, 'Gen11')].id"
-    when: is_first_host and (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+      jq: "json.items[?contains(releaseVersion, '{{ Gen11_firmware_bundle_name }}') && contains(name, 'Gen11')].id"
+    when: is_first_host and (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(jq) )[0] | default([]) != []
 
   - name: Exit if Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}' does not exist
     fail:
@@ -1919,11 +1913,11 @@
   
   - name: Set variable for Gen12 firmware bundle '{{ Gen12_firmware_bundle_name }}'
     set_fact:
-      Gen12_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
+      Gen12_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(jq) )[0] }}"
     vars:
       # query: "json.items[?releaseVersion=='{{ Gen12_firmware_bundle_name }}'].id"
-      query: "json.items[?contains(releaseVersion, '{{ Gen12_firmware_bundle_name }}') && contains(name, 'Gen12')].id"
-    when: is_first_host and (Gen12_firmware_bundle_name is defined) and (Gen12_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+      jq: "json.items[?contains(releaseVersion, '{{ Gen12_firmware_bundle_name }}') && contains(name, 'Gen12')].id"
+    when: is_first_host and (Gen12_firmware_bundle_name is defined) and (Gen12_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(jq) )[0] | default([]) != []
 
   - name: Exit if Gen12 firmware bundle '{{ Gen12_firmware_bundle_name }}' does not exist
     fail:
@@ -2219,9 +2213,9 @@
   
   - name: Check if server '{{ serial_number }}' is already member of definitive server group '{{ server_group_name }}' 
     set_fact: 
-      server_found_in_definitive_group: "{{ definitive_server_group  | json_query(query) }}"
+      server_found_in_definitive_group: "{{ definitive_server_group  | json_query(jq) }}"
     vars:
-      query: "json.items[0].devices[?serial=='{{ serial_number }}']"
+      jq: "json.items[0].devices[?serial=='{{ serial_number }}']"
     when: definitive_server_group.json.count == 1
       
   # - debug: var=server_found_in_definitive_group
@@ -2273,24 +2267,23 @@
   
   # Start an HPE drivers, software and firmware update job
 
-  # To run a firmware update in parallel on each host and save time, it is necessary to use the group firmware update job
-  # This job will only be executed on the first host in the Ansible inventory
+  # Firmware is updated in ONE group job that targets ONLY the servers being provisioned in THIS inventory run (in
+  # parallel), not per host and not every member of the definitive group. The tasks below are guarded with
+  # 'when: is_first_host' so the single job is submitted exactly ONCE instead of once per host.
+  #
+  # The device list is built from each play host's 'server_id' (already in the API device-id form
+  # '<partNumber>+<serialNumber>'), so servers added to the group by a PREVIOUS run are left untouched. These plays use
+  # Ansible's default 'linear' strategy (no 'serial:' / no 'strategy: free'), so every host is already in the group and
+  # has its 'server_id' fact by the time the first host submits the job; 'is_first_host' is just a "run once" selector.
+  # NOTE: this "run once" guarantee holds ONLY under the linear strategy. If you switch to 'strategy: free' or
+  #       'serial:', use 'run_once: true' instead.
 
-  # Get the list of devices in the definitive server group with the first host only
-
-  - name: Get definitive group '{{ server_group_name }}' information (first host only)
-    uri:
-      url:  "{{ ConnectivityEndpoint }}{{ definitive_group_resourceuri  }}"
-      method: GET
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    register: definitive_server_group
-    delegate_to: localhost
-    when: is_first_host
-
-  - name: Set fact for the list of server IDs member of the definitive server group (first host only)
+  - name: Build the list of device ids for the servers being provisioned in this run (first host only)
+    # Target ONLY the servers in THIS inventory run - each play host's 'server_id' (already in the API device-id form
+    # '<partNumber>+<serialNumber>', e.g. 'P28948-B21+CZ2311004H') - NOT every device currently in the definitive
+    # group. This leaves servers added by previous runs untouched when the single group firmware update job runs.
     set_fact:
-      server_ids: "{{ definitive_server_group.json.devices  | map(attribute='id') | list  }}"
+      server_ids: "{{ ansible_play_hosts | map('extract', hostvars, 'server_id') | list }}"
     when: is_first_host
 
   - name: Display the server IDs found (first host only)
@@ -2389,9 +2382,9 @@
 
   - name: Extract items containing 'Firmware update'  
     set_fact:
-      firmware_update_items: "{{ (Server_activity_status | json_query(query))[0] }}"
+      firmware_update_items: "{{ (Server_activity_status | json_query(jq))[0] }}"
     vars:
-      query: "json.items[? contains(name, 'Firmware update') && contains(groupDisplayName, '{{ server_group_name }}')]"
+      jq: "json.items[? contains(name, 'Firmware update') && contains(groupDisplayName, '{{ server_group_name }}')]"
 
   # - debug: var=firmware_update_items
 
@@ -2457,8 +2450,10 @@
     delegate_to: localhost
 
   - name: Get runtime
+    # ansible-core 2.19 refuses to store native objects (a datetime subtraction yields a 'timedelta',
+    # which raises "Type 'timedelta' is unsupported for variable storage"). Cast to string for storage/display.
     set_fact:
-      runtime: "{{ ((ansible_date_time.iso8601[:19] | to_datetime('%Y-%m-%dT%H:%M:%S')) - (start_time[:19] | to_datetime('%Y-%m-%dT%H:%M:%S'))) }}"
+      runtime: "{{ ((ansible_date_time.iso8601[:19] | to_datetime('%Y-%m-%dT%H:%M:%S')) - (start_time[:19] | to_datetime('%Y-%m-%dT%H:%M:%S'))) | string }}"
 
   # Display server installation completed message
 
@@ -2486,4 +2481,10 @@
         - "OS is configured and running."
         - "Refer to the individual server activity entries in the HPE Compute Ops Management UI for more details."
         - "The provisioning task took {{ runtime }}."
-    when: (firmware_update_items.message is search('Firmware update failed', ignorecase=True)) or (group_firmware_update_job_status.json.resultCode is none)
+    # 'group_firmware_update_job_status' is registered only on the first host (the group firmware update job runs
+    # once for the whole server group). Non-first hosts hold a skipped-result dict with no '.json', so gate that
+    # part on 'is_first_host' and use '.get()' (ansible-core 2.19 RAISES on missing dict attributes). Non-first
+    # hosts fall back to their own per-host 'firmware_update_items.message'.
+    when: >-
+      (firmware_update_items.message is search('Firmware update failed', ignorecase=True))
+      or (is_first_host and ((group_firmware_update_job_status.get('json') or {}).get('resultCode') is none))

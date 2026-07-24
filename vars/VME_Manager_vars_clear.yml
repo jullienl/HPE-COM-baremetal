@@ -1,0 +1,26 @@
+---
+# =====================================================================================================================
+# HPE VM Essentials (VME) Manager credentials and HVM host SSH credentials
+#
+# This is an EXAMPLE (clear) file showing the content expected in the encrypted file
+# 'vars/VME_Manager_vars_encrypted.yml'. Create the encrypted version with:
+#
+#   ansible-vault create vars/VME_Manager_vars_encrypted.yml
+#
+# then paste the content below using your own values.
+# =====================================================================================================================
+
+# Base URL of the HPE VM Essentials Manager appliance (Morpheus based), resolvable by DNS from the Ansible control node.
+vme_manager_url: "https://vme-manager.lj.lab"
+
+# VME Manager API credentials.
+# The playbook authenticates against the Morpheus OAuth endpoint (/oauth/token) using these credentials to obtain a
+# bearer token. Use a manager account with permission to create clusters and add hosts.
+vme_manager_username: "admin"
+vme_manager_password: "****************"
+
+# SSH credentials of the administrative user created on each HVM host during installation. This single account is used
+# by the Ubuntu autoinstall seed to create the user, by the Ansible post-install play for SSH/sudo, and handed to the
+# VME Manager so it can connect to the host and add it to the HVM cluster.
+hvm_ssh_username: "hvmadmin"
+hvm_ssh_password: "****************"
