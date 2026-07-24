@@ -522,6 +522,27 @@ Want to see exactly what a run looks like before trying it yourself? Full, real 
 
 > **Note**: RHEL and Windows share a single unprovisioning playbook (`RHEL_WIN_unprovisioning.yml`), so they share one unprovisioning log.
 
+At a glance, here is the tail of a real HVM provisioning run — **two servers provisioned in parallel, from bare metal to a VME-managed cluster, in ~48 minutes with zero failures**:
+
+```text
+TASK [Get total runtime (including second-NIC link redundancy)] ****************
+ok: [HVM-2] => "The provisioning task took 0:48:23."
+
+PLAY RECAP *********************************************************************
+HVM-2                      : ok=122  changed=19   unreachable=0    failed=0    skipped=55   rescued=0    ignored=0
+HVM-3                      : ok=107  changed=18   unreachable=0    failed=0    skipped=60   rescued=0    ignored=0
+```
+
+<!--
+  Terminal recording (optional, ready to enable):
+  Record a run with asciinema (https://asciinema.org) or a terminal-to-GIF tool such as
+  `agg` (asciinema gif generator) or `vhs`, save the result as images/HVM_prov_demo.gif,
+  then uncomment the block below to embed an at-a-glance animated demo here.
+
+  <img src="images/HVM_prov_demo.gif" alt="HVM provisioning run (animated demo)" width="100%">
+-->
+
+
 ## Built and tested with
 
 The exact control-node software stack the playbooks were last validated against (OS, Python, ansible-core and collection versions) is maintained as a single source of truth in the **Tested with** table in [Ansible_control_node_requirements.md](https://github.com/jullienl/HPE-COM-baremetal/blob/main/files/Ansible_control_node_requirements.md#tested-with).
