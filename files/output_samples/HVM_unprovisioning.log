@@ -1,22 +1,21 @@
-$ ansible-playbook -i "CZ2311004G,CZ2311004H" RHEL_WIN_unprovisioning.yml --ask-vault-password 
+$ ansible-playbook -i "CZ2311004H,CZJ3100GD9" HVM_unprovisioning.yml --ask-vault-password  
 
-
-PLAY [Deleting provisioned compute module(s)] ****************************************************************************************************************************************************************************************************************************************
+PLAY [Deleting provisioned HVM host(s)] **********************************************************************************************************************************************************************************************************************************************
 
 TASK [Gather subset facts on localhost] **********************************************************************************************************************************************************************************************************************************************
-ok: [CZJ3100GD9 -> localhost]
 ok: [CZ2311004H -> localhost]
+ok: [CZJ3100GD9 -> localhost]
 
 TASK [Capture the start time] ********************************************************************************************************************************************************************************************************************************************************
-ok: [CZ2311004H]
 ok: [CZJ3100GD9]
+ok: [CZ2311004H]
 
 TASK [debug] *************************************************************************************************************************************************************************************************************************************************************************
 ok: [CZ2311004H] => {
-    "start_time": "2026-07-23T15:10:57Z"
+    "start_time": "2026-07-23T14:03:48Z"
 }
 ok: [CZJ3100GD9] => {
-    "start_time": "2026-07-23T15:10:57Z"
+    "start_time": "2026-07-23T14:03:48Z"
 }
 
 TASK [Create HPE Compute Ops Management session] *************************************************************************************************************************************************************************************************************************************
@@ -39,70 +38,70 @@ TASK [Set variables for each job template id] **********************************
 ok: [CZ2311004H] => (item=Variable set: AnalyzeFirmwareUpdate_job_template_id = 5a657c6f-777d-4c7e-874a-1650b95b37f2)
 ok: [CZ2311004H] => (item=Variable set: AnalyzeFirmwareUpdateOrchestrator_job_template_id = 87f47eff-7245-4788-bf58-5b6af361d1ba)
 ok: [CZ2311004H] => (item=Variable set: ApplianceUpdate_job_template_id = 1c4ac4be-8eeb-49f2-a86a-fd8c9182616c)
-ok: [CZJ3100GD9] => (item=Variable set: AnalyzeFirmwareUpdate_job_template_id = 5a657c6f-777d-4c7e-874a-1650b95b37f2)
 ok: [CZ2311004H] => (item=Variable set: ApplySettingsTemplate_job_template_id = 2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
-ok: [CZJ3100GD9] => (item=Variable set: AnalyzeFirmwareUpdateOrchestrator_job_template_id = 87f47eff-7245-4788-bf58-5b6af361d1ba)
 ok: [CZ2311004H] => (item=Variable set: CalculateiLOSettingsCompliance_job_template_id = 497a5418-cbc2-4870-a1e7-1fc30c885f2f)
-ok: [CZJ3100GD9] => (item=Variable set: ApplianceUpdate_job_template_id = 1c4ac4be-8eeb-49f2-a86a-fd8c9182616c)
+ok: [CZJ3100GD9] => (item=Variable set: AnalyzeFirmwareUpdate_job_template_id = 5a657c6f-777d-4c7e-874a-1650b95b37f2)
 ok: [CZ2311004H] => (item=Variable set: ColdBoot_job_template_id = aacfb3e0-6575-4d4f-a711-1ee1ae768407)
-ok: [CZJ3100GD9] => (item=Variable set: ApplySettingsTemplate_job_template_id = 2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
+ok: [CZJ3100GD9] => (item=Variable set: AnalyzeFirmwareUpdateOrchestrator_job_template_id = 87f47eff-7245-4788-bf58-5b6af361d1ba)
 ok: [CZ2311004H] => (item=Variable set: CollectServerLogs_job_template_id = 2d744494-22d4-4d61-8c65-647ccadeb6b6)
-ok: [CZJ3100GD9] => (item=Variable set: CalculateiLOSettingsCompliance_job_template_id = 497a5418-cbc2-4870-a1e7-1fc30c885f2f)
+ok: [CZJ3100GD9] => (item=Variable set: ApplianceUpdate_job_template_id = 1c4ac4be-8eeb-49f2-a86a-fd8c9182616c)
 ok: [CZ2311004H] => (item=Variable set: CopyServerProfileTemplates_job_template_id = 7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
-ok: [CZJ3100GD9] => (item=Variable set: ColdBoot_job_template_id = aacfb3e0-6575-4d4f-a711-1ee1ae768407)
+ok: [CZJ3100GD9] => (item=Variable set: ApplySettingsTemplate_job_template_id = 2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
 ok: [CZ2311004H] => (item=Variable set: CreateOneviewComplianceReport_job_template_id = aae145a1-79a2-4516-b191-c98039c96542)
-ok: [CZJ3100GD9] => (item=Variable set: CollectServerLogs_job_template_id = 2d744494-22d4-4d61-8c65-647ccadeb6b6)
+ok: [CZJ3100GD9] => (item=Variable set: CalculateiLOSettingsCompliance_job_template_id = 497a5418-cbc2-4870-a1e7-1fc30c885f2f)
 ok: [CZ2311004H] => (item=Variable set: DeleteVCenter_job_template_id = 3f06fd6b-dfb1-4bad-bd04-939951797e97)
-ok: [CZJ3100GD9] => (item=Variable set: CopyServerProfileTemplates_job_template_id = 7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
+ok: [CZJ3100GD9] => (item=Variable set: ColdBoot_job_template_id = aacfb3e0-6575-4d4f-a711-1ee1ae768407)
 ok: [CZ2311004H] => (item=Variable set: FirmwareDownload_job_template_id = 0683ada8-1a89-49dd-bf04-6df715b708a6)
-ok: [CZJ3100GD9] => (item=Variable set: CreateOneviewComplianceReport_job_template_id = aae145a1-79a2-4516-b191-c98039c96542)
+ok: [CZJ3100GD9] => (item=Variable set: CollectServerLogs_job_template_id = 2d744494-22d4-4d61-8c65-647ccadeb6b6)
 ok: [CZ2311004H] => (item=Variable set: FirmwareUpdate_New_job_template_id = fd54a96c-cabc-42e3-aee3-374a2d009dba)
-ok: [CZJ3100GD9] => (item=Variable set: DeleteVCenter_job_template_id = 3f06fd6b-dfb1-4bad-bd04-939951797e97)
+ok: [CZJ3100GD9] => (item=Variable set: CopyServerProfileTemplates_job_template_id = 7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
 ok: [CZ2311004H] => (item=Variable set: GatewayDiscoverIlos_job_template_id = d0afcc35-c6a9-4d05-adc8-f9e686b5fdfc)
-ok: [CZJ3100GD9] => (item=Variable set: FirmwareDownload_job_template_id = 0683ada8-1a89-49dd-bf04-6df715b708a6)
+ok: [CZJ3100GD9] => (item=Variable set: CreateOneviewComplianceReport_job_template_id = aae145a1-79a2-4516-b191-c98039c96542)
 ok: [CZ2311004H] => (item=Variable set: GatewayReboot_job_template_id = 91afe709-8b0d-4162-81d5-2a365e0359f3)
-ok: [CZJ3100GD9] => (item=Variable set: FirmwareUpdate_New_job_template_id = fd54a96c-cabc-42e3-aee3-374a2d009dba)
+ok: [CZJ3100GD9] => (item=Variable set: DeleteVCenter_job_template_id = 3f06fd6b-dfb1-4bad-bd04-939951797e97)
 ok: [CZ2311004H] => (item=Variable set: GetDeviceAndSoftwareInventory_job_template_id = ee5d8016-6b9f-4410-9d55-e05e3e86a0c8)
-ok: [CZJ3100GD9] => (item=Variable set: GatewayDiscoverIlos_job_template_id = d0afcc35-c6a9-4d05-adc8-f9e686b5fdfc)
+ok: [CZJ3100GD9] => (item=Variable set: FirmwareDownload_job_template_id = 0683ada8-1a89-49dd-bf04-6df715b708a6)
 ok: [CZ2311004H] => (item=Variable set: GetFullServerInventory_job_template_id = d6595f1b-84e6-4587-ade5-656e2a5ea20d)
-ok: [CZJ3100GD9] => (item=Variable set: GatewayReboot_job_template_id = 91afe709-8b0d-4162-81d5-2a365e0359f3)
+ok: [CZJ3100GD9] => (item=Variable set: FirmwareUpdate_New_job_template_id = fd54a96c-cabc-42e3-aee3-374a2d009dba)
 ok: [CZ2311004H] => (item=Variable set: GetIloSecurityParams_job_template_id = e3fef4ec-eb72-43ff-bea5-13501353b501)
+ok: [CZJ3100GD9] => (item=Variable set: GatewayDiscoverIlos_job_template_id = d0afcc35-c6a9-4d05-adc8-f9e686b5fdfc)
 ok: [CZ2311004H] => (item=Variable set: GetOneviewServerInventory_job_template_id = a0124cb1-00f1-46b7-818f-a9eb5f60591f)
-ok: [CZJ3100GD9] => (item=Variable set: GetDeviceAndSoftwareInventory_job_template_id = ee5d8016-6b9f-4410-9d55-e05e3e86a0c8)
+ok: [CZJ3100GD9] => (item=Variable set: GatewayReboot_job_template_id = 91afe709-8b0d-4162-81d5-2a365e0359f3)
 ok: [CZ2311004H] => (item=Variable set: GetOneViewSettings_job_template_id = fc16aa48-c73c-4463-9112-e061383ebfa9)
-ok: [CZJ3100GD9] => (item=Variable set: GetFullServerInventory_job_template_id = d6595f1b-84e6-4587-ade5-656e2a5ea20d)
+ok: [CZJ3100GD9] => (item=Variable set: GetDeviceAndSoftwareInventory_job_template_id = ee5d8016-6b9f-4410-9d55-e05e3e86a0c8)
 ok: [CZ2311004H] => (item=Variable set: GetPowerMeterData_job_template_id = 50fa7d05-5941-4e8e-90c3-5995f1d600a8)
-ok: [CZJ3100GD9] => (item=Variable set: GetIloSecurityParams_job_template_id = e3fef4ec-eb72-43ff-bea5-13501353b501)
+ok: [CZJ3100GD9] => (item=Variable set: GetFullServerInventory_job_template_id = d6595f1b-84e6-4587-ade5-656e2a5ea20d)
 ok: [CZ2311004H] => (item=Variable set: GetServerExternalStorage_job_template_id = 9310319e-7b7f-41ba-8b24-8b34eed1ca62)
-ok: [CZJ3100GD9] => (item=Variable set: GetOneviewServerInventory_job_template_id = a0124cb1-00f1-46b7-818f-a9eb5f60591f)
+ok: [CZJ3100GD9] => (item=Variable set: GetIloSecurityParams_job_template_id = e3fef4ec-eb72-43ff-bea5-13501353b501)
 ok: [CZ2311004H] => (item=Variable set: GetSettingsForTemplate_job_template_id = 6cd671db-ce6b-45ce-894e-7b5ae23e0399)
-ok: [CZJ3100GD9] => (item=Variable set: GetOneViewSettings_job_template_id = fc16aa48-c73c-4463-9112-e061383ebfa9)
+ok: [CZJ3100GD9] => (item=Variable set: GetOneviewServerInventory_job_template_id = a0124cb1-00f1-46b7-818f-a9eb5f60591f)
 ok: [CZ2311004H] => (item=Variable set: GetSSOUrl_job_template_id = 2c7de503-77af-4340-b68d-7a26e5359b8e)
-ok: [CZJ3100GD9] => (item=Variable set: GetPowerMeterData_job_template_id = 50fa7d05-5941-4e8e-90c3-5995f1d600a8)
+ok: [CZJ3100GD9] => (item=Variable set: GetOneViewSettings_job_template_id = fc16aa48-c73c-4463-9112-e061383ebfa9)
 ok: [CZ2311004H] => (item=Variable set: GetTelemetryDriveMetrics_job_template_id = ee46afcf-4f47-45b5-a958-cb9b02bb0e00)
-ok: [CZJ3100GD9] => (item=Variable set: GetServerExternalStorage_job_template_id = 9310319e-7b7f-41ba-8b24-8b34eed1ca62)
+ok: [CZJ3100GD9] => (item=Variable set: GetPowerMeterData_job_template_id = 50fa7d05-5941-4e8e-90c3-5995f1d600a8)
 ok: [CZ2311004H] => (item=Variable set: GroupAddActions_job_template_id = 3eeff1ea-8419-4335-aaf3-796ef50789ba)
-ok: [CZJ3100GD9] => (item=Variable set: GetSettingsForTemplate_job_template_id = 6cd671db-ce6b-45ce-894e-7b5ae23e0399)
+ok: [CZJ3100GD9] => (item=Variable set: GetServerExternalStorage_job_template_id = 9310319e-7b7f-41ba-8b24-8b34eed1ca62)
 ok: [CZ2311004H] => (item=Variable set: GroupApplianceUpdate_job_template_id = f69f553a-5004-4a08-9283-5b60abd9eb4a)
-ok: [CZJ3100GD9] => (item=Variable set: GetSSOUrl_job_template_id = 2c7de503-77af-4340-b68d-7a26e5359b8e)
+ok: [CZJ3100GD9] => (item=Variable set: GetSettingsForTemplate_job_template_id = 6cd671db-ce6b-45ce-894e-7b5ae23e0399)
 ok: [CZ2311004H] => (item=Variable set: GroupApplyExternalStorage_job_template_id = fcb79270-5954-42e9-9374-6a065b6d494a)
-ok: [CZJ3100GD9] => (item=Variable set: GetTelemetryDriveMetrics_job_template_id = ee46afcf-4f47-45b5-a958-cb9b02bb0e00)
+ok: [CZJ3100GD9] => (item=Variable set: GetSSOUrl_job_template_id = 2c7de503-77af-4340-b68d-7a26e5359b8e)
 ok: [CZ2311004H] => (item=Variable set: GroupApplyInternalStorageSettings_job_template_id = 54095626-3911-4fea-9741-816e2531994e)
-ok: [CZJ3100GD9] => (item=Variable set: GroupAddActions_job_template_id = 3eeff1ea-8419-4335-aaf3-796ef50789ba)
+ok: [CZJ3100GD9] => (item=Variable set: GetTelemetryDriveMetrics_job_template_id = ee46afcf-4f47-45b5-a958-cb9b02bb0e00)
 ok: [CZ2311004H] => (item=Variable set: GroupApplyOneviewSettings_job_template_id = a229a162-b43f-45b0-b7bb-692df77b9746)
-ok: [CZJ3100GD9] => (item=Variable set: GroupApplianceUpdate_job_template_id = f69f553a-5004-4a08-9283-5b60abd9eb4a)
 ok: [CZ2311004H] => (item=Variable set: GroupApplyServerSettings_job_template_id = beff07ce-f36d-4699-9ac3-f872dcd63133)
-ok: [CZJ3100GD9] => (item=Variable set: GroupApplyExternalStorage_job_template_id = fcb79270-5954-42e9-9374-6a065b6d494a)
+ok: [CZJ3100GD9] => (item=Variable set: GroupAddActions_job_template_id = 3eeff1ea-8419-4335-aaf3-796ef50789ba)
 ok: [CZ2311004H] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_id = db3620d4-19a4-4b54-9804-83f8f59d48a4)
-ok: [CZJ3100GD9] => (item=Variable set: GroupApplyInternalStorageSettings_job_template_id = 54095626-3911-4fea-9741-816e2531994e)
+ok: [CZJ3100GD9] => (item=Variable set: GroupApplianceUpdate_job_template_id = f69f553a-5004-4a08-9283-5b60abd9eb4a)
 ok: [CZ2311004H] => (item=Variable set: GroupExternalStorageCompliance_job_template_id = 7177aa6a-e8f8-4e9b-ae31-e01dafcc81df)
-ok: [CZJ3100GD9] => (item=Variable set: GroupApplyOneviewSettings_job_template_id = a229a162-b43f-45b0-b7bb-692df77b9746)
+ok: [CZJ3100GD9] => (item=Variable set: GroupApplyExternalStorage_job_template_id = fcb79270-5954-42e9-9374-6a065b6d494a)
 ok: [CZ2311004H] => (item=Variable set: GroupFirmwareCompliance_job_template_id = 23b8ba2a-6c46-4223-b028-919382c7dcac)
-ok: [CZJ3100GD9] => (item=Variable set: GroupApplyServerSettings_job_template_id = beff07ce-f36d-4699-9ac3-f872dcd63133)
+ok: [CZJ3100GD9] => (item=Variable set: GroupApplyInternalStorageSettings_job_template_id = 54095626-3911-4fea-9741-816e2531994e)
 ok: [CZ2311004H] => (item=Variable set: GroupFirmwareDownload_job_template_id = a17a7aa9-4540-4c21-bbf2-31af4ff65e98)
-ok: [CZJ3100GD9] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_id = db3620d4-19a4-4b54-9804-83f8f59d48a4)
+ok: [CZJ3100GD9] => (item=Variable set: GroupApplyOneviewSettings_job_template_id = a229a162-b43f-45b0-b7bb-692df77b9746)
 ok: [CZ2311004H] => (item=Variable set: GroupFirmwareUpdate_job_template_id = 91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
+ok: [CZJ3100GD9] => (item=Variable set: GroupApplyServerSettings_job_template_id = beff07ce-f36d-4699-9ac3-f872dcd63133)
 ok: [CZ2311004H] => (item=Variable set: GroupGetIloSecurityParams_job_template_id = 08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
+ok: [CZJ3100GD9] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_id = db3620d4-19a4-4b54-9804-83f8f59d48a4)
 ok: [CZJ3100GD9] => (item=Variable set: GroupExternalStorageCompliance_job_template_id = 7177aa6a-e8f8-4e9b-ae31-e01dafcc81df)
 ok: [CZ2311004H] => (item=Variable set: GroupIloFirmwareUpdate_job_template_id = 512fb1f2-516f-4bda-bc84-e623947858e4)
 ok: [CZJ3100GD9] => (item=Variable set: GroupFirmwareCompliance_job_template_id = 23b8ba2a-6c46-4223-b028-919382c7dcac)
@@ -173,67 +172,130 @@ ok: [CZJ3100GD9] => {
 
 TASK [debug] *************************************************************************************************************************************************************************************************************************************************************************
 ok: [CZ2311004H] => {
-    "server_name": "rhel-1.lj.lab"
+    "server_name": "hvm-2"
 }
 ok: [CZJ3100GD9] => {
-    "server_name": "rhel-2.lj.lab"
+    "server_name": "hvm-3"
 }
 
 TASK [Exit if server 'CZ2311004H' is not connected to COM] ***************************************************************************************************************************************************************************************************************************
 skipping: [CZ2311004H]
 skipping: [CZJ3100GD9]
 
-TASK [Check if server 'CZ2311004H' is already member of a server group] **************************************************************************************************************************************************************************************************************
-ok: [CZ2311004H -> localhost]
+TASK [Create HPE VM Essentials Manager session] **************************************************************************************************************************************************************************************************************************************
 ok: [CZJ3100GD9 -> localhost]
+ok: [CZ2311004H -> localhost]
 
-TASK [Capture the id of the server group of which the server 'CZ2311004H' is a member (if applicable)] *******************************************************************************************************************************************************************************
+TASK [Set variable vme_access_token for the VME Manager bearer token] ****************************************************************************************************************************************************************************************************************
 ok: [CZ2311004H]
 ok: [CZJ3100GD9]
 
-TASK [debug] *************************************************************************************************************************************************************************************************************************************************************************
-ok: [CZJ3100GD9] => {
-    "server_group_name_found": "RHEL_group"
-}
-ok: [CZ2311004H] => {
-    "server_group_name_found": "RHEL_group"
-}
-
-TASK [Remove server 'CZ2311004H' from the server group of which it is currently a member] ********************************************************************************************************************************************************************************************
+TASK [Look up the HVM cluster 'HVM-Cluster-01' in the VME Manager] *******************************************************************************************************************************************************************************************************************
 ok: [CZ2311004H -> localhost]
 ok: [CZJ3100GD9 -> localhost]
 
-TASK [Wait for deletion to complete] *************************************************************************************************************************************************************************************************************************************************
+TASK [Set the cluster id and its member-server list from the lookup] *****************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H]
+ok: [CZJ3100GD9]
+
+TASK [Resolve the OS management IP of 'CZ2311004H' from DNS (VME stores the cluster member by its OS IP)] ****************************************************************************************************************************************************************************
+ok: [CZ2311004H -> localhost]
+ok: [CZJ3100GD9 -> localhost]
+
+TASK [Set the resolved OS management IP] *********************************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H]
+ok: [CZJ3100GD9]
+
+TASK [Build the set of identifiers that could match the VME cluster member] **********************************************************************************************************************************************************************************************************
+ok: [CZ2311004H]
+ok: [CZJ3100GD9]
+
+TASK [Find the VME server id of 'CZ2311004H' in cluster 'HVM-Cluster-01' (matched by OS IP / host name)] *****************************************************************************************************************************************************************************
+ok: [CZ2311004H]
+ok: [CZJ3100GD9]
+
+TASK [Show the cluster member list and the matched VME server id (for troubleshooting)] **********************************************************************************************************************************************************************************************
+ok: [CZ2311004H] => {
+    "msg": [
+        "Resolved OS management IP: '192.168.3.181'",
+        "Match candidates: ['192.168.3.181', 'hvm-2']",
+        "Cluster members (name -> id): ['HVM-2', 'HVM-3']",
+        "Matched vme_server_id: '11'"
+    ]
+}
+ok: [CZJ3100GD9] => {
+    "msg": [
+        "Resolved OS management IP: '192.168.3.182'",
+        "Match candidates: ['192.168.3.182', 'hvm-3']",
+        "Cluster members (name -> id): ['HVM-2', 'HVM-3']",
+        "Matched vme_server_id: '12'"
+    ]
+}
+
+TASK [Aggregate the teardown decision across the batch] ******************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H]
+ok: [CZJ3100GD9]
+
+TASK [Determine whether the whole cluster is being torn down (last-worker case)] *****************************************************************************************************************************************************************************************************
+ok: [CZ2311004H]
+ok: [CZJ3100GD9]
+
+TASK [Remove HVM host 'CZ2311004H' as a cluster worker (host delete, async)] *********************************************************************************************************************************************************************************************************
+skipping: [CZ2311004H]
+skipping: [CZJ3100GD9]
+
+TASK [Wait until HVM host 'CZ2311004H' (server id 11) has left the VME Manager] ******************************************************************************************************************************************************************************************************
+skipping: [CZ2311004H]
+skipping: [CZJ3100GD9]
+
+TASK [Delete the whole HVM cluster 'HVM-Cluster-01' (removes all remaining members, async)] ******************************************************************************************************************************************************************************************
+ok: [CZ2311004H -> localhost]
+
+TASK [Wait until the HVM cluster 'HVM-Cluster-01' is fully removed] ******************************************************************************************************************************************************************************************************************
+FAILED - RETRYING: [CZ2311004H -> localhost]: Wait until the HVM cluster 'HVM-Cluster-01' is fully removed (30 retries left).
+ok: [CZ2311004H -> localhost]
+
+TASK [Check if server 'CZ2311004H' is a member of a server group] ********************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H -> localhost]
+ok: [CZJ3100GD9 -> localhost]
+
+TASK [Capture the id of the server group of which the server is a member (if applicable)] ********************************************************************************************************************************************************************************************
+ok: [CZ2311004H]
+ok: [CZJ3100GD9]
+
+TASK [Remove server 'CZ2311004H' from its server group] ******************************************************************************************************************************************************************************************************************************
+ok: [CZ2311004H -> localhost]
+ok: [CZJ3100GD9 -> localhost]
+
+TASK [Wait for unassignment to complete] *********************************************************************************************************************************************************************************************************************************************
 Pausing for 15 seconds
 (ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
 ok: [CZ2311004H]
 
 TASK [Power off server 'CZ2311004H'] *************************************************************************************************************************************************************************************************************************************************
-ok: [CZJ3100GD9 -> localhost]
 ok: [CZ2311004H -> localhost]
+ok: [CZJ3100GD9 -> localhost]
 
-TASK [Extract hostname from FQDN 'rhel-1.lj.lab'] ************************************************************************************************************************************************************************************************************************************
+TASK [Extract hostname from 'hvm-2'] *************************************************************************************************************************************************************************************************************************************************
 ok: [CZ2311004H]
 ok: [CZJ3100GD9]
 
-TASK [Resolve the OS management IP of 'rhel-1.lj.lab' from DNS (for known_hosts cleanup)] ********************************************************************************************************************************************************************************************
-ok: [CZJ3100GD9 -> localhost]
+TASK [Resolve the OS management IP of 'hvm-2' from DNS (for known_hosts cleanup)] ****************************************************************************************************************************************************************************************************
 ok: [CZ2311004H -> localhost]
+ok: [CZJ3100GD9 -> localhost]
 
 TASK [Remove any stale SSH host key for 'CZ2311004H' (IP, FQDN and short name) from known_hosts] *************************************************************************************************************************************************************************************
-ok: [CZ2311004H -> localhost] => (item=192.168.3.176)
-ok: [CZJ3100GD9 -> localhost] => (item=192.168.3.177)
-ok: [CZ2311004H -> localhost] => (item=rhel-1.lj.lab)
-ok: [CZJ3100GD9 -> localhost] => (item=rhel-2.lj.lab)
-changed: [CZ2311004H -> localhost] => (item=rhel-1)
-changed: [CZJ3100GD9 -> localhost] => (item=rhel-2)
+changed: [CZJ3100GD9 -> localhost] => (item=192.168.3.182)
+changed: [CZ2311004H -> localhost] => (item=192.168.3.181)
+ok: [CZ2311004H -> localhost] => (item=hvm-2)
+ok: [CZJ3100GD9 -> localhost] => (item=hvm-3)
 
 PLAY [Remove the DNS record from DNS server] *****************************************************************************************************************************************************************************************************************************************
 
-TASK [Remove "rhel-1" from "dc.lj.lab"] **********************************************************************************************************************************************************************************************************************************************
-changed: [CZJ3100GD9 -> dc.lj.lab]
+TASK [Remove "hvm-2" from "dc.lj.lab"] ***********************************************************************************************************************************************************************************************************************************************
 changed: [CZ2311004H -> dc.lj.lab]
+changed: [CZJ3100GD9 -> dc.lj.lab]
 
 PLAY RECAP ***************************************************************************************************************************************************************************************************************************************************************************
-CZ2311004H                 : ok=22   changed=2    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
-CZJ3100GD9                 : ok=21   changed=2    unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+CZ2311004H                 : ok=34   changed=2    unreachable=0    failed=0    skipped=4    rescued=0    ignored=0   
+CZJ3100GD9                 : ok=31   changed=2    unreachable=0    failed=0    skipped=4    rescued=0    ignored=0   

@@ -1,4 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  =====================================================================================================================
+  Windows Server 2022 (and equivalents) - unattended answer file (autounattend.xml)
+
+  This file is the Windows Setup answer file used to perform a fully unattended installation of Windows Server on HPE
+  Compute Ops Management servers. It is rendered by Ansible (Jinja2) from 'WIN2022_provisioning.yml' and shipped on the
+  per-host media; Windows Setup reads it automatically as 'autounattend.xml'.
+
+  WHAT THIS SEED CONFIGURES (item by item, by setup pass):
+    1. windowsPE pass  - locale/keyboard, product key + EULA acceptance, the WIM image index to deploy, and the OS
+                         install target (the target DiskID is set at WinPE startup from the COM-detected boot volume;
+                         the partition layout block is kept commented as a reference).
+    2. oobeSystem pass - Administrator password, and first-logon commands: disable the network-discovery prompt,
+                         run C:\Temp\winRM.ps1 to enable WinRM so the post-install Ansible play can connect, and
+                         (when 'proxy_url' is set) configure a persistent system WinHTTP + machine WinINET proxy.
+    3. specialize pass - computer name, timezone, Remote Desktop enablement (+ firewall rule), IE hardening off, and
+                         registered owner/organization.
+  =====================================================================================================================
+-->
 <unattend xmlns="urn:schemas-microsoft-com:unattend">
     <settings pass="windowsPE">
         <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -113,6 +132,23 @@
                     <Description>winRM installation for Ansible</Description>
                     <Order>1</Order>
                 </SynchronousCommand>
+{% if proxy_url is defined and (proxy_url | length) > 0 %}
+                <SynchronousCommand wcm:action="add">
+                    <CommandLine>netsh winhttp set proxy proxy-server="{{ proxy_url | regex_replace('^https?://', '') }}" bypass-list="localhost;127.0.0.1;*.{{ domain }}"</CommandLine>
+                    <Description>Set persistent system WinHTTP proxy</Description>
+                    <Order>5</Order>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <CommandLine>reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyServer /t REG_SZ /d "{{ proxy_url | regex_replace('^https?://', '') }}" /f</CommandLine>
+                    <Description>Set machine WinINET proxy server</Description>
+                    <Order>6</Order>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <CommandLine>reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable /t REG_DWORD /d 1 /f</CommandLine>
+                    <Description>Enable machine WinINET proxy</Description>
+                    <Order>7</Order>
+                </SynchronousCommand>
+{% endif %}
             </FirstLogonCommands>
         </component>
     </settings>0 

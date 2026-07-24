@@ -1,3 +1,22 @@
+# ---------------------------------------------------------------------------------------------------------------------
+# VMware ESXi 8.0 - kickstart (weasel) seed
+#
+# This file is the ESXi installer kickstart (ks.cfg) used to perform a fully unattended installation of ESXi on HPE
+# Compute Ops Management servers. It is rendered by Ansible (Jinja2) from 'ESXi80_provisioning.yml' and shipped in a
+# small per-host seed ISO; the ESXi installer finds it via 'ks=cdrom:/KS.CFG' (CD-ROM scan of the attached media).
+#
+# WHAT THIS SEED CONFIGURES (item by item, top to bottom):
+#   1. EULA + root password - accepts the VMware EULA and sets the root password ('hashed_root_password', crypted).
+#   2. Network            - static IP on a single management NIC 'vmnic0' (adds a VM port group), with hostname,
+#                           netmask, gateway and DNS; reboots after install.
+#   3. Storage (%pre)     - identifies the OS boot disk by controller type ('Controller_type') and the COM-detected
+#                           size ('boot_drive_bytes_size', smallest size delta), then writes /tmp/DiskConfig with
+#                           'clearpart' + 'install' pinned to that disk (falls back to '--firstdisk=local'; halts if
+#                           no suitable disk is found).
+#   4. Post-install (%firstboot) - sets hostname/FQDN/DNS search + system time, authorizes the Ansible control
+#                           node SSH public key so the post-install play can connect over SSH, and (when 'proxy_url'
+#                           is set) writes a persistent HTTP proxy for shell/CLI-driven downloads.
+# ---------------------------------------------------------------------------------------------------------------------
 vmaccepteula
 
 rootpw --iscrypted {{hashed_root_password}}
@@ -137,3 +156,12 @@ echo "Installing Ansible SSH public key"
 cat <<EOF >/etc/ssh/keys-root/authorized_keys
 {{ansible_ssh_public_key}}
 EOF
+{% if proxy_url is defined and (proxy_url | length) > 0 %}
+
+# Persistent HTTP proxy for shell/CLI-driven downloads (e.g. 'esxcli software ... --proxy'). ESXi has no single
+# global HTTP proxy; this exports the proxy for interactive shells and persists across reboots (/etc/profile.local
+# is sourced by /etc/profile and saved to the ESXi state). localhost and the local '{{ domain }}' domain bypass it.
+echo 'export http_proxy="{{ proxy_url }}"'  >> /etc/profile.local
+echo 'export https_proxy="{{ proxy_url }}"' >> /etc/profile.local
+echo 'export no_proxy="localhost,127.0.0.1,.{{ domain }}"' >> /etc/profile.local
+{% endif %}

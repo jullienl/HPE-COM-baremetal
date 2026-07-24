@@ -6,18 +6,24 @@
 #    •	os_ip_address: the IP address that will be assigned to the operating system
 #    •	serial_number: the serial number of the server to be provisioned (found in COM)
 
-localhost ansible_python_interpreter=/usr/bin/python3 ansible_connection=local 
+localhost ansible_python_interpreter="{{ ansible_playbook_python }}" ansible_connection=local
 # localhost refers to the local machine on which Ansible is being run
-# tells Ansible to use Python 3 as the interpreter for running modules
+# ansible_playbook_python is the interpreter that launched ansible-playbook, so local tasks use the SAME
+#   environment as the control node (e.g. a virtualenv with the project's pip deps and any required shims).
 # local directive informs Ansible that it should execute the tasks locally instead of connecting over SSH 
 
 [All:vars]
 ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+ansible_python_interpreter=/usr/bin/python3
+# RHEL 9.3 ships /usr/bin/python3 (-> python3.9). Pinning it to a stable path stops ansible-core 2.19 from
+# emitting the "discovered Python interpreter" warning and guarantees the same interpreter every run.
 # In Ansible, when connecting to servers for the first time, you might encounter an interactive prompt asking you 
 # to verify the authenticity of the host. For automated scripts and playbooks, this interaction can cause the process 
 # to halt, waiting for user input. By setting StrictHostKeyChecking=no, Ansible forces the SSH client to bypass this 
 # interactive step, enabling automated processes to run without manual intervention.
 
 [All]
-RHEL92-1 os_ip_address=192.168.3.176 serial_number=CZ2311004H        # DL360 Gen10 Plus (MR enabled - NS204i enabled)     [iLO: 192.168.0.21]
-RHEL92-2 os_ip_address=192.168.3.177 serial_number=CZ2311004G        # DL360 Gen10 Plus (MR disabled - NS204i enabled)    [iLO: 192.168.0.20]
+RHEL-1 os_ip_address=192.168.3.176 serial_number=CZ2311004H         # ProLiant DL360 Gen10 Plus              [iLO: 192.168.0.21]
+RHEL-2 os_ip_address=192.168.3.177 serial_number=CZJ3100GD9         # DL365 Gen11                            [iLO: 192.168.1.56]
+
+

@@ -16,7 +16,9 @@
 
 # Adding a DNS record for the server that will be provisioned in the defined DNS server
 
-#-------------------------------------- DNS record (WinRM Mode) -------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
+#  Play 0 - DNS record (WinRM Mode)
+# ---------------------------------------------------------------------------------------------------------------------
 
 - name: DNS record for the bare metal RHEL server
   hosts: All
@@ -27,7 +29,7 @@
     - vars/Windows_DNS_vars_encrypted.yml
   tasks:
     - name: Add '{{ inventory_hostname }}' with '{{ os_ip_address }}' on '{{ dns_server }}' in '{{ domain }}' DNS domain
-      community.windows.win_dns_record:
+      ansible.windows.win_dns_record:
         name: "{{ inventory_hostname }}"
         type: "A"
         value: "{{ os_ip_address }}"
@@ -35,7 +37,9 @@
         state: present
       delegate_to: "{{ dns_server }}"
 
-#-------------------------------------- Bare Metal Provisioning -------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
+#  Play 1 - Bare metal provisioning (COM orchestration, runs from the Ansible control node)
+# ---------------------------------------------------------------------------------------------------------------------
 
 - name: Automated RHEL 9.3 installation on HPE Compute Ops Managmeent server(s) using an auto-generated ISO file with customized kickstart.
   hosts: All
@@ -71,7 +75,7 @@
 
   - name: Set fact for the first host in inventory
     set_fact:
-      is_first_host: "{{ play_hosts[0] == inventory_hostname }}"
+      is_first_host: "{{ ansible_play_batch[0] == inventory_hostname }}"
       
 
 #--------------------------------------Authentication with COM---------------------------------------------------------------------------------------------------------
@@ -119,14 +123,43 @@
       msg: "Server '{{ serial_number }}' cannot be found in COM!"
     when: server.json.count == 0
 
-  - name: Capture server '{{ serial_number }}' generation, id, uri, connection status and iLO IP
+  - name: Capture server '{{ serial_number }}' id, uri and connection status
     set_fact:
-      server_generation:  "{{ server | json_query('json.items[0].serverGeneration') }}"
-      server_model:  "{{ server | json_query('json.items[0].hardware.model') }}"
       server_id:  "{{ server | json_query('json.items[0].id') }}"
       server_resourceUri:  "{{ server | json_query('json.items[0].resourceUri') }}"
       server_connected_status:  "{{ server | json_query('json.items[0].state.connected') }}"
+
+  - name: Exit if server '{{ serial_number }}' is not connected to COM
+    fail:
+      msg: 
+        - "Server '{{ serial_number }}' is not connected to COM!" 
+        - "Make sure to connect the server's iLO to COM ! Go to iLO UI / Management / Compute Ops Management"
+    when: server_connected_status == false
+
+  # When a server has just been added to COM or is rebooting/re-discovering, the hardware fields (serverGeneration,
+  # model, powerState, iLO IP) are transiently reported as 'UNKNOWN' or empty. Wait until they are populated before
+  # capturing them, otherwise the power-on logic below (which keys off 'server_power_state') runs on bogus data.
+  - name: Wait until server '{{ serial_number }}' hardware information (generation, model, power state) is populated
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ serial_number }}'"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server
+    until:
+      - (server | json_query('json.items[0].serverGeneration') | default('UNKNOWN', true)) not in ['UNKNOWN', '']
+      - (server | json_query('json.items[0].hardware.model') | default('', true)) | length > 0
+      - (server | json_query('json.items[0].hardware.powerState') | default('UNKNOWN', true)) not in ['UNKNOWN', '']
+    retries: 30
+    delay: 20
+    delegate_to: localhost
+
+  - name: Capture server '{{ serial_number }}' generation, model, power state and iLO IP
+    set_fact:
+      server_generation:  "{{ server | json_query('json.items[0].serverGeneration') }}"
+      server_model:  "{{ server | json_query('json.items[0].hardware.model') }}"
       server_ilo_ip:  "{{ server | json_query('json.items[0].hardware.bmc.ip') }}"
+      server_power_state:  "{{ server | json_query('json.items[0].hardware.powerState') }}"
 
   - debug: 
       msg:
@@ -136,13 +169,7 @@
         - "URI: {{ server_resourceUri }}"
         - "Connection status: {{ server_connected_status }}"
         - "iLO IP: {{ server_ilo_ip }}"
-
-  - name: Exit if server '{{ serial_number }}' is not connected to COM
-    fail:
-      msg: 
-        - "Server '{{ serial_number }}' is not connected to COM!" 
-        - "Make sure to connect the server's iLO to COM ! Go to iLO UI / Management / Compute Ops Management"
-    when: server_connected_status == false
+        - "Power state: {{ server_power_state }}"
 
   - name: Wait until the server '{{ serial_number }}' inventory information is available (necessary when the server has recently been added to COM) then capture the data
     uri:
@@ -166,12 +193,12 @@
       headers:
         Authorization: "Bearer {{ access_token }}"
     register: server_inventory_from_ui_doorway
-    until: server_inventory_from_ui_doorway.json.state_ != "Retrieving server information in progress" 
+    until: server_inventory_from_ui_doorway.json.get('state_') != "Retrieving server information in progress" 
     retries: 30
     delay: 60
     delegate_to: localhost
 
-  - name: Power on the server '{{ serial_number }}' to get the storage inventory information 
+  - name: Power on the server '{{ serial_number }}' to get the storage inventory information (only if not already ON)
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
       method: POST
@@ -185,13 +212,20 @@
         resourceId: "{{ server_id }}"
         resourceType: "compute-ops-mgmt/server"
     register: power_on_job_result
+    when: server_power_state != "ON"
     delegate_to: localhost
 
   # - debug: var=power_on_job_result
 
+  - name: Report that server '{{ serial_number }}' is already powered on (skipping power on)
+    debug:
+      msg: "Server '{{ serial_number }}' is already powered on (power state '{{ server_power_state }}'). Skipping the power on job."
+    when: server_power_state == "ON"
+
   - name: Set a variable for the job resource URI
     set_fact:
       job_resourceUri: "{{ power_on_job_result.json.resourceUri }}"
+    when: server_power_state != "ON"
 
   # - debug: var=job_resourceUri
 
@@ -208,6 +242,7 @@
       (server_power_on_job_status.json.state == "COMPLETE" or 
       server_power_on_job_status.json.state == "ERROR")
     register: server_power_on_job_status
+    when: server_power_state != "ON"
     delegate_to: localhost
 
   # - debug: var=server_power_on_job_status
@@ -218,11 +253,14 @@
         - "State: {{ server_power_on_job_status.json.state }}"
         - "ResultCode: {{ server_power_on_job_status.json.resultCode }}"
         - "Status: {{ server_power_on_job_status.json.status }}"
+    when: server_power_state != "ON"
 
   - name: Exit when server power on job is failing
     fail: 
       msg: "Error ! Server power on job has failed !"
-    when: server_power_on_job_status.json.state == "ERROR" 
+    when:
+      - server_power_state != "ON"
+      - server_power_on_job_status.json.state == "ERROR" 
 
 
 #--------------------------------------Check BIOS/Workload profile settings -------------------------------------------------------------------------------------------
@@ -254,76 +292,30 @@
   # - debug: var=bios_server_setting_resourceuri    
 
 
-#-------------------------------------- Run a server inventory job to collect the local storage information -----------------------------------------------------------------------------------------------
+#-------------------------------------- Collect the local storage information -----------------------------------------------------------------------------------------------
 
-  - name: Wait until PCI devices information is available then capture the server '{{ serial_number }}' inventory information 
+  # COM populates the PCI device inventory ('device.data') and the storage inventory ('storage.data') INDEPENDENTLY, and
+  # the storage array can lag well behind the PCI one (observed on Gen10 Plus: 'device.data' full while 'storage.data'
+  # was still empty). The storage-controller detection below relies on 'storage.data', so we must wait until it is
+  # actually populated - i.e. at least one controller reports Drives or Volumes - not just until 'device.data' appears.
+  # Waiting on the wrong array made the playbook run the detection against empty storage data and wrongly fail with
+  # "No storage controller with drives available found in the server".
+  - name: Wait until the storage inventory of server '{{ serial_number }}' is populated then capture the inventory
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/inventory"
       method: GET
       headers:
         Authorization: "Bearer {{ access_token }}"
     register: server_inventory
-    until: server_inventory.json.device.data | default([]) | length > 0
+    until:
+      - (server_inventory.json.device.data | default([]) | length) > 0
+      - ((server_inventory.json.storage.data | default([]) | selectattr('Drives', 'defined') | map(attribute='Drives') | map('length') | sum)
+         + (server_inventory.json.storage.data | default([]) | selectattr('Volumes', 'defined') | map(attribute='Volumes') | map('length') | sum)) > 0
     retries: 30
     delay: 60
     delegate_to: localhost
 
-  # Run a server inventory job to collect the local storage information
-
-  - name: Run a server inventory job to collect the local storage information
-    uri:
-      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
-      method: POST
-      status_code: 201
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-        Content-Type: "application/json"
-      body_format: json
-      body:
-        jobTemplate: "{{ GetFullServerInventory_job_template_id }}"
-        resourceId: "{{ server_id }}"
-        resourceType: "compute-ops-mgmt/server"
-        jobParams: 
-          is_reports_call: true
-    register: inventory_job_result
-    delegate_to: localhost
-
-  # - debug: var=inventory_job_result
-
-  - name: Set a variable for the job resource URI
-    set_fact:
-      job_resourceUri: "{{ inventory_job_result.json.resourceUri }}"
-
-  # - debug: var=job_resourceUri
-
-  - name: Wait for the server inventory job to complete
-    uri:
-      url: "{{ ConnectivityEndpoint }}{{ job_resourceUri }}"
-      method: GET
-      return_content: yes
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    retries: 60
-    delay: 5
-    until: >
-      (server_inventory_job_status.json.state == "COMPLETE" or 
-      server_inventory_job_status.json.state == "ERROR")
-    register: server_inventory_job_status
-    delegate_to: localhost
-
-  # - debug: var=server_inventory_job_status
-
-  - name: Display the server inventory job result 
-    debug: 
-      msg:
-        - "State: {{ server_inventory_job_status.json.state }}"
-        - "ResultCode: {{ server_inventory_job_status.json.resultCode }}"
-        - "Status: {{ server_inventory_job_status.json.status }}"
-
-  - name: Exit when server inventory job is failing
-    fail: 
-      msg: "Error ! Server inventory job to collect the local storage information has failed!"
-    when: server_inventory_job_status.json.state == "ERROR" 
+  # Server storage inventory is now collected automatically by COM, so a dedicated inventory job is no longer required.
 
   - name: Capture the server '{{ serial_number }}' inventory information 
     uri:
@@ -499,6 +491,57 @@
 
   - debug: 
       msg: "Controller type found that will be used by kickstart: {{ Controller_type }}" 
+
+
+#-------------------------------------- Management NIC selection (auto MAC discovery, mirrors HVM) ---------------------
+
+  # The OS install runs over a SINGLE NIC and (optionally) an active-backup 'team0' bond is built AFTER the
+  # install from these MACs. Selecting by MAC from the COM inventory is generation-independent (interface
+  # names differ across ProLiant generations), so the same playbook installs reliably on Gen10 Plus/Gen11/Gen12.
+  # This mirrors the HVM provisioning 'bond_member_macs' derivation.
+
+  - name: Derive the management NIC MAC addresses from the COM inventory of server '{{ serial_number }}'
+    set_fact:
+      bond_member_macs: >-
+        {%- set ns = namespace(macs=[]) -%}
+        {%- for a in server_inventory.json.networkAdapter.data | default([]) -%}
+        {%-   set aname = ((a.Name | default('')) ~ ' ' ~ (a.Model | default('')) ~ ' ' ~ (a.Description | default(''))) | lower -%}
+        {%-   if (bond_member_adapter_match | default('') | length == 0) or (bond_member_adapter_match | lower in aname) -%}
+        {%-     for p in a.Ports | default([]) -%}
+        {%-       set tech = ((p.LinkNetworkTechnology | default('')) ~ '|' ~ (p.PortProtocol | default(''))) | lower -%}
+        {%-       if 'ethernet' in tech -%}
+        {%-         set mac = '' -%}
+        {%-         if p.Ethernet is defined and p.Ethernet.AssociatedMACAddresses is defined -%}
+        {%-           set amac = p.Ethernet.AssociatedMACAddresses -%}
+        {%-           if amac is string -%}
+        {%-             set mac = amac -%}
+        {%-           elif (amac | length) > 0 -%}
+        {%-             set mac = amac[0] -%}
+        {%-           endif -%}
+        {%-         elif p.Ethernet is defined and p.Ethernet.MACAddress is defined -%}
+        {%-           set mac = p.Ethernet.MACAddress -%}
+        {%-         endif -%}
+        {%-         if (mac | length) > 0 and (mac | lower not in ns.macs) -%}
+        {%-           set ns.macs = ns.macs + [mac | lower] -%}
+        {%-         endif -%}
+        {%-       endif -%}
+        {%-     endfor -%}
+        {%-   endif -%}
+        {%- endfor -%}
+        {{ ns.macs[:(bond_member_count | int)] }}
+    when: bond_member_selection | default('auto') == 'auto'
+    delegate_to: localhost
+
+  # Primary (install) NIC MAC = first derived MAC. Empty when nothing could be derived; the kickstart %pre
+  # then falls back to the first carrier-up interface, so the install still proceeds on a single NIC.
+  - name: Set the primary (install) NIC MAC for server '{{ serial_number }}'
+    set_fact:
+      primary_nic_mac: "{{ (bond_member_macs | default([]) | first) | default('', true) | lower }}"
+
+  - debug:
+      msg:
+        - "Management NIC MACs (by COM inventory) for '{{ inventory_hostname }}': {{ bond_member_macs | default([]) }}"
+        - "Primary (install) NIC MAC: '{{ primary_nic_mac | default('') }}' (empty => kickstart falls back to first carrier-up NIC)"
 
 
 #--------------------------------------Create internal storage settings when SR/MR controller with disk available found (no NS204i found) -----------------------------------------------------------------------------------------------
@@ -842,10 +885,10 @@
     set_fact:
       server_group_id_found: "{{ server_info_from_ui_doorway.json.group_.id }}"
       server_group_name_found: "{{ server_info_from_ui_doorway.json.group_.name }}"
-    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+    when: server_info_from_ui_doorway.json.get('group_') is not none
 
   - debug: var=server_group_name_found
-    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+    when: server_info_from_ui_doorway.json.get('group_') is not none
 
   - name: Remove server '{{ serial_number }}' from the server group of which it is currently a member
     uri:
@@ -860,14 +903,14 @@
         devices:
           # Only servers that are not part of a group can be assigned to a group.
           - deviceId: "{{ server_id }}"
-    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+    when: server_info_from_ui_doorway.json.get('group_') is not none
     register: group_unassignment_result
     delegate_to: localhost
 
   - name: Wait for deletion to complete
     pause:
       seconds: 15
-    when: server_info_from_ui_doorway.json.group_ is not none and server_info_from_ui_doorway.json.group_ is defined
+    when: server_info_from_ui_doorway.json.get('group_') is not none
     
   # Add server to the temporary server group 
 
@@ -911,7 +954,7 @@
   #     filter: "associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"      
   #     query: "json.items[? name=='Server automatic configuration' && (contains(message,'Automatic configuration of server is complete') || contains(message,'failed'))]"
   #   register: server_activities
-  #   until: server_activities | json_query(query) 
+  #   until: server_activities | json_query(jq) 
   #   retries: 30
   #   delay: 60
   #   delegate_to: localhost
@@ -921,7 +964,7 @@
   #     msg: "The configuration of server '{{ serial_number }}' failed to complete! Refer to the individual server activity entries in GLP UI for details."
   #   vars:
   #     query: "json.items[? name=='Server automatic configuration' && contains(message,'failed')]"
-  #   when: server_activities | json_query(query) 
+  #   when: server_activities | json_query(jq) 
 
 
 #--------------------------------------Build ISO image with customized kickstart --------------------------------------------------------------------------------------
@@ -1017,69 +1060,7 @@
       umount /mnt/{{ inventory_hostname }}
     delegate_to: localhost
 
-  - name: Modify UEFI bootloader for kickstart installation from CDROM
-    shell: |
-      sed -i '1,/quiet/s/quiet/quiet inst.ks=cdrom:\/ks.cfg/'  {{ staging_directory }}/baremetal/{{ inventory_hostname }}/EFI/BOOT/grub.cfg
-      sed -i '1,/60/{s/60/5/}'  {{ staging_directory }}/baremetal/{{ inventory_hostname }}/EFI/BOOT/grub.cfg
-      sed -i '1,/1/{s/1/0/}'  {{ staging_directory }}/baremetal/{{ inventory_hostname }}/EFI/BOOT/grub.cfg
-    delegate_to: localhost
-
-  # Creation of the kickstart file
-
-  - name: Create kickstart file in '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/' on '{{lookup("pipe","hostname")}}' with variable substitution
-    template:
-      src: files/{{ rhel_version }}/{{ kickstart }}
-      dest: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/ks.cfg"
-    delegate_to: localhost
-
-  # Copy of HPE Agentless Management Service rpm to /rpms on the ISO (AMS is required by COM to detect completion of OS install)
-
-  - name: Create '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/rpms/' on '{{lookup("pipe","hostname")}}' if it does not exist
-    file:
-      path: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/rpms"
-      state: directory
-    delegate_to: localhost
-
-  - name: Copying HPE AMS rpm file to '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/rpms' on '{{lookup("pipe","hostname")}}'
-    copy:
-      src: files/{{ rhel_version }}/{{ AMS_package }}
-      dest: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/rpms/{{ AMS_package }}"
-    delegate_to: localhost
-
-  # Creation of the new RHEL ISO image with unattended installation
-
-  - name: Create customized bootable ISO in '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/'
-    # become: yes
-    shell: >
-      mkisofs
-      -V {{ iso_label }}
-      -J
-      -R
-      -l
-      -v
-      -b isolinux/isolinux.bin
-      -c isolinux/boot.cat
-      -no-emul-boot
-      -boot-load-size 4
-      -boot-info-table
-      -eltorito-alt-boot
-      -e images/efiboot.img
-      -no-emul-boot
-      -o {{ staging_directory }}/baremetal/{{ inventory_hostname }}.iso
-      -graft-points
-      {{ staging_directory }}/baremetal/{{ inventory_hostname }}/
-    delegate_to: localhost
-
-  - name: Implant MD5 checksum into the ISO to make it bootable
-    # become: yes
-    shell: |
-      # Convert the ISO image to be compatible for a USB boot image
-      isohybrid --uefi {{ staging_directory }}/baremetal/{{ inventory_hostname }}.iso
-      # Implant MD5 checksum into the ISO, if not done, ISO will not boot…
-      implantisomd5 {{ staging_directory }}/baremetal/{{ inventory_hostname }}.iso
-    delegate_to: localhost 
-
-  - name: Create '/usr/share/nginx/html/isos/' on '{{lookup("pipe","hostname")}}' if it does not exist
+  - name: Create '/usr/share/nginx/html/isos/' if it does not exist
     become: yes
     file:
       path: /usr/share/nginx/html/isos/
@@ -1087,10 +1068,182 @@
       mode: "0755"
     delegate_to: localhost
 
-  - name: Move created ISO to the nginx default html folder. ISO URL='http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}.iso'
+  # ---- Shared prepared boot ISO (built once, reused by all hosts) ----
+  # The RHEL boot ISO is customized once: a fast GRUB timeout plus the host-agnostic HPE AMS rpm
+  # baked into '/rpms' (still reachable at /run/install/repo/rpms by the kickstart). The per-host
+  # kickstart is delivered on a small separate seed ISO labelled OEMDRV, which Anaconda auto-discovers.
+  # This avoids a full multi-GB ISO rebuild and copy per host.
+
+  - name: Check if the shared prepared RHEL boot ISO '{{ prepared_iso_file }}' already exists on nginx
+    stat:
+      path: "/usr/share/nginx/html/isos/{{ prepared_iso_file }}"
+    register: prepared_iso_present
+    run_once: true
+    delegate_to: localhost
+
+  - name: Build the shared prepared RHEL boot ISO (done once for all hosts)
+    when: not prepared_iso_present.stat.exists
+    run_once: true
+    delegate_to: localhost
+    block:
+
+      - name: Create '/mnt/_prepared_iso_rhel' if it does not exist
+        become: yes
+        file:
+          path: /mnt/_prepared_iso_rhel
+          state: directory
+          mode: "0755"
+
+      - name: Create the staging directory for the prepared boot ISO
+        file:
+          path: "{{ staging_directory }}/baremetal/_prepared_iso"
+          state: directory
+
+      - name: Mount the source RHEL ISO '{{ src_iso_directory }}/{{ src_iso_file }}'
+        become: yes
+        shell: mount -o loop -t iso9660 --read-only {{ src_iso_directory }}/{{ src_iso_file }} /mnt/_prepared_iso_rhel/
+
+      - name: Copy the ISO files to the prepared staging directory
+        become: yes
+        shell: |
+          rsync -a /mnt/_prepared_iso_rhel/. {{ staging_directory }}/baremetal/_prepared_iso/
+
+      - name: Set permissions so the Ansible user can modify the prepared staging directory
+        become: yes
+        file:
+          path: "{{ staging_directory }}/baremetal/_prepared_iso"
+          mode: ug+w
+          owner: "{{ user }}"
+          group: "{{ user }}"
+          recurse: yes
+          state: directory
+
+      - name: Unmount '/mnt/_prepared_iso_rhel'
+        become: yes
+        shell: umount /mnt/_prepared_iso_rhel
+
+      - name: Set a fast boot timeout, disable ISO media verification, and disable systemd GPT auto-root (UEFI GRUB + BIOS isolinux)
+        # RHEL boot media default to the "Test this media & install" entry, which adds the
+        # 'rd.live.check' kernel arg. That makes Anaconda run checkisomd5 over the WHOLE ISO before
+        # installing - very slow here because the ISO is served as iLO virtual media over HTTP (nginx).
+        # We boot the plain "Install" entry, strip 'rd.live.check' everywhere, and shorten the timeout.
+        #
+        # We ALSO add 'rd.systemd.gpt_auto=0 rd.auto=0' to the installer kernel line. The installer initramfs
+        # has no explicit 'root=', so systemd-gpt-auto-generator tries to auto-discover a root partition from
+        # any leftover GPT on the disks. On a REPROVISIONED server whose boot disk still carries a previous
+        # install (e.g. an NS204i NVMe with an old Ubuntu/HVM GPT+LVM), it latches onto that stale layout,
+        # waits for '/dev/gpt-auto-root', TIMES OUT, and drops the installer to dracut Emergency Mode BEFORE
+        # Anaconda (and therefore the kickstart 'clearpart' that would wipe the disk) ever runs. Disabling
+        # GPT auto-root makes the installer ignore leftover partitions and boot straight into Anaconda, which
+        # then clears and repartitions the target disk as designed. No-op on a clean/first-time server.
+        #
+        # Both boot paths must be handled: UEFI reads EFI/BOOT/grub.cfg, Legacy BIOS reads isolinux/isolinux.cfg.
+        # NOTE: on UEFI virtual-media boot the firmware actually loads GRUB from the El Torito image
+        # images/efiboot.img, which embeds its OWN copy of EFI/BOOT/grub.cfg. Editing the ISO9660
+        # EFI/BOOT/grub.cfg below is NOT enough - the embedded copy is patched in the next task.
+        shell: |
+          GPT_OFF='rd.systemd.gpt_auto=0 rd.auto=0'
+          # --- UEFI (GRUB) ---
+          sed -i 's/^set default=.*/set default="0"/' {{ staging_directory }}/baremetal/_prepared_iso/EFI/BOOT/grub.cfg
+          sed -i 's/^set timeout=.*/set timeout=5/'    {{ staging_directory }}/baremetal/_prepared_iso/EFI/BOOT/grub.cfg
+          sed -i 's/ rd.live.check//g'                 {{ staging_directory }}/baremetal/_prepared_iso/EFI/BOOT/grub.cfg
+          # Append the GPT-auto-off args to every kernel line (linux/linuxefi) if not already present.
+          sed -i "/^\s*linux\(efi\)\?\s/{/rd.systemd.gpt_auto/!s/\$/ ${GPT_OFF}/}" {{ staging_directory }}/baremetal/_prepared_iso/EFI/BOOT/grub.cfg
+          # --- Legacy BIOS (isolinux) ---
+          # RHEL isolinux defaults to the media-check entry ('menu default' on 'label check'); strip the
+          # check and shorten the timeout (isolinux timeout is in 1/10 s, so 50 = 5 s).
+          sed -i 's/ rd.live.check//g'  {{ staging_directory }}/baremetal/_prepared_iso/isolinux/isolinux.cfg
+          sed -i 's/^timeout .*/timeout 50/' {{ staging_directory }}/baremetal/_prepared_iso/isolinux/isolinux.cfg
+          # Append the GPT-auto-off args to every 'append' line if not already present.
+          sed -i "/^\s*append /{/rd.systemd.gpt_auto/!s/\$/ ${GPT_OFF}/}" {{ staging_directory }}/baremetal/_prepared_iso/isolinux/isolinux.cfg
+
+      - name: Apply the same fixes inside 'images/efiboot.img' (the GRUB config UEFI virtual-media boot actually reads)
+        # UEFI firmware boots GRUB from the El Torito image 'images/efiboot.img', which embeds its OWN
+        # EFI/BOOT/grub.cfg. The stock embedded config defaults to entry 1 ('Test this media & install',
+        # i.e. rd.live.check) and lacks the GPT-auto-off args, so editing only the ISO9660 grub.cfg above
+        # has NO effect on UEFI boot: the server still runs the slow checkisomd5 media verification and can
+        # still hit dracut Emergency Mode from a leftover GPT. We loop-mount the FAT image read-write and
+        # apply the identical edits (default=Install, strip rd.live.check, fast timeout, disable GPT auto-root).
+        become: yes
+        shell: |
+          GPT_OFF='rd.systemd.gpt_auto=0 rd.auto=0'
+          EFIMNT=/mnt/_prepared_iso_rhel_efi
+          EFIIMG={{ staging_directory }}/baremetal/_prepared_iso/images/efiboot.img
+          mkdir -p ${EFIMNT}
+          mount -o loop ${EFIIMG} ${EFIMNT}
+          sed -i 's/^set default=.*/set default="0"/' ${EFIMNT}/EFI/BOOT/grub.cfg
+          sed -i 's/^set timeout=.*/set timeout=5/'    ${EFIMNT}/EFI/BOOT/grub.cfg
+          sed -i 's/ rd.live.check//g'                 ${EFIMNT}/EFI/BOOT/grub.cfg
+          sed -i "/^\s*linux\(efi\)\?\s/{/rd.systemd.gpt_auto/!s/\$/ ${GPT_OFF}/}" ${EFIMNT}/EFI/BOOT/grub.cfg
+          sync
+          umount ${EFIMNT}
+
+      - name: Create the '/rpms' directory in the prepared ISO staging area
+        file:
+          path: "{{ staging_directory }}/baremetal/_prepared_iso/rpms"
+          state: directory
+
+      - name: Bake the host-agnostic HPE AMS rpm into the prepared ISO '/rpms' (required by COM to detect OS install completion)
+        copy:
+          src: files/{{ rhel_version }}/{{ AMS_package }}
+          dest: "{{ staging_directory }}/baremetal/_prepared_iso/rpms/{{ AMS_package }}"
+
+      - name: Build the prepared boot ISO with mkisofs (host-agnostic, no per-host content)
+        shell: >
+          mkisofs
+          -V {{ iso_label }}
+          -J
+          -R
+          -l
+          -v
+          -b isolinux/isolinux.bin
+          -c isolinux/boot.cat
+          -no-emul-boot
+          -boot-load-size 4
+          -boot-info-table
+          -eltorito-alt-boot
+          -e images/efiboot.img
+          -no-emul-boot
+          -o {{ staging_directory }}/baremetal/{{ prepared_iso_file }}
+          -graft-points
+          {{ staging_directory }}/baremetal/_prepared_iso/
+
+      - name: Make the prepared ISO USB-bootable (isohybrid + implantisomd5)
+        shell: |
+          isohybrid --uefi {{ staging_directory }}/baremetal/{{ prepared_iso_file }}
+          implantisomd5 {{ staging_directory }}/baremetal/{{ prepared_iso_file }}
+
+      - name: Move the prepared boot ISO to the nginx html folder. ISO URL='http://{{ lookup("pipe","hostname") }}/isos/{{ prepared_iso_file }}'
+        become: yes
+        shell: |
+          mv {{ staging_directory }}/baremetal/{{ prepared_iso_file }} /usr/share/nginx/html/isos/
+
+  # ---- Per-host kickstart seed ISO (small, one per host, labelled OEMDRV) ----
+
+  - name: Create the seed staging directory '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed'
+    file:
+      path: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed"
+      state: directory
+    delegate_to: localhost
+
+  - name: Render the RHEL kickstart 'ks.cfg' seed for '{{ inventory_hostname }}' with variable substitution
+    template:
+      src: files/{{ rhel_version }}/{{ kickstart }}
+      dest: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed/ks.cfg"
+    delegate_to: localhost
+
+  - name: Build the per-host OEMDRV kickstart seed ISO for '{{ inventory_hostname }}'
+    shell: >
+      xorriso -as mkisofs
+      -output "{{ staging_directory }}/baremetal/{{ inventory_hostname }}-seed.iso"
+      -volid OEMDRV -joliet -rock
+      "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed/"
+    delegate_to: localhost
+
+  - name: Move the per-host seed ISO to the nginx default html folder. ISO URL='http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}-seed.iso'
     become: yes
     shell: |
-      mv {{ staging_directory }}/baremetal/{{ inventory_hostname }}.iso /usr/share/nginx/html/isos/
+      mv {{ staging_directory }}/baremetal/{{ inventory_hostname }}-seed.iso /usr/share/nginx/html/isos/
     delegate_to: localhost
 
   - name: Update SELinux security contexts so that Nginx is allowed to serve content from the '/usr/share/nginx/html/isos/' directory.
@@ -1133,7 +1286,8 @@
         settings:
           DEFAULT:
             osType: "RHEL"
-            mediaUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}.iso'
+            mediaUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ prepared_iso_file }}'
+            unattendedInstallationFileUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}-seed.iso'
     register: OS_image_server_setting_result
     delegate_to: localhost
     when: OS_image_server_setting.json.count == 0
@@ -1163,7 +1317,8 @@
         settings:
           DEFAULT:
             osType: "RHEL"
-            mediaUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}.iso'
+            mediaUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ prepared_iso_file }}'
+            unattendedInstallationFileUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}-seed.iso'
     vars: 
       OS_image_server_setting_id: "{{ OS_image_server_setting  | json_query('json.items[0].id') }}"
     register: OS_image_server_setting_result
@@ -1214,7 +1369,10 @@
             firmwarePowerOff: false
             firmwareUpdate: false
             iloApplySettings: false
-            osInstall: true
+            # Keep the STANDING group policy OS install disabled. The OS install is triggered ONCE, explicitly, by
+            # the 'Start OS image installation' GroupOSInstallation job below. If 'true', COM re-applies the group
+            # policy when the installed server reconnects (AMS) and reinstalls the OS in a loop.
+            osInstall: false
             storageConfiguration: false
             storageVolumeDeletion: false
             storageVolumeName: ""
@@ -1256,7 +1414,10 @@
             storageConfiguration: true
             storageVolumeDeletion: true
             storageVolumeName: "OS_boot_volume"
-            osInstall: true
+            # Keep the STANDING group policy OS install disabled - the OS install is triggered ONCE by the explicit
+            # GroupOSInstallation job below. If 'true', COM re-applies the policy when the installed server
+            # reconnects (AMS) and reinstalls the OS in a loop.
+            osInstall: false
           onSettingsApply:
             firmwareDowngrade: false
         # autoAddServerTags:
@@ -1306,9 +1467,9 @@
         Authorization: "Bearer {{ access_token }}"
     vars: 
       filter: "associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"      
-      query: "json.items[?name=='Server OS Installation' && contains(message,'Operating system image installation task marked as complete')]"
+      jq: "json.items[?name=='Server OS Installation' && contains((message || ''),'Operating system image installation task marked as complete')]"
     register: server_activities
-    until: server_activities | json_query(query) 
+    until: (server_activities | json_query(jq) | length) > 0 
     retries: 60
     delay: 60
     delegate_to: localhost
@@ -1388,6 +1549,21 @@
       port: 22
     delegate_to: localhost
 
+  # The host has just been (re)installed, so its SSH host key is new. Any key left in the control node's known_hosts
+  # from a previous install of the same IP/name would make ssh refuse the upcoming SSH tasks (SUT install) with
+  # "REMOTE HOST IDENTIFICATION HAS CHANGED" -> auth disabled, because 'StrictHostKeyChecking=no' only auto-accepts NEW
+  # keys, not CHANGED ones. Purge any stale entry first; the fresh key is then auto-added on connect.
+  - name: Remove any stale SSH host key for '{{ inventory_hostname }}' from the control node known_hosts
+    known_hosts:
+      name: "{{ item }}"
+      path: ~/.ssh/known_hosts
+      state: absent
+    loop:
+      - "{{ os_ip_address }}"
+      - "{{ inventory_fqdn }}"
+      - "{{ inventory_hostname }}"
+    delegate_to: localhost
+
   # Backup kickstart file for troubleshooting purposes
 
   - name: Create a kickstart backup directory if it does not exist
@@ -1398,7 +1574,7 @@
 
   - name: Create a backup of the kickstart file named '{{ inventory_hostname }}_ks.cfg' in '{{ staging_directory }}/kickstarts_backup/RHEL' folder
     shell: |
-      cp -f {{ staging_directory }}/baremetal/{{ inventory_hostname }}/ks.cfg {{ staging_directory }}/kickstarts_backup/RHEL/{{ inventory_hostname }}_ks.cfg
+      cp -f {{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed/ks.cfg {{ staging_directory }}/kickstarts_backup/RHEL/{{ inventory_hostname }}_ks.cfg
     delegate_to: localhost
 
   # Cleaning up staging files
@@ -1407,7 +1583,7 @@
     become: yes
     shell: |
       rm -rf {{ inventory_hostname }}
-      rm -f /usr/share/nginx/html/isos/{{ inventory_hostname }}.iso
+      rm -f /usr/share/nginx/html/isos/{{ inventory_hostname }}-seed.iso
       rm -rf /mnt/{{ inventory_hostname }}
     args:
       chdir: "{{ staging_directory }}/baremetal"
@@ -1497,7 +1673,133 @@
       msg: "Error ! HPE AMS service is not running !"
     when: ams_service_status.status.ActiveState != "active"
 
-  # Wait for 1 minute after the server reboot before initiating a firmware update.
+  # ---------------------------------------------------------------------------------------------------------------
+  # Post-install NIC bonding (active-backup 'team0'), built AFTER the OS is up - mirrors the HVM provisioning model.
+  # The install itself ran over a SINGLE management NIC (see the kickstart %pre). Here, when 'enable_nic_bonding' is
+  # true AND a second management NIC (derived from the COM inventory) is present WITH a cable (carrier), we team it
+  # with the primary into an active-backup bond carrying the same static IP. No switch-side LAG is required.
+  # The builder is SELF-HEALING: if the freshly-built bond cannot reach the gateway (e.g. the second port lands on a
+  # wrong/dead switch port on a non-LAG fabric - exactly the failure that black-holed the old install-time bond), it
+  # automatically reverts to the single primary NIC, so the host is never left unreachable. It runs DETACHED
+  # (systemd-run) so the brief connectivity blip while the IP moves onto the bond cannot kill the SSH task.
+  - name: Build the post-install management NIC bond (active-backup, self-healing) on '{{ inventory_hostname }}'
+    when: enable_nic_bonding | bool
+    block:
+
+      - name: Stage the NIC-bond setup script on '{{ inventory_hostname }}'
+        remote_user: root
+        copy:
+          dest: /root/rhel_bond_setup.sh
+          mode: "0755"
+          content: |
+            #!/bin/bash
+            # Self-healing active-backup NIC bond builder (staged by the RHEL provisioning playbook).
+            set -u
+            LOG=/var/log/rhel_postinstall_bond.log
+            exec >>"$LOG" 2>&1
+            echo "=== $(date) RHEL post-install NIC bond setup ==="
+
+            PRIMARY_MAC="{{ primary_nic_mac | default('') | lower }}"
+            SECONDARY_MAC="{{ bond_member_macs[1] | lower if (bond_member_macs | default([]) | length) > 1 else '' }}"
+            IPADDR="{{ os_ip_address }}"
+            NETMASK="{{ netmask }}"
+            GATEWAY="{{ gateway }}"
+            DNS="{{ nameserver }}"
+            MODE="{{ mgmt_bond_mode | default('active-backup') }}"
+
+            # Convert dotted-quad netmask to a CIDR prefix (e.g. 255.255.252.0 -> 22).
+            IFS=. read -r o1 o2 o3 o4 <<< "$NETMASK"
+            mask=$(( (o1<<24)+(o2<<16)+(o3<<8)+o4 ))
+            prefix=0
+            for ((i=31;i>=0;i--)); do
+                if (( (mask>>i)&1 )); then prefix=$((prefix+1)); else break; fi
+            done
+
+            dev_by_mac() {
+                local want="${1,,}" n m
+                [ -z "$want" ] && return 1
+                for n in $(ls /sys/class/net | grep -v '^lo$'); do
+                    m=$(cat "/sys/class/net/$n/address" 2>/dev/null | tr 'A-Z' 'a-z')
+                    if [ "$m" == "$want" ]; then echo "$n"; return 0; fi
+                done
+                return 1
+            }
+
+            PRIMARY_DEV=$(dev_by_mac "$PRIMARY_MAC") || PRIMARY_DEV=""
+            if [ -z "$PRIMARY_DEV" ]; then
+                # Fall back to the device currently holding the install IP.
+                PRIMARY_DEV=$(ip -o -4 addr show | awk -v ip="$IPADDR" '$4 ~ "^"ip"/" {print $2}' | head -n1)
+            fi
+            echo "Primary dev: ${PRIMARY_DEV:-<none>}"
+            if [ -z "$PRIMARY_DEV" ]; then echo "ERROR: no primary device found, leaving network untouched"; echo error > /run/rhel_bond_result; exit 0; fi
+
+            SECONDARY_DEV=""
+            [ -n "$SECONDARY_MAC" ] && SECONDARY_DEV=$(dev_by_mac "$SECONDARY_MAC") || true
+            echo "Secondary dev: ${SECONDARY_DEV:-<none>}"
+
+            # Only bond when a secondary NIC exists AND has a cable (carrier) - mirrors the HVM teaming logic.
+            if [ -z "$SECONDARY_DEV" ]; then echo "No secondary NIC -> staying single-NIC"; echo single > /run/rhel_bond_result; exit 0; fi
+            ip link set "$SECONDARY_DEV" up 2>/dev/null || true
+            sleep 2
+            if [ "$(cat /sys/class/net/$SECONDARY_DEV/carrier 2>/dev/null || echo 0)" != "1" ]; then
+                echo "Secondary $SECONDARY_DEV has no carrier -> staying single-NIC"; echo single > /run/rhel_bond_result; exit 0
+            fi
+
+            echo "Building active-backup bond team0 ($PRIMARY_DEV + $SECONDARY_DEV, primary=$PRIMARY_DEV)"
+            nmcli -t -f NAME con show | grep -qx team0 && nmcli con delete team0
+            nmcli con add type bond ifname team0 con-name team0 bond.options "mode=$MODE,primary=$PRIMARY_DEV,miimon=100"
+            nmcli con mod team0 ipv4.method manual ipv4.addresses "$IPADDR/$prefix" ipv4.gateway "$GATEWAY" ipv4.dns "${DNS//,/ }" ipv6.method ignore
+            for d in "$PRIMARY_DEV" "$SECONDARY_DEV"; do
+                for c in $(nmcli -t -f NAME,DEVICE con show | awk -F: -v dv="$d" '$2==dv{print $1}'); do nmcli con delete "$c"; done
+                nmcli con add type ethernet ifname "$d" master team0 con-name "bond-$d"
+            done
+            nmcli con up team0
+            sleep 5
+
+            if ping -c2 -W2 "$GATEWAY" >/dev/null 2>&1; then
+                echo "Bond team0 reachable -> keeping bond"; echo bond > /run/rhel_bond_result; exit 0
+            fi
+
+            echo "Bond team0 UNREACHABLE -> reverting to single NIC $PRIMARY_DEV"
+            nmcli con down team0 2>/dev/null || true
+            nmcli con delete team0 2>/dev/null || true
+            nmcli con delete "bond-$PRIMARY_DEV" 2>/dev/null || true
+            nmcli con delete "bond-$SECONDARY_DEV" 2>/dev/null || true
+            nmcli con add type ethernet ifname "$PRIMARY_DEV" con-name "mgmt-$PRIMARY_DEV" \
+                ipv4.method manual ipv4.addresses "$IPADDR/$prefix" ipv4.gateway "$GATEWAY" ipv4.dns "${DNS//,/ }" ipv6.method ignore
+            nmcli con up "mgmt-$PRIMARY_DEV"
+            echo reverted > /run/rhel_bond_result
+            exit 0
+
+      - name: Run the NIC-bond setup detached (survives the IP move onto the bond)
+        remote_user: root
+        shell: |
+          rm -f /run/rhel_bond_result
+          systemd-run --unit=rhel-bond-setup --collect /bin/bash /root/rhel_bond_setup.sh
+        # systemd-run returns immediately; the transient unit runs independently of this SSH session, so the
+        # brief blip while the IP moves onto the bond cannot break this task.
+
+      - name: Wait for '{{ inventory_hostname }}' to be reachable again after the bond/IP move
+        remote_user: root
+        wait_for_connection:
+          delay: 8
+          timeout: 240
+
+      - name: Read the NIC-bond result marker
+        remote_user: root
+        slurp:
+          src: /run/rhel_bond_result
+        register: rhel_bond_result_raw
+        failed_when: false
+
+      - name: Report the NIC-bond outcome
+        debug:
+          msg: >-
+            NIC bonding outcome for '{{ inventory_hostname }}':
+            {{ (rhel_bond_result_raw.content | b64decode | trim) if (rhel_bond_result_raw.content is defined) else 'unknown (marker missing)' }}
+            (bond = active-backup team0 kept | single = only one usable NIC | reverted = bond unreachable, fell back to single NIC | error = no primary NIC)
+
+
 
   - name: Wait a little while for things to stabilize
     pause: 
@@ -1552,10 +1854,10 @@
 
   - name: Set variable for Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}'
     set_fact:
-      Gen10_10p_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
+      Gen10_10p_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(jq) )[0] }}"
     vars:
-      query: "json.items[?contains(releaseVersion, '{{ Gen10_10p_firmware_bundle_name }}') && contains(name, 'Gen10')].id"
-    when: is_first_host and (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+      jq: "json.items[?contains(releaseVersion, '{{ Gen10_10p_firmware_bundle_name }}') && contains(name, 'Gen10')].id"
+    when: is_first_host and (Gen10_10p_firmware_bundle_name is defined) and (Gen10_10p_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(jq) )[0] | default([]) != []
 
   - name:  Exit if Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}' does not exist
     fail:
@@ -1569,11 +1871,11 @@
   
   - name: Set variable for Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}'
     set_fact:
-      Gen11_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
+      Gen11_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(jq) )[0] }}"
     vars:
       # query: "json.items[?releaseVersion=='{{ Gen11_firmware_bundle_name }}'].id"
-      query: "json.items[?contains(releaseVersion, '{{ Gen11_firmware_bundle_name }}') && contains(name, 'Gen11')].id"
-    when: is_first_host and (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+      jq: "json.items[?contains(releaseVersion, '{{ Gen11_firmware_bundle_name }}') && contains(name, 'Gen11')].id"
+    when: is_first_host and (Gen11_firmware_bundle_name is defined) and (Gen11_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(jq) )[0] | default([]) != []
 
   - name: Exit if Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}' does not exist
     fail:
@@ -1587,11 +1889,11 @@
   
   - name: Set variable for Gen12 firmware bundle '{{ Gen12_firmware_bundle_name }}'
     set_fact:
-      Gen12_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(query) )[0] }}"
+      Gen12_firmware_bundle_ID:  "{{ (firmwarebundles | json_query(jq) )[0] }}"
     vars:
       # query: "json.items[?releaseVersion=='{{ Gen12_firmware_bundle_name }}'].id"
-      query: "json.items[?contains(releaseVersion, '{{ Gen12_firmware_bundle_name }}') && contains(name, 'Gen12')].id"
-    when: is_first_host and (Gen12_firmware_bundle_name is defined) and (Gen12_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(query) )[0] | default([]) != []
+      jq: "json.items[?contains(releaseVersion, '{{ Gen12_firmware_bundle_name }}') && contains(name, 'Gen12')].id"
+    when: is_first_host and (Gen12_firmware_bundle_name is defined) and (Gen12_firmware_bundle_name|length > 0) and (firmwarebundles | json_query(jq) )[0] | default([]) != []
 
   - name: Exit if Gen12 firmware bundle '{{ Gen12_firmware_bundle_name }}' does not exist
     fail:
@@ -1887,9 +2189,9 @@
 
   - name: Check if server '{{ serial_number }}' is already member of definitive server group '{{ server_group_name }}' 
     set_fact: 
-      server_found_in_definitive_group: "{{ definitive_server_group  | json_query(query) }}"
+      server_found_in_definitive_group: "{{ definitive_server_group  | json_query(jq) }}"
     vars:
-      query: "json.items[0].devices[?serial=='{{ serial_number }}']"
+      jq: "json.items[0].devices[?serial=='{{ serial_number }}']"
     when: definitive_server_group.json.count == 1
       
   # - debug: var=server_found_in_definitive_group  
@@ -1941,38 +2243,30 @@
 
   # Start an HPE drivers, software and firmware update job
 
-  # To run a firmware update in parallel on each host and save time, it is necessary to use the group firmware update job
-  # This job will only be executed on the first host in the Ansible inventory
-
-  # Get the list of devices in the definitive server group with the first host only
-
-  - name: Get definitive group '{{ server_group_name }}' information (first host only)
-    uri:
-      url:  "{{ ConnectivityEndpoint }}{{ definitive_group_resourceuri  }}"
-      method: GET
-      headers:
-        Authorization: "Bearer {{ access_token }}"
-    register: definitive_server_group
-    delegate_to: localhost
-    when: is_first_host
-
-  - name: Set fact for the list of server IDs member of the definitive server group (first host only)
-    set_fact:
-      server_ids: "{{ definitive_server_group.json.devices  | map(attribute='id') | list  }}"
-    when: is_first_host
-
-  - name: Display the server IDs found (first host only)
-    debug: var=server_ids
-    when: is_first_host
+  # Firmware is updated in ONE group job that targets ONLY the servers being provisioned in THIS inventory run (in
+  # parallel), not every member of the definitive group. The job is submitted exactly ONCE (guarded with is_first_host)
+  # against the group (resourceType 'compute-ops-mgmt/group', resourceId = definitive group id) because the firmware
+  # baseline lives on the group; 'jobParams.devices' narrows the scope to this run's servers, so servers added to the
+  # group by a PREVIOUS run are left untouched. The device list is built from each play host's 'server_id' (already in
+  # the API device-id form '<partNumber>+<serialNumber>', e.g. 'P28948-B21+CZ2311004H'). Under the default 'linear'
+  # strategy every host is already in the group with its 'server_id' fact by the time the first host submits the job.
 
   # If updating HPE drivers, software and firmware takes a long time, it's safer to ask for a new COM token now
 
   - name: Create a new HPE Compute Ops Management session to avoid token expiration during the firmware update job
     import_tasks: files/Create_COM_session.yml
 
-  # Start a group firmware update job with the first host only
+  - name: Build the list of device ids for the servers being provisioned in this run (first host only)
+    set_fact:
+      server_ids: "{{ ansible_play_hosts | map('extract', hostvars, 'server_id') | list }}"
+    when: is_first_host
 
-  - name: Start a group firmware update job using the defined firmware baseline (first host only)
+  - name: Display the device ids targeted by the firmware update job (first host only)
+    debug:
+      msg: "Firmware update will target these {{ server_ids | length }} server(s): {{ server_ids }}"
+    when: is_first_host
+
+  - name: Start a single group firmware update job for this run's servers (first host only)
     uri:
       url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
       method: POST
@@ -2057,9 +2351,9 @@
 
   - name: Extract items containing 'Firmware update'  
     set_fact:
-      firmware_update_items: "{{ (Server_activity_status | json_query(query))[0] }}"
+      firmware_update_items: "{{ (Server_activity_status | json_query(jq))[0] }}"
     vars:
-      query: "json.items[? contains(name, 'Firmware update') && contains(groupDisplayName, '{{ server_group_name }}')]"
+      jq: "json.items[? contains(name, 'Firmware update') && contains(groupDisplayName, '{{ server_group_name }}')]"
 
   # - debug: var=firmware_update_items
 
@@ -2125,8 +2419,10 @@
     delegate_to: localhost
 
   - name: Get runtime
+    # ansible-core 2.19 refuses to store native objects (a datetime subtraction yields a 'timedelta',
+    # which raises "Type 'timedelta' is unsupported for variable storage"). Cast to string for storage/display.
     set_fact:
-      runtime: "{{ ((ansible_date_time.iso8601[:19] | to_datetime('%Y-%m-%dT%H:%M:%S')) - (start_time[:19] | to_datetime('%Y-%m-%dT%H:%M:%S'))) }}"
+      runtime: "{{ ((ansible_date_time.iso8601[:19] | to_datetime('%Y-%m-%dT%H:%M:%S')) - (start_time[:19] | to_datetime('%Y-%m-%dT%H:%M:%S'))) | string }}"
 
   # Display server installation completed message
 
@@ -2155,7 +2451,13 @@
         - "Refer to the individual server activity entries in the HPE Compute Ops Management UI for more details."
         - "To SSH to the new host from Ansible control node, use: ssh root@{{ inventory_hostname }}.{{domain}}"
         - "The provisioning task took {{ runtime }}."
-    when: (firmware_update_items.message is search('Firmware update failed', ignorecase=True)) or (group_firmware_update_job_status.json.resultCode is none)
+    # 'group_firmware_update_job_status' is registered only on the first host (the group firmware update job runs
+    # once for the whole run). Non-first hosts hold a skipped-result/undefined value with no '.json', so gate that
+    # part on 'is_first_host' and use '.get()' (ansible-core 2.19 RAISES on missing dict attributes). Non-first
+    # hosts fall back to their own per-host 'firmware_update_items.message'.
+    when: >-
+      (firmware_update_items.message is search('Firmware update failed', ignorecase=True))
+      or (is_first_host and (((group_firmware_update_job_status | default({})).get('json') or {}).get('resultCode') is none))
 
 
     

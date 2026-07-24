@@ -70,6 +70,14 @@ src_iso_directory: "{{ lookup('env','HOME') }}/ISOs/rhelisosrc"
 # Note: You must define a directory in your user home directory using {{ lookup('env','HOME') }}. 
 staging_directory: "{{ lookup('env','HOME') }}/staging"
 
+# Split-media model (recommended): the RHEL boot ISO is prepared and copied to nginx only ONCE and reused as the COM OS
+# image 'mediaUrl' for every host, while only a small per-host kickstart seed ISO (a few KB, holding ks.cfg) is generated
+# per server and attached via the COM 'unattendedInstallationFileUrl' field. The seed is labelled OEMDRV so Anaconda
+# auto-discovers the kickstart. The host-agnostic HPE AMS rpm is baked into the shared ISO '/rpms' once. This avoids
+# rebuilding and copying the multi-GB ISO for each host. 'prepared_iso_file' is the shared boot ISO name built from
+# '{{ src_iso_file }}'.
+prepared_iso_file: "rhel-9.3-x86_64-boot-prepared.iso"
+
 
 #------------------------ Kickstart file and HPE Packages ---------------------------------------------------------------------
 
@@ -81,10 +89,10 @@ rhel_version: "RHEL_9.3"
 kickstart: "ks-rhel9.sh"
 
 # Name of the HPE Agentless Management Service (AMS) (required)
-AMS_package: "amsd-3.4.0-1790.3.rhel9.x86_64.rpm"
+AMS_package: "amsd-4.7.0-2151.8.rhel9.x86_64.rpm"
 
 # Name of the HPE Integrated Smart Update Tools (iSUT)
-SUT_package: "sut-4.6.0-14.linux.x86_64.rpm"
+SUT_package: "sut-6.7.0-16.linux.x86_64.rpm"
 
 # RHEL repositories location (contains BaseOS and Appstream folders)
 # = Installation source URL (is a copy of the contents of the DVD ISO image containing the required repository and software packages)
@@ -106,6 +114,12 @@ hashed_root_password: "$6$VRZaSg6YXxzE5IDL$e5J06Rf.ae.f8ZcVYa9ndbB/JgLPGEz3xVEqO
 timezone: "Europe/Paris"
 ntp_server: "time.cloudflare.com"
 
+# Optional HTTP/HTTPS corporate proxy used to reach EXTERNAL repositories (e.g. the EPEL release rpm from
+# dl.fedoraproject.org) during the kickstart %post, and persisted for dnf/yum on the installed system.
+# The internal RHEL repo ('RHEL_repo_url') and the local '{{ domain }}' domain always BYPASS the proxy.
+# Full URL form, e.g. "http://proxy.example.com:8080". Leave empty for a direct connection.
+proxy_url: ""
+
 # Keyboard layouts: us, fr, de, es, etc.
 # To get the list of supported keyboard values: ls /usr/lib/kbd/keymaps/xkb/ | sed 's/.\{7\}$//'
 keyboard: "us"
@@ -113,7 +127,32 @@ keyboard: "us"
 # To get the list of supported language values: locale -a | grep _
 language: "en_US"
 
-# If true, create a NIC bonding using the first two connected NICs to set the network settings
-# If false, no NIC bonding is created. The first connected NIC found is used to set the network settings
+# If true, an active-backup NIC bond ('team0') is created AFTER the OS install, on the installed system,
+# from the two management NICs derived from the COM inventory (see 'bond_member_selection' below). If only
+# one of those NICs has a cable (carrier), or 'enable_nic_bonding' is false, the host stays on a single NIC.
+# The OS INSTALL itself always runs over a SINGLE NIC (the primary), exactly like the HVM provisioning:
+# this avoids a bond stalling Anaconda's early network-repo fetch on non-LAG switch fabrics.
 enable_nic_bonding: true
+
+# --- Management NIC selection (mirrors the HVM provisioning logic) --------------------------------------
+# The primary (install) NIC and the bond members are derived from the COM network inventory by MAC address,
+# which is generation-independent (interface names differ across ProLiant generations/adapters). This is
+# what lets the same playbook install reliably on Gen10 Plus, Gen11 and Gen12.
+#   'auto'   : derive the MACs from the COM inventory (recommended, default).
+#   'mac'    : use the explicit MACs in 'bond_member_macs' below.
+#   'manual' : use the explicit interface names in 'bond_interfaces' below.
+bond_member_selection: "auto"
+# Number of Ethernet ports to derive in 'auto' mode. The first is the install/primary NIC; the second (when
+# cabled) becomes the bond backup. Keep >= 2 for redundancy.
+bond_member_count: 2
+# Substring used to select the management Ethernet adapter from the COM inventory in 'auto' mode (matched
+# against the adapter Name/Model/Description, case-insensitive). Leave EMPTY to consider all adapters in
+# inventory order (the first Ethernet ports win). Set e.g. "OCP" to pin the LOM/OCP adapter.
+bond_member_adapter_match: ""
+# Explicit lower/any-case MACs to use when 'bond_member_selection' is 'mac' (also filled internally in auto
+# mode). Explicit interface names when 'bond_member_selection' is 'manual'.
+bond_member_macs: []
+bond_interfaces: []
+# Bond mode for the post-install 'team0' bond. Keep 'active-backup' (no switch-side LAG required).
+mgmt_bond_mode: "active-backup"
 

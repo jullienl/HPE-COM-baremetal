@@ -1,0 +1,38 @@
+---
+# =====================================================================================================================
+# Create an HPE VM Essentials (VME) Manager API session
+#
+# The VME Manager is based on Morpheus, which exposes an OAuth2 password-grant token endpoint. This task set obtains a
+# bearer token used by the HVM cluster create/join tasks in HVM_provisioning.yml.
+#
+# Requires (from vars/VME_Manager_vars_encrypted.yml):
+#   - vme_manager_url        e.g. https://vme.lj.lab
+#   - vme_manager_username
+#   - vme_manager_password
+#
+# Sets the fact:
+#   - vme_access_token
+# =====================================================================================================================
+
+- name: Create HPE VM Essentials Manager session
+  uri:
+    url: "{{ vme_manager_url }}/oauth/token?grant_type=password&scope=write"
+    method: POST
+    body_format: form-urlencoded
+    validate_certs: false
+    headers:
+      Content-Type: "application/x-www-form-urlencoded"
+    body:
+      client_id: "morph-api"
+      username: "{{ vme_manager_username }}"
+      password: "{{ vme_manager_password }}"
+  register: vme_login
+  until: vme_login.status == 200
+  retries: 5
+  delay: 5
+  delegate_to: localhost
+  no_log: true
+
+- name: Set variable vme_access_token for the VME Manager bearer token
+  set_fact:
+    vme_access_token: "{{ vme_login.json.access_token }}"

@@ -1,0 +1,2057 @@
+---
+# =====================================================================================================================
+# Automated HPE Morpheus VM Essentials - HVM OS (Ubuntu 24.04) installation on HPE Compute Ops Management server(s)
+# using an auto-generated ISO file with a customized Ubuntu autoinstall (cloud-init) seed.
+#
+#  Command that can be used to run this playbook:
+#
+#   $ ansible-playbook -i hosts_HVM HVM_provisioning.yml --ask-vault-password --ask-become-pass
+#
+#   With a pass file containing the vault/become password:
+#   $ ansible-playbook -i hosts_HVM HVM_provisioning.yml --become-password-file pass --vault-password-file pass
+#
+#  Note: Make sure to provide the list of servers to be provisioned with their details in the inventory file 'hosts_HVM'
+#
+#  High level workflow:
+#    1.  Create a DNS record for each host (Windows DNS / WinRM)
+#    2.  Authenticate with HPE Compute Ops Management (COM) and capture job template IDs
+#    3.  Discover the server, power it on and collect the local storage inventory
+#    4.  Detect the OS boot volume (NS204i / MR / SR / local disk) and create the internal storage setting if needed
+#    5.  Create a temporary COM server group with the BIOS (and storage) settings
+#    6.  Build a per-host HVM Install ISO with the customized Ubuntu autoinstall seed and host it on nginx
+#    7.  Create the COM OS image setting and start the group OS installation job
+#    8.  Wait for the installation to complete and the host to be reachable over SSH
+#    9.  Update the HVM host packages (apt) and configure NTP (chrony)         [Play 2, over SSH]
+#    10. Optionally update HPE firmware/drivers via COM                        [Play 3]
+#    11. Create the HVM cluster in the VME Manager if missing and add the host [Play 3]
+#    12. Team a cabled second management NIC into an OVS bond (redundancy)     [Play 4, over SSH]
+# =====================================================================================================================
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+#  Play 0 - DNS record (WinRM Mode)
+# ---------------------------------------------------------------------------------------------------------------------
+
+- name: DNS record for the bare metal HVM server
+  hosts: All
+  gather_facts: no
+  vars:
+    ansible_forks: 5
+  vars_files:
+    - vars/Windows_DNS_vars_encrypted.yml
+  tasks:
+    - name: Add '{{ inventory_hostname }}' with '{{ os_ip_address }}' on '{{ dns_server }}' in '{{ domain }}' DNS domain
+      ansible.windows.win_dns_record:
+        name: "{{ inventory_hostname }}"
+        type: "A"
+        value: "{{ os_ip_address }}"
+        zone: "{{ domain }}"
+        state: present
+      delegate_to: "{{ dns_server }}"
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+#  Play 1 - Bare metal provisioning (COM orchestration, runs from the Ansible control node)
+# ---------------------------------------------------------------------------------------------------------------------
+
+- name: Automated HVM OS (Ubuntu 24.04) installation on HPE Compute Ops Management server(s)
+  hosts: All
+  gather_facts: no
+  vars_files:
+    - vars/GLP_COM_API_credentials_encrypted.yml
+    - vars/VME_Manager_vars_encrypted.yml
+    - vars/HVM_vars.yml
+    - vars/api_versions.yml
+  vars:
+    inventory_fqdn: "{{ inventory_hostname | lower }}.{{ domain }}"
+    ansible_host_key_checking: false
+    validate_certs: false
+    user: "{{ lookup('env', 'USER') }}"
+    ssh_known_hosts_file: "{{ lookup('env','HOME') + '/.ssh/known_hosts' }}"
+    ansible_ssh_public_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+    ansible_forks: 5
+
+  tasks:
+
+#--------------------------------------Capture start time--------------------------------------------------------------
+
+  - name: Gather subset facts on localhost
+    setup:
+      gather_subset: [all]
+    delegate_to: localhost
+
+  - name: Capture the start time (used later to filter COM activities and compute the playbook runtime)
+    set_fact:
+      start_time: "{{ ansible_date_time.iso8601 }}"
+
+  - debug: var=start_time
+
+  - name: Set fact for the first host in inventory
+    set_fact:
+      is_first_host: "{{ ansible_play_batch[0] == inventory_hostname }}"
+
+
+#--------------------------------------Authentication with COM---------------------------------------------------------
+
+  - name: Create HPE Compute Ops Management session
+    import_tasks: files/Create_COM_session.yml
+
+
+#--------------------------------------Capture Job Templates IDs-------------------------------------------------------
+
+  - name: Capture Job Templates IDs
+    import_tasks: files/Get_job_templates_id.yml
+
+
+#--------------------------------------Ensure hostname is supported ---------------------------------------------------
+
+  - name: Ensure hostname is supported for HVM server '{{ inventory_hostname }}'
+    assert:
+      that:
+        - inventory_hostname is match('^[a-zA-Z0-9-]+$')          # Only letters, digits, and hyphens
+        - not (inventory_hostname is match('^-'))                 # Not start with hyphen
+        - not (inventory_hostname.endswith('-'))                  # Not end with hyphen
+        - not (inventory_hostname is match('^[0-9]+$'))           # Not all numeric
+      fail_msg: "Invalid hostname '{{ inventory_hostname }}'. Hostname must only contain letters, digits, and hyphens."
+
+
+#--------------------------------------Capture server information -----------------------------------------------------
+
+  - name: Capture server '{{ serial_number }}' information
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ serial_number }}'"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server
+    delegate_to: localhost
+
+  - name: Exit if server '{{ serial_number }}' does not exist
+    fail:
+      msg: "Server '{{ serial_number }}' cannot be found in COM!"
+    when: server.json.count == 0
+
+  - name: Capture server '{{ serial_number }}' id, uri and connection status
+    set_fact:
+      server_id: "{{ server | json_query('json.items[0].id') }}"
+      server_resourceUri: "{{ server | json_query('json.items[0].resourceUri') }}"
+      server_connected_status: "{{ server | json_query('json.items[0].state.connected') }}"
+
+  - name: Exit if server '{{ serial_number }}' is not connected to COM
+    fail:
+      msg:
+        - "Server '{{ serial_number }}' is not connected to COM!"
+        - "Make sure to connect the server's iLO to COM ! Go to iLO UI / Management / Compute Ops Management"
+    when: server_connected_status == false
+
+  # When a server has just been added to COM or is rebooting/re-discovering, the hardware fields (serverGeneration,
+  # model, powerState, iLO IP) are transiently reported as 'UNKNOWN' or empty. Wait until they are populated before
+  # capturing them, otherwise the power-on logic below (which keys off 'server_power_state') runs on bogus data.
+  - name: Wait until server '{{ serial_number }}' hardware information (generation, model, power state) is populated
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers?filter=hardware/serialNumber%20eq%20'{{ serial_number }}'"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server
+    until:
+      - (server | json_query('json.items[0].serverGeneration') | default('UNKNOWN', true)) not in ['UNKNOWN', '']
+      - (server | json_query('json.items[0].hardware.model') | default('', true)) | length > 0
+      - (server | json_query('json.items[0].hardware.powerState') | default('UNKNOWN', true)) not in ['UNKNOWN', '']
+    retries: 30
+    delay: 20
+    delegate_to: localhost
+
+  - name: Capture server '{{ serial_number }}' generation, model, power state and iLO IP
+    set_fact:
+      server_generation: "{{ server | json_query('json.items[0].serverGeneration') }}"
+      server_model: "{{ server | json_query('json.items[0].hardware.model') }}"
+      server_ilo_ip: "{{ server | json_query('json.items[0].hardware.bmc.ip') }}"
+      server_power_state: "{{ server | json_query('json.items[0].hardware.powerState') }}"
+
+  - debug:
+      msg:
+        - "Generation: {{ server_generation }}"
+        - "Model: {{ server_model }}"
+        - "ID: {{ server_id }}"
+        - "Connection status: {{ server_connected_status }}"
+        - "iLO IP: {{ server_ilo_ip }}"
+        - "Power state: {{ server_power_state }}"
+
+  - name: Wait until the server '{{ serial_number }}' inventory information is available then capture the data
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/inventory"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server_inventory
+    failed_when: server_inventory.status != 200 and server_inventory.status != 404
+    until: server_inventory.status == 200
+    retries: 30
+    delay: 60
+    delegate_to: localhost
+
+  - name: Wait until the complete discovery of server '{{ serial_number }}' is complete
+    uri:
+      url: "{{ ConnectivityEndpoint }}/ui-doorway/compute/v2/servers/{{ server_id }}"
+      method: GET
+      return_content: yes
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server_inventory_from_ui_doorway
+    until: server_inventory_from_ui_doorway.json.get('state_') != "Retrieving server information in progress"
+    retries: 30
+    delay: 60
+    delegate_to: localhost
+
+  - name: Power on the server '{{ serial_number }}' to get the storage inventory information (only if not already ON)
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        jobTemplate: "{{ PowerOn_New_job_template_id }}"
+        resourceId: "{{ server_id }}"
+        resourceType: "compute-ops-mgmt/server"
+    register: power_on_job_result
+    when: server_power_state != "ON"
+    delegate_to: localhost
+
+  - name: Report that server '{{ serial_number }}' is already powered on (skipping power on)
+    debug:
+      msg: "Server '{{ serial_number }}' is already powered on (power state '{{ server_power_state }}'). Skipping the power on job."
+    when: server_power_state == "ON"
+
+  - name: Set a variable for the job resource URI
+    set_fact:
+      job_resourceUri: "{{ power_on_job_result.json.resourceUri }}"
+    when: server_power_state != "ON"
+
+  - name: Wait for the server power on job to complete
+    uri:
+      url: "{{ ConnectivityEndpoint }}{{ job_resourceUri }}"
+      method: GET
+      return_content: yes
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    retries: 60
+    delay: 5
+    until: >
+      (server_power_on_job_status.json.state == "COMPLETE" or
+      server_power_on_job_status.json.state == "ERROR")
+    register: server_power_on_job_status
+    when: server_power_state != "ON"
+    delegate_to: localhost
+
+  - name: Exit when server power on job is failing
+    fail:
+      msg: "Error ! Server power on job has failed !"
+    when:
+      - server_power_state != "ON"
+      - server_power_on_job_status.json.state == "ERROR"
+
+
+#--------------------------------------Check BIOS/Workload profile settings -------------------------------------------
+
+  - name: Check if workload profile '{{ workload_profile_name }}' exists
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ settings_API_version }}/settings?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars:
+      filter: "category eq 'BIOS' and name eq '{{ workload_profile_name }}'"
+    register: bios_server_setting
+    delegate_to: localhost
+
+  - name: Exit if workload profile '{{ workload_profile_name }}' does not exist
+    fail:
+      msg: "Workload profile '{{ workload_profile_name }}' does not exist!"
+    when: bios_server_setting.json.count == 0
+
+  - name: Set a variable for the resourceUri of workload profile '{{ workload_profile_name }}'
+    set_fact:
+      bios_server_setting_resourceuri: "{{ bios_server_setting | json_query('json.items[0].resourceUri') }}"
+
+
+#-------------------------------------- Collect the local storage information -----------------------------------------
+
+  # COM populates the PCI device inventory ('device.data') and the storage inventory ('storage.data') INDEPENDENTLY, and
+  # the storage array can lag well behind the PCI one (observed on Gen10 Plus: 'device.data' full while 'storage.data'
+  # was still empty). The storage-controller detection below relies on 'storage.data', so we must wait until it is
+  # actually populated - i.e. at least one controller reports Drives or Volumes - not just until 'device.data' appears.
+  # Waiting on the wrong array made the playbook run the detection against empty storage data and wrongly fail with
+  # "No storage controller with drives available found in the server".
+  - name: Wait until the storage inventory of server '{{ serial_number }}' is populated then capture the inventory
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/inventory"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server_inventory
+    until:
+      - (server_inventory.json.device.data | default([]) | length) > 0
+      - ((server_inventory.json.storage.data | default([]) | selectattr('Drives', 'defined') | map(attribute='Drives') | map('length') | sum)
+         + (server_inventory.json.storage.data | default([]) | selectattr('Volumes', 'defined') | map(attribute='Volumes') | map('length') | sum)) > 0
+    retries: 30
+    delay: 60
+    delegate_to: localhost
+
+  - name: Capture the server '{{ serial_number }}' inventory information
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ servers_API_version }}/servers/{{ server_id }}/inventory"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server_inventory
+    delegate_to: localhost
+
+
+#-------------------------------------- Management bond NIC selection (auto MAC discovery) -----------------------------
+
+  # When 'bond_member_selection' is 'auto', derive the mgmt bond member MAC addresses from the COM network inventory
+  # instead of relying on interface names (which differ across ProLiant generations/adapters). We take the first
+  # 'bond_member_count' Ethernet ports of the adapter whose Name/Model matches 'bond_member_adapter_match'. The seed
+  # then matches these ports by MAC in netplan, so it is generation-independent.
+
+  - name: Show the raw network adapter inventory for server '{{ serial_number }}' (troubleshooting)
+    debug:
+      var: server_inventory.json.networkAdapter.data
+      verbosity: 1
+    when: bond_member_selection | default('manual') == 'auto'
+
+  - name: Derive the mgmt bond member MAC addresses from the COM inventory of server '{{ serial_number }}'
+    set_fact:
+      bond_member_macs: >-
+        {%- set ns = namespace(macs=[]) -%}
+        {%- for a in server_inventory.json.networkAdapter.data | default([]) -%}
+        {%-   set aname = ((a.Name | default('')) ~ ' ' ~ (a.Model | default('')) ~ ' ' ~ (a.Description | default(''))) | lower -%}
+        {%-   if (bond_member_adapter_match | default('') | length == 0) or (bond_member_adapter_match | lower in aname) -%}
+        {%-     for p in a.Ports | default([]) -%}
+        {%-       set tech = ((p.LinkNetworkTechnology | default('')) ~ '|' ~ (p.PortProtocol | default(''))) | lower -%}
+        {%-       if 'ethernet' in tech -%}
+        {%-         set mac = '' -%}
+        {%-         if p.Ethernet is defined and p.Ethernet.AssociatedMACAddresses is defined -%}
+        {%-           set amac = p.Ethernet.AssociatedMACAddresses -%}
+        {%-           if amac is string -%}
+        {%-             set mac = amac -%}
+        {%-           elif (amac | length) > 0 -%}
+        {%-             set mac = amac[0] -%}
+        {%-           endif -%}
+        {%-         elif p.Ethernet is defined and p.Ethernet.MACAddress is defined -%}
+        {%-           set mac = p.Ethernet.MACAddress -%}
+        {%-         endif -%}
+        {%-         if (mac | length) > 0 and (mac | lower not in ns.macs) -%}
+        {%-           set ns.macs = ns.macs + [mac | lower] -%}
+        {%-         endif -%}
+        {%-       endif -%}
+        {%-     endfor -%}
+        {%-   endif -%}
+        {%- endfor -%}
+        {{ ns.macs[:(bond_member_count | int)] }}
+    when: bond_member_selection | default('manual') == 'auto'
+    delegate_to: localhost
+
+  - name: Show the mgmt bond member MAC addresses selected for server '{{ serial_number }}'
+    debug:
+      msg: "Mgmt bond members (by MAC) for '{{ inventory_hostname }}': {{ bond_member_macs }}"
+    when: bond_member_selection | default('manual') == 'auto'
+
+  - name: Fail if no Ethernet MAC could be derived from the COM inventory (auto mode)
+    fail:
+      msg:
+        - "Could not derive any mgmt bond member MAC address from the COM inventory for server '{{ serial_number }}'."
+        - "Check 'bond_member_adapter_match' ('{{ bond_member_adapter_match }}') against the adapter names above,"
+        - "or switch 'bond_member_selection' to 'mac' (with 'bond_member_macs') or 'manual' (with 'bond_interfaces')."
+    when:
+      - bond_member_selection | default('manual') == 'auto'
+      - (bond_member_macs | default([]) | length) == 0
+
+  # When a SEPARATE compute (VM) network is requested, derive the dedicated compute NIC MAC(s) too. If
+  # 'hvm_compute_adapter_match' is set, the ports of THAT adapter are used; otherwise the ports that FOLLOW the
+  # management ports on the same (management) adapter are used (offset by 'bond_member_count'). The seed then renames
+  # them to 'comp0' (+ 'comp1'). This is a no-op in the default converged model (hvm_separate_compute_network=false).
+  - name: Derive the dedicated compute NIC MAC addresses from the COM inventory (separate compute network)
+    set_fact:
+      compute_bond_member_macs: >-
+        {%- set match = (hvm_compute_adapter_match | default('')) | trim -%}
+        {%- set same = (match | length == 0) -%}
+        {%- set effmatch = (bond_member_adapter_match if same else match) -%}
+        {%- set ns = namespace(macs=[]) -%}
+        {%- for a in server_inventory.json.networkAdapter.data | default([]) -%}
+        {%-   set aname = ((a.Name | default('')) ~ ' ' ~ (a.Model | default('')) ~ ' ' ~ (a.Description | default(''))) | lower -%}
+        {%-   if (effmatch | length == 0) or (effmatch | lower in aname) -%}
+        {%-     for p in a.Ports | default([]) -%}
+        {%-       set tech = ((p.LinkNetworkTechnology | default('')) ~ '|' ~ (p.PortProtocol | default(''))) | lower -%}
+        {%-       if 'ethernet' in tech -%}
+        {%-         set mac = '' -%}
+        {%-         if p.Ethernet is defined and p.Ethernet.AssociatedMACAddresses is defined -%}
+        {%-           set amac = p.Ethernet.AssociatedMACAddresses -%}
+        {%-           if amac is string -%}
+        {%-             set mac = amac -%}
+        {%-           elif (amac | length) > 0 -%}
+        {%-             set mac = amac[0] -%}
+        {%-           endif -%}
+        {%-         elif p.Ethernet is defined and p.Ethernet.MACAddress is defined -%}
+        {%-           set mac = p.Ethernet.MACAddress -%}
+        {%-         endif -%}
+        {%-         if (mac | length) > 0 and (mac | lower not in ns.macs) -%}
+        {%-           set ns.macs = ns.macs + [mac | lower] -%}
+        {%-         endif -%}
+        {%-       endif -%}
+        {%-     endfor -%}
+        {%-   endif -%}
+        {%- endfor -%}
+        {%- set start = (bond_member_count | int) if same else 0 -%}
+        {{ ns.macs[start : start + (hvm_compute_nic_count | int)] }}
+    when: bond_member_selection | default('manual') == 'auto' and (hvm_separate_compute_network | default(false) | bool)
+    delegate_to: localhost
+
+  - name: Show the dedicated compute NIC MAC addresses selected for server '{{ serial_number }}'
+    debug:
+      msg: "Compute NICs (by MAC) for '{{ inventory_hostname }}': {{ compute_bond_member_macs | default([]) }}"
+    when: bond_member_selection | default('manual') == 'auto' and (hvm_separate_compute_network | default(false) | bool)
+
+  - name: Fail if a separate compute network was requested but no compute NIC MAC could be derived
+    fail:
+      msg:
+        - "'hvm_separate_compute_network' is true but no dedicated compute NIC MAC could be derived for '{{ serial_number }}'."
+        - "Set 'hvm_compute_adapter_match' to the compute adapter name/model, or ensure the management adapter has at"
+        - "least 'bond_member_count' + 'hvm_compute_nic_count' Ethernet ports, then re-run."
+    when:
+      - bond_member_selection | default('manual') == 'auto'
+      - (hvm_separate_compute_network | default(false) | bool)
+      - (compute_bond_member_macs | default([]) | length) == 0
+
+  # ---- NS204i detection ----
+  - name: Capture the presence of a NS204i NVMe boot controller in server '{{ serial_number }}'
+    set_fact:
+      NS204i_data: "{{ item }}"
+    loop: "{{ server_inventory.json.storage.data }}"
+    loop_control:
+      label: never
+    when: item.Name is search('NS204i')
+
+  - debug:
+      msg: "NS204i found in server '{{ serial_number }}'! NVMe RAID1 volume will be used as the OS boot volume."
+    when: NS204i_data is defined
+
+  - name: Capture size of the NS204i RAID1 volume if any
+    set_fact:
+      boot_drive_bytes_size: "{{ item.Volumes[0].CapacityBytes }}"
+    loop: "{{ server_inventory.json.storage.data }}"
+    loop_control:
+      label: never
+    when:
+      - NS204i_data is defined
+      - item.Name is defined
+      - item.Name is search('NS204i')
+      - item.Volumes is defined
+      - item.Volumes | length > 0
+
+  # ---- MR/SR controller detection ----
+  - name: Capture storage RAID controller information when an HPE MR or SR controller is used with available drives
+    set_fact:
+      SR_MR_storage_controller_data: "{{ item }}"
+    loop: "{{ server_inventory.json.storage.data }}"
+    loop_control:
+      label: never
+    when:
+      - NS204i_data is undefined
+      - item.Drives is defined
+      - item.Drives | length > 1
+      - (item.Name is search('HPE MR') or item.Name is search('HPE SR'))
+      - SR_MR_storage_controller_data is not defined
+
+  - name: Set a variable for the name of the storage RAID controller found
+    set_fact:
+      storage_controller_name: "{{ SR_MR_storage_controller_data.Name }}"
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
+
+  - name: Capture size of the HPE MR or SR RAID1 volume if any
+    set_fact:
+      boot_drive_bytes_size: "{{ item.Volumes[0].CapacityBytes }}"
+    loop: "{{ server_inventory.json.storage.data }}"
+    loop_control:
+      label: never
+    when:
+      - NS204i_data is undefined
+      - SR_MR_storage_controller_data is defined
+      - (item.Name is search('HPE MR') or item.Name is search('HPE SR'))
+      - item.Volumes is defined
+      - item.Volumes | length > 0
+
+  # ---- Local disk fallback ----
+  - name: Detect a local disk when no NS204i and no SR/MR controller with disks is available
+    set_fact:
+      no_NS204i_no_SR_MR_but_local_disk: "{{ item }}"
+    loop: "{{ server_inventory.json.storage.data }}"
+    loop_control:
+      label: never
+    when:
+      - NS204i_data is undefined
+      - SR_MR_storage_controller_data is undefined
+      - item.Drives is defined
+      - item.Drives | length > 0
+
+  - name: Exit if no NS204i and no SR/MR controller with disk and no local disk found
+    fail:
+      msg: "Error! No storage controller with drives available found in the server. Ensure the server contains storage drives, then run the playbook again."
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and no_NS204i_no_SR_MR_but_local_disk is not defined
+
+  - name: Set a variable for the name of the local disk controller when used
+    set_fact:
+      storage_controller_name: "{{ no_NS204i_no_SR_MR_but_local_disk.Name }}"
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and no_NS204i_no_SR_MR_but_local_disk is defined
+
+  - name: Capture size of the local disk if any
+    set_fact:
+      boot_drive_bytes_size: "{{ item.Drives[0].CapacityBytes }}"
+    loop: "{{ server_inventory.json.storage.data }}"
+    loop_control:
+      label: never
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is undefined and no_NS204i_no_SR_MR_but_local_disk is defined
+
+  # ---- Controller type (kept for reference / autoinstall seed comment) ----
+  - name: Set a controller type variable when a NS204i controller or local disk is present
+    set_fact:
+      Controller_type: "NS204i"
+    when: NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined
+
+  - name: Set a controller type variable when there is no NS204i but an SR/MR controller is present
+    set_fact:
+      Controller_type: "{{ storage_controller_name }}"
+    when: SR_MR_storage_controller_data is defined
+
+  - debug:
+      msg: "OS boot volume detected on controller '{{ Controller_type }}' with size {{ ((boot_drive_bytes_size | int) / (1024 ** 3)) | round(1) }} GB"
+
+
+#--------------------------------------Create internal storage settings (SR/MR only) ----------------------------------
+
+  - name: Check if settings '{{ raid_type }}' already exist
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/settings?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars:
+      filter: "name eq '{{ raid_type }}'"
+    register: internal_storage_server_setting
+    when: SR_MR_storage_controller_data is defined
+    delegate_to: localhost
+
+  - name: Create internal storage configuration '{{ raid_type }}' ({{ volume_size_in_GB }} GB) for the OS boot volume when it does not exist
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ server_settings_API_version }}/settings"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "{{ raid_type }}"
+        description: "Local storage settings using {{ raid_type }} for OS"
+        platformFamily: "Any"
+        category: "STORAGE"
+        settings:
+          DEFAULT:
+            raidType: "{{ raid_type }}"
+            volumeSizeInGB: "{{ volume_size_in_GB }}"
+    register: internal_storage_server_setting_result
+    when: SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 0
+    delegate_to: localhost
+
+  - name: Set the resourceUri of the internal storage configuration '{{ raid_type }}' just created
+    set_fact:
+      internal_storage_server_setting_resourceuri: "{{ internal_storage_server_setting_result.json.resourceUri }}"
+    when: SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 0
+
+  - name: Set the resourceUri of the internal storage configuration '{{ raid_type }}' when it already exists
+    set_fact:
+      internal_storage_server_setting_resourceuri: "{{ internal_storage_server_setting | json_query('json.items[0].resourceUri') }}"
+    when: SR_MR_storage_controller_data is defined and internal_storage_server_setting.json.count == 1
+
+
+#--------------------------------------Create temporary server group with server settings -----------------------------
+
+  - name: Create server group name '{{ inventory_hostname }}_server_group' variable
+    set_fact:
+      temporary_server_group_name: "{{ inventory_hostname }}_server_group"
+
+  - name: Check if group '{{ temporary_server_group_name }}' already exists
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars:
+      filter: "name eq '{{ temporary_server_group_name }}'"
+    register: temporary_server_group
+    delegate_to: localhost
+
+  # ---- NS204i / local disk : no local storage configuration definition ----
+  - name: Create temporary group '{{ temporary_server_group_name }}' (no local storage definition) if it does not exist
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "{{ temporary_server_group_name }}"
+        description: "Temporary server group for HVM installation on server '{{ inventory_hostname }}'"
+        deviceType: "DIRECT_CONNECT_SERVER"
+        settingsUris:
+          - "{{ bios_server_setting_resourceuri }}"
+        policies:
+          onDeviceAdd:
+            biosApplySettings: false
+            biosFactoryReset: false
+            firmwarePowerOff: false
+            firmwareUpdate: false
+            iloApplySettings: false
+            osInstall: false
+            storageConfiguration: false
+            storageVolumeDeletion: false
+            storageVolumeName: ""
+            externalStorageConfiguration: false
+          onDeviceApply:
+            firmwareDowngrade: false
+    register: server_group_result
+    when: temporary_server_group.json.count == 0 and (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined)
+    delegate_to: localhost
+
+  - name: Set the id and resourceUri of temporary group '{{ temporary_server_group_name }}' just created (no storage)
+    set_fact:
+      temporary_group_id: "{{ server_group_result.json.id }}"
+      temporary_group_resourceuri: "{{ server_group_result.json.resourceUri }}"
+    when: temporary_server_group.json.count == 0 and (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined)
+
+  - name: Set the id and resourceUri of temporary group '{{ temporary_server_group_name }}' when it already exists (no storage)
+    set_fact:
+      temporary_group_id: "{{ temporary_server_group | json_query('json.items[0].id') }}"
+      temporary_group_resourceuri: "{{ temporary_server_group | json_query('json.items[0].resourceUri') }}"
+    when: temporary_server_group.json.count == 1 and (NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined)
+
+  # ---- SR/MR : with local storage configuration definition ----
+  - name: Create temporary group '{{ temporary_server_group_name }}' (with local storage definition) if it does not exist
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "{{ temporary_server_group_name }}"
+        description: "Temporary server group for HVM installation on server '{{ inventory_hostname }}'"
+        deviceType: "DIRECT_CONNECT_SERVER"
+        settingsUris:
+          - "{{ bios_server_setting_resourceuri }}"
+          - "{{ internal_storage_server_setting_resourceuri }}"
+        policies:
+          onDeviceAdd:
+            biosApplySettings: false
+            biosFactoryReset: false
+            firmwarePowerOff: false
+            firmwareUpdate: false
+            iloApplySettings: false
+            osInstall: false
+            storageConfiguration: false
+            storageVolumeDeletion: false
+            storageVolumeName: ""
+            externalStorageConfiguration: false
+          onDeviceApply:
+            firmwareDowngrade: false
+    register: server_group_result
+    when: temporary_server_group.json.count == 0 and SR_MR_storage_controller_data is defined
+    delegate_to: localhost
+
+  - name: Set the id and resourceUri of temporary group '{{ temporary_server_group_name }}' just created (with storage)
+    set_fact:
+      temporary_group_id: "{{ server_group_result.json.id }}"
+      temporary_group_resourceuri: "{{ server_group_result.json.resourceUri }}"
+    when: temporary_server_group.json.count == 0 and SR_MR_storage_controller_data is defined
+
+  - name: Set the id and resourceUri of temporary group '{{ temporary_server_group_name }}' when it already exists (with storage)
+    set_fact:
+      temporary_group_id: "{{ temporary_server_group | json_query('json.items[0].id') }}"
+      temporary_group_resourceuri: "{{ temporary_server_group | json_query('json.items[0].resourceUri') }}"
+    when: temporary_server_group.json.count == 1 and SR_MR_storage_controller_data is defined
+
+  - debug: var=temporary_group_id
+
+
+#--------------------------------------Add server to temporary server group -------------------------------------------
+
+  - name: Check if server '{{ serial_number }}' is already member of a server group
+    uri:
+      url: "{{ ConnectivityEndpoint }}/ui-doorway/compute/v2/servers/{{ server_id }}"
+      method: GET
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: server_info_from_ui_doorway
+    delegate_to: localhost
+
+  - name: Capture the id of the server group of which the server '{{ serial_number }}' is a member (if applicable)
+    set_fact:
+      server_group_id_found: "{{ server_info_from_ui_doorway.json.group_.id }}"
+      server_group_name_found: "{{ server_info_from_ui_doorway.json.group_.name }}"
+    when: server_info_from_ui_doorway.json.get('group_') is not none
+
+  - name: Remove server '{{ serial_number }}' from the server group of which it is currently a member
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ server_group_id_found }}/devices/unassign"
+      method: POST
+      status_code: 202
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        devices:
+          - deviceId: "{{ server_id }}"
+    when: server_info_from_ui_doorway.json.get('group_') is not none
+    delegate_to: localhost
+
+  - name: Wait for unassignment to complete
+    pause:
+      seconds: 15
+    when: server_info_from_ui_doorway.json.get('group_') is not none
+
+  - name: Assign server '{{ serial_number }}' to temporary group '{{ temporary_server_group_name }}'
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ temporary_group_id }}/devices"
+      method: POST
+      status_code: 202
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        devices:
+          - deviceId: "{{ server_id }}"
+    register: group_assignment_result
+    delegate_to: localhost
+
+
+#--------------------------------------Build ISO image with customized autoinstall seed -------------------------------
+
+  - name: Check if HPE HVM Install ISO '{{ src_iso_file }}' exists in '{{ src_iso_directory }}' on '{{ lookup("pipe","hostname") }}'
+    stat:
+      path: "{{ src_iso_directory }}/{{ src_iso_file }}"
+    register: ISO_Present
+    delegate_to: localhost
+
+  - name: Create the directory '{{ src_iso_directory }}' to host the ISO file
+    file:
+      path: "{{ src_iso_directory }}"
+      state: directory
+    when: ISO_Present.stat.exists == False
+    delegate_to: localhost
+
+  - name: Check if the HVM ISO '{{ src_iso_url }}/{{ src_iso_file }}' exists
+    uri:
+      url: "{{ src_iso_url }}/{{ src_iso_file }}"
+      method: HEAD
+      status_code: 200
+      validate_certs: false
+    when: ISO_Present.stat.exists == False
+    delegate_to: localhost
+
+  - name: Download file '{{ src_iso_file }}' to '{{ src_iso_directory }}' if not present
+    get_url:
+      url: "{{ src_iso_url }}/{{ src_iso_file }}"
+      dest: "{{ src_iso_directory }}"
+      validate_certs: no
+    when: ISO_Present.stat.exists == False
+    delegate_to: localhost
+
+  # -------------------------------------------------------------------------------------------------------------------
+  # Split-media model: instead of remastering the full ~4.5 GB HPE HVM ISO for every host, the large boot ISO is built
+  # and copied to nginx only ONCE (shared COM 'mediaUrl') and a small per-host cloud-init seed ISO (a few KB, labelled
+  # 'CIDATA') is generated per server and attached by COM via the 'unattendedInstallationFileUrl' field. This removes
+  # the slow per-host multi-GB copy to nginx.
+  #
+  #   - Shared prepared boot ISO : the source ISO with GRUB 'timeout=0' and the autoinstall datasource changed from
+  #                                'ds=nocloud;s=/cdrom/server/' to 'ds=nocloud', so the installer ignores the seed
+  #                                embedded in the ISO and picks up the externally-attached CIDATA seed instead.
+  #   - Per-host seed ISO        : a small ISO labelled 'CIDATA' containing the rendered 'user-data' and 'meta-data'.
+  # -------------------------------------------------------------------------------------------------------------------
+
+  - name: Check if HPE HVM Install ISO '{{ src_iso_file }}' exists in '{{ src_iso_directory }}' on '{{ lookup("pipe","hostname") }}'
+    stat:
+      path: "{{ src_iso_directory }}/{{ src_iso_file }}"
+    register: ISO_Present
+    delegate_to: localhost
+
+  - name: Create the directory '{{ src_iso_directory }}' to host the ISO file
+    file:
+      path: "{{ src_iso_directory }}"
+      state: directory
+    when: ISO_Present.stat.exists == False
+    delegate_to: localhost
+
+  - name: Check if the HVM ISO '{{ src_iso_url }}/{{ src_iso_file }}' exists
+    uri:
+      url: "{{ src_iso_url }}/{{ src_iso_file }}"
+      method: HEAD
+      status_code: 200
+      validate_certs: false
+    when: ISO_Present.stat.exists == False
+    delegate_to: localhost
+
+  - name: Download file '{{ src_iso_file }}' to '{{ src_iso_directory }}' if not present
+    get_url:
+      url: "{{ src_iso_url }}/{{ src_iso_file }}"
+      dest: "{{ src_iso_directory }}"
+      validate_certs: no
+    when: ISO_Present.stat.exists == False
+    delegate_to: localhost
+
+  - name: Create '/usr/share/nginx/html/isos/' if it does not exist
+    become: yes
+    file:
+      path: /usr/share/nginx/html/isos/
+      state: directory
+      mode: "0755"
+    delegate_to: localhost
+
+  # ---- Shared prepared boot ISO (built once, reused by all hosts) ----
+
+  - name: Check if the shared prepared HVM boot ISO '{{ prepared_iso_file }}' already exists on nginx
+    stat:
+      path: "/usr/share/nginx/html/isos/{{ prepared_iso_file }}"
+    register: prepared_iso_present
+    run_once: true
+    delegate_to: localhost
+
+  - name: Build the shared prepared HVM boot ISO (done once for all hosts)
+    when: not prepared_iso_present.stat.exists
+    run_once: true
+    delegate_to: localhost
+    block:
+
+      - name: Create the staging directory for the prepared boot ISO
+        file:
+          path: "{{ staging_directory }}/baremetal/_prepared_iso"
+          state: directory
+
+      - name: Extract the GRUB config '/boot/grub/grub.cfg' from the source ISO
+        shell: >
+          osirrox -indev "{{ src_iso_directory }}/{{ src_iso_file }}"
+          -overwrite on
+          -extract /boot/grub/grub.cfg "{{ staging_directory }}/baremetal/_prepared_iso/grub.cfg"
+
+      - name: Set the GRUB boot timeout to 0 so the HVM install starts immediately (no 30s wait)
+        replace:
+          path: "{{ staging_directory }}/baremetal/_prepared_iso/grub.cfg"
+          regexp: '^set\s+timeout=.*$'
+          replace: 'set timeout=0'
+
+      - name: Point the autoinstall datasource at the externally-attached CIDATA seed (drop the embedded /cdrom/server seed)
+        replace:
+          path: "{{ staging_directory }}/baremetal/_prepared_iso/grub.cfg"
+          regexp: 'ds=nocloud[^ ]*'
+          replace: 'ds=nocloud'
+
+      - name: Build the prepared boot ISO with xorriso (updates GRUB only, preserves the hybrid BIOS+UEFI boot records)
+        shell: >
+          xorriso -indev "{{ src_iso_directory }}/{{ src_iso_file }}"
+          -outdev "{{ staging_directory }}/baremetal/{{ prepared_iso_file }}"
+          -boot_image any replay
+          -update "{{ staging_directory }}/baremetal/_prepared_iso/grub.cfg" /boot/grub/grub.cfg
+          -commit -end
+
+      - name: Move the prepared boot ISO to the nginx html folder. ISO URL='http://{{ lookup("pipe","hostname") }}/isos/{{ prepared_iso_file }}'
+        become: yes
+        shell: |
+          mv {{ staging_directory }}/baremetal/{{ prepared_iso_file }} /usr/share/nginx/html/isos/
+
+  # ---- Per-host cloud-init seed ISO (small, one per host) ----
+
+  - name: Create the seed staging directory '{{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed'
+    file:
+      path: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed"
+      state: directory
+    delegate_to: localhost
+
+  - name: Render the autoinstall user-data seed for '{{ inventory_hostname }}'
+    template:
+      src: "files/{{ hvm_build }}/{{ autoinstall_template }}"
+      dest: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed/user-data"
+    delegate_to: localhost
+
+  - name: Render the autoinstall meta-data seed for '{{ inventory_hostname }}'
+    template:
+      src: "files/{{ hvm_build }}/meta-data.j2"
+      dest: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed/meta-data"
+    delegate_to: localhost
+
+  - name: Add the bundled HPE amsd '{{ AMS_package }}' to the seed so COM can detect OS install completion
+    copy:
+      src: "files/{{ hvm_build }}/{{ AMS_package }}"
+      dest: "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed/{{ AMS_package }}"
+    when: install_ams | default(true) | bool
+    delegate_to: localhost
+
+  - name: Build the per-host cloud-init seed ISO (CIDATA) for '{{ inventory_hostname }}'
+    shell: >
+      xorriso -as mkisofs
+      -output "{{ staging_directory }}/baremetal/{{ inventory_hostname }}-seed.iso"
+      -volid CIDATA -joliet -rock
+      "{{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed/"
+    delegate_to: localhost
+
+  - name: Move the per-host seed ISO to the nginx html folder. ISO URL='http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}-seed.iso'
+    become: yes
+    shell: |
+      mv {{ staging_directory }}/baremetal/{{ inventory_hostname }}-seed.iso /usr/share/nginx/html/isos/
+    delegate_to: localhost
+
+  - name: Update SELinux security contexts so that Nginx can serve the ISO directory
+    become: yes
+    shell: |
+      chcon -vR system_u:object_r:httpd_sys_content_t:s0 /usr/share/nginx/html/isos/
+    delegate_to: localhost
+
+
+#--------------------------------------Create OS image settings -------------------------------------------------------
+
+  - name: Check if the operating system image server setting 'OS_Image_HVM_for_{{ inventory_hostname }}' exists
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ settings_API_version }}/settings?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars:
+      filter: "name eq 'OS_Image_HVM_for_{{ inventory_hostname }}'"
+    register: OS_image_server_setting
+    delegate_to: localhost
+
+  - name: Create the operating system image server setting 'OS_Image_HVM_for_{{ inventory_hostname }}' if it does not exist
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ settings_API_version }}/settings"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "OS_Image_HVM_for_{{ inventory_hostname }}"
+        description: "HVM OS (Ubuntu 24.04) image for {{ inventory_hostname }}"
+        category: "OS"
+        settings:
+          DEFAULT:
+            osType: "{{ com_os_type }}"
+            mediaUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ prepared_iso_file }}'
+            unattendedInstallationFileUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}-seed.iso'
+    register: OS_image_server_setting_result
+    delegate_to: localhost
+    when: OS_image_server_setting.json.count == 0
+
+  - name: Set the id and resourceUri of the OS Image configuration just created
+    set_fact:
+      OS_image_server_setting_id: "{{ OS_image_server_setting_result.json.id }}"
+      OS_image_server_setting_resourceuri: "{{ OS_image_server_setting_result.json.resourceUri }}"
+    when: OS_image_server_setting.json.count == 0
+
+  - name: Update the operating system image server setting if it already exists
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ settings_API_version }}/settings/{{ OS_image_server_setting_id }}"
+      method: PATCH
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/merge-patch+json"
+      body_format: json
+      body:
+        name: "OS_Image_HVM_for_{{ inventory_hostname }}"
+        description: "HVM OS (Ubuntu 24.04) image for {{ inventory_hostname }}"
+        settings:
+          DEFAULT:
+            osType: "{{ com_os_type }}"
+            mediaUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ prepared_iso_file }}'
+            unattendedInstallationFileUrl: 'http://{{ lookup("pipe","hostname") }}/isos/{{ inventory_hostname }}-seed.iso'
+    vars:
+      OS_image_server_setting_id: "{{ OS_image_server_setting | json_query('json.items[0].id') }}"
+    register: OS_image_server_setting_result
+    delegate_to: localhost
+    when: OS_image_server_setting.json.count == 1
+
+  - name: Set the id and resourceUri of the OS Image configuration when it already exists
+    set_fact:
+      OS_image_server_setting_id: "{{ OS_image_server_setting | json_query('json.items[0].id') }}"
+      OS_image_server_setting_resourceuri: "{{ OS_image_server_setting | json_query('json.items[0].resourceUri') }}"
+    when: OS_image_server_setting.json.count == 1
+
+
+#--------------------------------------Start OS image installation-----------------------------------------------------
+
+  - name: Update temporary group '{{ temporary_server_group_name }}' to add OS image installation settings with NS204i / local disk
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ temporary_group_id }}"
+      method: PATCH
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/merge-patch+json"
+      body_format: json
+      body:
+        name: "{{ temporary_server_group_name }}"
+        description: "Temporary server group for HVM installation on server '{{ inventory_hostname }}'"
+        settingsUris:
+          - "{{ bios_server_setting_resourceuri }}"
+          - "{{ OS_image_server_setting_resourceuri }}"
+        policies:
+          onDeviceAdd:
+            biosApplySettings: true
+            biosFactoryReset: false
+            firmwarePowerOff: false
+            firmwareUpdate: false
+            iloApplySettings: false
+            # Keep the STANDING group policy OS install disabled. The OS installation is triggered ONCE, explicitly,
+            # by the 'Start OS image installation' GroupOSInstallation job below. If this were 'true', COM would
+            # re-apply the group policy when the freshly installed server reconnects (now that amsd reports it back
+            # to COM) and reinstall the OS in a loop.
+            osInstall: false
+            storageConfiguration: false
+            storageVolumeDeletion: false
+            storageVolumeName: ""
+            externalStorageConfiguration: false
+            osCompletionTimeoutMin: 60
+          onDeviceApply:
+            firmwareDowngrade: false
+    register: server_group_result
+    when: NS204i_data is defined or no_NS204i_no_SR_MR_but_local_disk is defined
+    delegate_to: localhost
+
+  - name: Update temporary group '{{ temporary_server_group_name }}' to add OS image installation settings with storage controller (SR/MR)
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ temporary_group_id }}"
+      method: PATCH
+      status_code: 200
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/merge-patch+json"
+      body_format: json
+      body:
+        name: "{{ temporary_server_group_name }}"
+        description: "Temporary server group for HVM installation on server '{{ inventory_hostname }}'"
+        settingsUris:
+          - "{{ bios_server_setting_resourceuri }}"
+          - "{{ internal_storage_server_setting_resourceuri }}"
+          - "{{ OS_image_server_setting_resourceuri }}"
+        serverPolicies:
+          onServerAdd:
+            firmwareUpdate: false
+            biosApplySettings: true
+            storageConfiguration: true
+            storageVolumeDeletion: true
+            storageVolumeName: "OS_boot_volume"
+            # Keep the STANDING group policy OS install disabled - the OS install is triggered ONCE by the explicit
+            # GroupOSInstallation job below. If 'true', COM re-applies the policy when the installed server
+            # reconnects (amsd) and reinstalls the OS in a loop.
+            osInstall: false
+          onSettingsApply:
+            firmwareDowngrade: false
+    register: server_group_result
+    when: NS204i_data is undefined and SR_MR_storage_controller_data is defined
+    delegate_to: localhost
+
+  - name: Start OS image installation in group '{{ temporary_server_group_name }}'
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        jobTemplate: "{{ GroupOSInstallation_job_template_id }}"
+        resourceId: "{{ temporary_group_id }}"
+        resourceType: "compute-ops-mgmt/group"
+        jobParams:
+          devices:
+            - "{{ server_id }}"
+          parallel: true
+          stopOnFailure: true
+          osCompletionTimeoutMin: 60
+    register: group_os_installation_result
+    delegate_to: localhost
+
+
+#--------------------------------------Wait for OS image installation to complete -------------------------------------
+
+  - name: Wait for the OS image installation of server '{{ serial_number }}' to complete
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ activities_API_version }}/activities?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars:
+      filter: "associatedServerId eq '{{ server_id }}' and createdAt gt {{ start_time }}"
+      jq: "json.items[?name=='Server OS Installation' && contains((message || ''),'Operating system image installation task marked as complete')]"
+    register: server_activities
+    until: (server_activities | json_query(jq) | length) > 0
+    retries: 120
+    delay: 60
+    delegate_to: localhost
+
+  - name: Exit if the operating system image installation task of server '{{ serial_number }}' failed to complete
+    fail:
+      msg: "The operating system image installation task of server '{{ serial_number }}' failed to complete!"
+    when: server_activities.attempts >= 120
+
+
+#--------------------------------------Delete temporary server group and OS image settings ----------------------------
+
+  - name: Remove server '{{ serial_number }}' from temporary group '{{ temporary_server_group_name }}'
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ temporary_group_id }}/devices/unassign"
+      method: POST
+      status_code: 202
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        devices:
+          - deviceId: "{{ server_id }}"
+    delegate_to: localhost
+
+  - name: Wait for unassignment to complete
+    pause:
+      seconds: 15
+
+  - name: Delete temporary group '{{ temporary_server_group_name }}'
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ temporary_group_id }}"
+      method: DELETE
+      status_code: 204
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    delegate_to: localhost
+
+  - name: Delete operating system image server setting 'OS_Image_HVM_for_{{ inventory_hostname }}'
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ settings_API_version }}/settings/{{ OS_image_server_setting_id }}"
+      method: DELETE
+      status_code: 204
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    delegate_to: localhost
+
+
+#--------------------------------------Wait for the host to be reachable over SSH -------------------------------------
+
+  - name: Wait for '{{ os_ip_address }}' to respond on SSH port 22 (HVM OS installed and rebooted)
+    wait_for:
+      timeout: 1800
+      host: "{{ os_ip_address }}"
+      port: 22
+    delegate_to: localhost
+
+  - name: Wait a little longer so the HVM host is truly ready
+    wait_for:
+      timeout: 60
+    delegate_to: localhost
+
+  # Backup the rendered autoinstall seed for troubleshooting, then clean up staging and nginx.
+
+  - name: Create an autoinstall backup directory if it does not exist
+    file:
+      path: "{{ staging_directory }}/kickstarts_backup/HVM"
+      state: directory
+    delegate_to: localhost
+
+  - name: Backup the rendered user-data seed to '{{ staging_directory }}/kickstarts_backup/HVM'
+    shell: |
+      cp -f {{ staging_directory }}/baremetal/{{ inventory_hostname }}/seed/user-data {{ staging_directory }}/kickstarts_backup/HVM/{{ inventory_hostname }}_user-data
+    delegate_to: localhost
+
+  - name: Delete related staging files and the per-host seed ISO from the nginx web server folder
+    become: yes
+    shell: |
+      rm -rf {{ inventory_hostname }}
+      rm -f /usr/share/nginx/html/isos/{{ inventory_hostname }}-seed.iso
+    args:
+      chdir: "{{ staging_directory }}/baremetal"
+    delegate_to: localhost
+
+  # The host has just been (re)installed, so its SSH host key is new. Any key left in the control node's known_hosts
+  # from a previous install of the same IP/name would make ssh refuse the upcoming post-install SSH play ("REMOTE HOST
+  # IDENTIFICATION HAS CHANGED" -> auth disabled), because 'StrictHostKeyChecking=no' only auto-accepts NEW keys, not
+  # CHANGED ones. Purge any stale entry here (Play 1 has no 'ansible_host' override, so delegate_to localhost is safe);
+  # the fresh key is then auto-added when Play 2 connects (and reused by the later SSH play).
+  - name: Remove any stale SSH host key for '{{ inventory_hostname }}' from the control node known_hosts
+    known_hosts:
+      name: "{{ item }}"
+      path: ~/.ssh/known_hosts
+      state: absent
+    loop:
+      - "{{ os_ip_address }}"
+      - "{{ inventory_hostname }}.{{ domain }}"
+      - "{{ inventory_hostname }}"
+    delegate_to: localhost
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+#  Play 2 - HVM host post-installation configuration (runs over SSH on each HVM host)
+# ---------------------------------------------------------------------------------------------------------------------
+
+- name: HVM host post-installation configuration (packages update and NTP)
+  hosts: All
+  gather_facts: no
+  vars_files:
+    - vars/HVM_vars.yml
+    - vars/VME_Manager_vars_encrypted.yml
+  vars:
+    ansible_host: "{{ os_ip_address }}"
+    ansible_user: "{{ hvm_ssh_username }}"
+    # SSH key-based authentication: the Ansible control node public key ('ansible_ssh_public_key') is injected into
+    # the host during the Ubuntu autoinstall (see the 'ssh.authorized-keys' section of 'files/HVM_24.04/user-data.j2'),
+    # so no password is needed to connect. 
+    ansible_ssh_private_key_file: "~/.ssh/id_rsa"
+    ansible_become: true
+    ansible_become_method: sudo
+    ansible_become_pass: "{{ hvm_ssh_password }}"
+    ansible_connection: ssh
+    ansible_python_interpreter: /usr/bin/python3
+    ansible_forks: 5
+
+  tasks:
+
+    - name: Wait for SSH to be fully available on '{{ inventory_hostname }}'
+      wait_for_connection:
+        timeout: 300
+
+    #-------------------------------- Update HVM host packages (apt) ------------------------------------------------
+    # HVM OS packages are served from the HPE-curated (zion) repositories configured during installation. The stock
+    # HPE seed disables in-installer upgrades, so the latest packages are pulled here after the host reboots.
+
+    - name: Update apt cache and upgrade all packages to the latest HPE-curated versions
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: dist
+      register: apt_upgrade_result
+      retries: 3
+      delay: 30
+      until: apt_upgrade_result is succeeded
+
+    #-------------------------------- Install HPE Integrated Smart Update Tools (iSUT) -----------------------------
+    # iSUT lets COM install HPE firmware and drivers online on the running HVM host (used together with the COM
+    # firmware baseline / 'install_SWDrivers_policy'). The HVM OS is Ubuntu-based, so the bundled Debian package is
+    # copied to the host and installed with apt, which resolves its dependencies from the HPE-curated repositories
+    # (the RHEL '.rpm' would not install here). Unlike amsd, iSUT is not needed during the OS install, so it is
+    # installed post-reboot over SSH rather than from the cloud-init seed.
+
+    - name: Copy the bundled HPE iSUT package '{{ SUT_package }}' to '{{ inventory_hostname }}'
+      ansible.builtin.copy:
+        src: "files/{{ hvm_build }}/{{ SUT_package }}"
+        dest: "/tmp/{{ SUT_package }}"
+        mode: "0644"
+      when: install_sut | default(true) | bool
+
+    - name: Install HPE iSUT on '{{ inventory_hostname }}'
+      ansible.builtin.apt:
+        deb: "/tmp/{{ SUT_package }}"
+      register: sut_install_result
+      when: install_sut | default(true) | bool
+
+    - name: Ensure the HPE iSUT service is enabled and running on '{{ inventory_hostname }}'
+      ansible.builtin.systemd:
+        name: sut
+        state: started
+        enabled: true
+      register: sut_service_status
+      until: sut_service_status is succeeded
+      retries: 12
+      delay: 5
+      when: install_sut | default(true) | bool
+
+    - name: Remove the copied HPE iSUT package from '{{ inventory_hostname }}'
+      ansible.builtin.file:
+        path: "/tmp/{{ SUT_package }}"
+        state: absent
+      when: install_sut | default(true) | bool
+
+    #-------------------------------- Configure time synchronization (NTP) ------------------------------------------
+    # The HVM OS (Ubuntu 24.04) uses chrony for time synchronization (systemd-timesyncd is present but inactive,
+    # as chrony takes precedence when installed). NTP is crucial for HVM hosts to coordinate cluster operations.
+
+    - name: Configure the NTP servers for chrony (drop-in in /etc/chrony/sources.d)
+      ansible.builtin.copy:
+        dest: /etc/chrony/sources.d/ansible-hvm.sources
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          # Managed by Ansible - HVM bare metal provisioning
+          {% for ntp in ntp_servers %}
+          server {{ ntp }} iburst
+          {% endfor %}
+      notify: Restart chrony
+
+    - name: Disable the default chrony pool so only the configured NTP servers are used
+      ansible.builtin.replace:
+        path: /etc/chrony/chrony.conf
+        regexp: '^(pool\s+.*)$'
+        replace: '# \1  # disabled by Ansible - HVM bare metal provisioning'
+      notify: Restart chrony
+
+    - name: Ensure chrony is enabled and running
+      ansible.builtin.systemd:
+        name: chrony
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Restart chrony
+      ansible.builtin.systemd:
+        name: chrony
+        state: restarted
+        enabled: true
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+#  Play 3 - Firmware update (COM) and HVM cluster join (VME Manager) - runs from the Ansible control node
+# ---------------------------------------------------------------------------------------------------------------------
+
+- name: HVM firmware update and cluster join
+  hosts: All
+  gather_facts: no
+  vars_files:
+    - vars/GLP_COM_API_credentials_encrypted.yml
+    - vars/VME_Manager_vars_encrypted.yml
+    - vars/HVM_vars.yml
+    - vars/api_versions.yml
+  vars:
+    ansible_forks: 5
+
+  tasks:
+
+  - name: Re-create HPE Compute Ops Management session
+    import_tasks: files/Create_COM_session.yml
+
+  - name: Capture Job Templates IDs
+    import_tasks: files/Get_job_templates_id.yml
+
+
+#--------------------------------------Firmware update (optional) -----------------------------------------------------
+
+  - name: Collect firmware bundles (first host only)
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ firmware_bundles_API_version }}/firmware-bundles"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    register: firmwarebundles
+    delegate_to: localhost
+    when: enable_firmware_update | bool and is_first_host
+
+  - name: Set variable for Gen10 firmware bundle '{{ Gen10_10p_firmware_bundle_name }}'
+    set_fact:
+      Gen10_10p_firmware_bundle_ID: "{{ (firmwarebundles | json_query(jq))[0] }}"
+    vars:
+      jq: "json.items[?contains(releaseVersion, '{{ Gen10_10p_firmware_bundle_name }}') && contains(name, 'Gen10')].id"
+    when: enable_firmware_update | bool and is_first_host and (Gen10_10p_firmware_bundle_name | length > 0) and (firmwarebundles | json_query(jq))[0] | default([]) != []
+
+  - name: Set variable for Gen11 firmware bundle '{{ Gen11_firmware_bundle_name }}'
+    set_fact:
+      Gen11_firmware_bundle_ID: "{{ (firmwarebundles | json_query(jq))[0] }}"
+    vars:
+      jq: "json.items[?contains(releaseVersion, '{{ Gen11_firmware_bundle_name }}') && contains(name, 'Gen11')].id"
+    when: enable_firmware_update | bool and is_first_host and (Gen11_firmware_bundle_name | length > 0) and (firmwarebundles | json_query(jq))[0] | default([]) != []
+
+  - name: Set variable for Gen12 firmware bundle '{{ Gen12_firmware_bundle_name }}'
+    set_fact:
+      Gen12_firmware_bundle_ID: "{{ (firmwarebundles | json_query(jq))[0] }}"
+    vars:
+      jq: "json.items[?contains(releaseVersion, '{{ Gen12_firmware_bundle_name }}') && contains(name, 'Gen12')].id"
+    when: enable_firmware_update | bool and is_first_host and (Gen12_firmware_bundle_name | length > 0) and (firmwarebundles | json_query(jq))[0] | default([]) != []
+
+  - name: Create the firmware server setting '{{ firmware_server_setting_name }}' (first host only)
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ settings_API_version }}/settings?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars:
+      filter: "name eq '{{ firmware_server_setting_name }}'"
+    register: firmware_server_setting
+    delegate_to: localhost
+    when: enable_firmware_update | bool and is_first_host
+
+  - name: Create the firmware server setting '{{ firmware_server_setting_name }}'
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ settings_API_version }}/settings"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "{{ firmware_server_setting_name }}"
+        description: "Firmware baseline for HVM (Ubuntu 24.04)"
+        category: "FIRMWARE"
+        settings:
+          GEN10:
+            id: "{{ Gen10_10p_firmware_bundle_ID | default('') }}"
+          GEN11:
+            id: "{{ Gen11_firmware_bundle_ID | default('') }}"
+          GEN12:
+            id: "{{ Gen12_firmware_bundle_ID | default('') }}"
+    register: firmware_server_setting_result
+    when: enable_firmware_update | bool and is_first_host and firmware_server_setting.json.count == 0
+    delegate_to: localhost
+
+  - name: Set the resourceUri of the firmware server setting (just created)
+    set_fact:
+      firmware_server_setting_resourceuri: "{{ firmware_server_setting_result.json.resourceUri }}"
+    when: enable_firmware_update | bool and is_first_host and firmware_server_setting.json.count == 0
+
+  - name: Set the resourceUri of the firmware server setting (already exists)
+    set_fact:
+      firmware_server_setting_resourceuri: "{{ firmware_server_setting | json_query('json.items[0].resourceUri') }}"
+    when: enable_firmware_update | bool and is_first_host and firmware_server_setting.json.count == 1
+
+  - name: Check if definitive group '{{ server_group_name }}' already exists (first host only)
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars:
+      filter: "name eq '{{ server_group_name }}'"
+    register: definitive_server_group
+    delegate_to: localhost
+    when: enable_firmware_update | bool and is_first_host
+
+  - name: Create definitive group '{{ server_group_name }}' if it does not exist
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        name: "{{ server_group_name }}"
+        description: "Server group for HVM servers"
+        deviceType: "DIRECT_CONNECT_SERVER"
+        settingsUris:
+          - "{{ bios_server_setting_resourceuri }}"
+          - "{{ firmware_server_setting_resourceuri }}"
+        policies:
+          onDeviceAdd:
+            biosApplySettings: false
+            biosFactoryReset: false
+            firmwarePowerOff: false
+            firmwareUpdate: false
+            iloApplySettings: false
+            osInstall: false
+            storageConfiguration: false
+            storageVolumeDeletion: false
+            storageVolumeName: ""
+            externalStorageConfiguration: false
+            osCompletionTimeoutMin: 240
+          onDeviceApply:
+            firmwareDowngrade: "{{ firmware_downgrade_policy }}"
+    register: definitive_server_group_result
+    when: enable_firmware_update | bool and is_first_host and definitive_server_group.json.count == 0
+    delegate_to: localhost
+
+  - name: Set id/resourceUri of the definitive group (just created)
+    set_fact:
+      definitive_group_id: "{{ definitive_server_group_result.json.id }}"
+      definitive_group_resourceuri: "{{ definitive_server_group_result.json.resourceUri }}"
+    when: enable_firmware_update | bool and is_first_host and definitive_server_group.json.count == 0
+
+  - name: Set id/resourceUri of the definitive group (already exists)
+    set_fact:
+      definitive_group_id: "{{ definitive_server_group | json_query('json.items[0].id') }}"
+      definitive_group_resourceuri: "{{ definitive_server_group | json_query('json.items[0].resourceUri') }}"
+    when: enable_firmware_update | bool and is_first_host and definitive_server_group.json.count == 1
+
+  # Bare-metal bios (server BIOS) settings must be applied via the group; note the bios setting URI must be resolved
+  # again in this play since facts from Play 1 persist per host, but the definitive group is created by the first host.
+
+  - name: Get definitive group '{{ server_group_name }}' id (all hosts)
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups?filter={{ filter | urlencode }}"
+      method: GET
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    vars:
+      filter: "name eq '{{ server_group_name }}'"
+    register: definitive_server_group_all
+    delegate_to: localhost
+    when: enable_firmware_update | bool
+
+  - name: Set definitive group id (all hosts)
+    set_fact:
+      definitive_group_id: "{{ definitive_server_group_all | json_query('json.items[0].id') }}"
+      definitive_group_resourceuri: "{{ definitive_server_group_all | json_query('json.items[0].resourceUri') }}"
+    when: enable_firmware_update | bool and definitive_server_group_all.json.count == 1
+
+  - name: Check if server '{{ serial_number }}' is already a member of definitive group '{{ server_group_name }}'
+    set_fact:
+      server_found_in_definitive_group: "{{ definitive_server_group_all | json_query(jq) }}"
+    vars:
+      jq: "json.items[0].devices[?serial=='{{ serial_number }}']"
+    when: enable_firmware_update | bool and definitive_server_group_all.json.count == 1
+
+  - name: Add server '{{ serial_number }}' to definitive group '{{ server_group_name }}'
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ groups_API_version }}/groups/{{ definitive_group_id }}/devices"
+      method: POST
+      status_code: 202
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        devices:
+          - deviceId: "{{ server_id }}"
+    register: group_assignment_result
+    when: enable_firmware_update | bool and (server_found_in_definitive_group is not defined or server_found_in_definitive_group | length == 0)
+    delegate_to: localhost
+
+  - name: Wait for assignment to truly complete
+    pause:
+      seconds: 15
+    when: enable_firmware_update | bool
+
+  - name: Capture the firmware update start time
+    set_fact:
+      firmware_update_start_time: "{{ '%Y-%m-%dT%H:%M:%SZ' | strftime }}"
+    when: enable_firmware_update | bool
+
+  # Firmware is updated in ONE group job that targets ONLY the servers being provisioned in THIS inventory run (in
+  # parallel), not every member of the definitive group. The tasks below are guarded with 'when: ... and is_first_host'
+  # so the single job is submitted exactly ONCE instead of once per host.
+  #
+  # The device list is built from each play host's 'server_id' (already in the API device-id form
+  # '<partNumber>+<serialNumber>', e.g. 'P28948-B21+CZ2311004H'), so servers added to the group by a PREVIOUS run are
+  # left untouched. This play uses Ansible's default 'linear' strategy (no 'serial:' / no 'strategy: free'), so every
+  # host has already been added to the group and has its 'server_id' fact by the time the first host reaches this
+  # block; 'is_first_host' (ansible_play_batch[0] == inventory_hostname) is just a "run this once" selector.
+  # NOTE: this "run once" guarantee holds ONLY under the linear strategy. If you switch to 'strategy: free' or
+  #       'serial:', use 'run_once: true' instead.
+
+  - name: Build the list of device ids for the servers being provisioned in this run (first host only)
+    set_fact:
+      server_ids: "{{ ansible_play_hosts | map('extract', hostvars, 'server_id') | list }}"
+    when: enable_firmware_update | bool and is_first_host
+
+  - name: Display the device ids targeted by the firmware update job (first host only)
+    debug:
+      msg: "Firmware update will target these {{ server_ids | length }} server(s): {{ server_ids }}"
+    when: enable_firmware_update | bool and is_first_host
+
+  - name: Start a group firmware update job using the defined firmware baseline (first host only)
+    uri:
+      url: "{{ ConnectivityEndpoint }}/compute-ops-mgmt/{{ jobs_API_version }}/jobs"
+      method: POST
+      status_code: 201
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+        Content-Type: "application/json"
+      body_format: json
+      body:
+        jobTemplate: "{{ GroupFirmwareUpdate_job_template_id }}"
+        resourceId: "{{ definitive_group_id }}"
+        resourceType: "compute-ops-mgmt/group"
+        jobParams:
+          devices: "{{ server_ids }}"
+          parallel: true
+          stopOnFailure: false
+          installSWDrivers: "{{ install_SWDrivers_policy }}"
+          downgrade: "{{ firmware_downgrade_policy }}"
+          powerOff: false
+    register: group_firmware_update_job
+    delegate_to: localhost
+    when: enable_firmware_update | bool and is_first_host
+
+  - name: Wait for the group firmware update job to complete (first host only)
+    uri:
+      url: "{{ ConnectivityEndpoint }}{{ group_firmware_update_job.json.resourceUri }}"
+      method: GET
+      return_content: yes
+      headers:
+        Authorization: "Bearer {{ access_token }}"
+    retries: 600
+    delay: 60
+    until: >
+      (group_firmware_update_job_status.json.state == "COMPLETE" or
+      group_firmware_update_job_status.json.state == "ERROR")
+    register: group_firmware_update_job_status
+    ignore_errors: yes
+    changed_when: false
+    delegate_to: localhost
+    when: enable_firmware_update | bool and is_first_host
+
+  - name: Wait for '{{ os_ip_address }}' to be reachable again on SSH after firmware activation (may reboot)
+    wait_for:
+      timeout: 1800
+      host: "{{ os_ip_address }}"
+      port: 22
+    delegate_to: localhost
+    when: enable_firmware_update | bool
+
+
+#--------------------------------------Join host in VME Manager HVM cluster -------------------------------------------
+
+# =====================================================================================================================
+#   Join host to the HVM cluster (VME Manager)
+#
+#   Creating / joining an 'mvm-cluster' is the mirror of the removal in HVM_unprovisioning.yml and works as follows:
+#
+#     1. Create-or-join   : the FIRST inventory host creates the cluster if it does not already exist via
+#                           'POST /api/clusters' (type 'mvm-cluster'), with that host embedded as the first member.
+#                           Every subsequent host is added with 'POST /api/clusters/{id}/servers'.
+#     2. Member identity   : each host is added with 'name: os_ip_address', so a member is stored under its OS
+#                            management IP (e.g. '192.168.3.181') - this is the same identity the unprovisioning
+#                            playbook matches on when removing a node.
+#     3. Integer ids       : both request bodies are built with 'to_json' so the numeric ids (group / cloud / layout
+#                            / plan) are sent as real integers. This project does not enable jinja2_native, so a bare
+#                            "{{ x | int }}" would be serialized as the string "1" and rejected as "not found or not
+#                            allowed".
+#
+#   NOTE: the VME Manager (Morpheus) API schema (verified against VME 9.x / Morpheus) can vary between versions.
+#   Run tests/Test_VME_Manager.yml first to validate connectivity, variables, group / layout / plan and (optionally,
+#   with -e create_cluster=true) exercise the cluster creation. All steps are gated by 'join_hvm_cluster'.
+# =====================================================================================================================
+
+  - name: Create a VME Manager session
+    import_tasks: files/Create_VME_session.yml
+    when: join_hvm_cluster | bool
+
+  - name: Fail early if the VME Manager is not reachable but auto-deploy is disabled (first host)
+    fail:
+      msg:
+        - "The VME Manager at '{{ vme_manager_url }}' could not be authenticated and 'deploy_vme_manager' is false."
+        - "Deploy the VM Essentials Manager appliance on one HVM host using 'sudo hpe-vm' (see the HPE deployment guide),"
+        - "or set the correct 'vme_manager_url' / credentials in vars/VME_Manager_vars_encrypted.yml, then re-run."
+    when: join_hvm_cluster | bool and is_first_host and deploy_vme_manager | bool and (vme_access_token is not defined)
+
+  # --- Resolve the group, cloud, layout and service-plan ids (needed to build the create / join request bodies) -------
+  - name: Look up the VME group '{{ vme_group_name }}'
+    uri:
+      url: "{{ vme_manager_url }}/api/groups?name={{ vme_group_name | urlencode }}&max=100"
+      method: GET
+      validate_certs: false
+      headers:
+        Authorization: "Bearer {{ vme_access_token }}"
+        Accept: "application/json"
+    register: vme_groups
+    delegate_to: localhost
+    when: join_hvm_cluster | bool
+
+  - name: Set the group and cloud id facts
+    set_fact:
+      vme_group_id: "{{ (vme_groups.json.groups | default([]) | selectattr('name', 'equalto', vme_group_name) | list | first).id | default('') }}"
+      vme_cloud_id: "{{ ((vme_groups.json.groups | default([]) | selectattr('name', 'equalto', vme_group_name) | list | first).zones | default([]) | first).id | default('') }}"
+      vme_cloud_name: "{{ ((vme_groups.json.groups | default([]) | selectattr('name', 'equalto', vme_group_name) | list | first).zones | default([]) | first).name | default('') }}"
+    when: join_hvm_cluster | bool
+
+  - name: List the cluster layouts
+    uri:
+      url: "{{ vme_manager_url }}/api/library/cluster-layouts?max=200"
+      method: GET
+      validate_certs: false
+      headers:
+        Authorization: "Bearer {{ vme_access_token }}"
+        Accept: "application/json"
+    register: vme_layouts
+    delegate_to: localhost
+    when: join_hvm_cluster | bool
+
+  - name: Set the layout id fact
+    set_fact:
+      vme_layout_id: "{{ (vme_layouts.json.layouts | default([]) | selectattr('name', 'equalto', vme_cluster_layout) | list | first).id | default('') }}"
+    when: join_hvm_cluster | bool
+
+  - name: Look up the service plan '{{ vme_service_plan_name }}'
+    uri:
+      url: "{{ vme_manager_url }}/api/service-plans?phrase={{ vme_service_plan_name | urlencode }}&max=100"
+      method: GET
+      validate_certs: false
+      headers:
+        Authorization: "Bearer {{ vme_access_token }}"
+        Accept: "application/json"
+    register: vme_plans
+    delegate_to: localhost
+    when: join_hvm_cluster | bool
+
+  - name: Set the service plan id fact
+    set_fact:
+      vme_plan_id: "{{ (vme_plans.json.servicePlans | default([]) | selectattr('name', 'equalto', vme_service_plan_name) | list | first).id | default('') }}"
+    when: join_hvm_cluster | bool
+
+  # --- Look up the cluster and decide create-vs-join -----------------------------------------------------------------
+  - name: Look up the HVM cluster '{{ cluster_name }}' in the VME Manager
+    uri:
+      url: "{{ vme_manager_url }}/api/clusters?name={{ cluster_name | urlencode }}&max=1"
+      method: GET
+      validate_certs: false
+      headers:
+        Authorization: "Bearer {{ vme_access_token }}"
+        Accept: "application/json"
+    register: vme_cluster_lookup
+    delegate_to: localhost
+    when: join_hvm_cluster | bool
+
+  # The first inventory host creates the cluster (with itself as the first member) when it does not exist yet; every
+  # other host - and the first host on a subsequent run when the cluster already exists - joins the existing cluster.
+  - name: Set facts for cluster existence and whether this host will create it
+    set_fact:
+      hvm_cluster_exists: "{{ (vme_cluster_lookup.json.clusters | default([]) | length) > 0 }}"
+      hvm_cluster_id: "{{ (vme_cluster_lookup.json.clusters | default([]))[0].id | default('') }}"
+      hvm_cluster_created_by_me: "{{ is_first_host and ((vme_cluster_lookup.json.clusters | default([]) | length) == 0) }}"
+    when: join_hvm_cluster | bool
+
+  - name: Fail if the ids needed to create the cluster could not be resolved (first host, creating cluster)
+    fail:
+      msg:
+        - "Could not resolve the VME Manager ids needed to create the cluster '{{ cluster_name }}':"
+        - "group '{{ vme_group_name }}' id='{{ vme_group_id | default('') }}', cloud id='{{ vme_cloud_id | default('') }}',"
+        - "layout '{{ vme_cluster_layout }}' id='{{ vme_layout_id | default('') }}', plan '{{ vme_service_plan_name }}' id='{{ vme_plan_id | default('') }}'."
+        - "Verify these exist in the manager (run tests/Test_VME_Manager.yml), then re-run."
+    when: join_hvm_cluster | bool and (hvm_cluster_created_by_me | bool) and
+          ((vme_group_id | string | length == 0) or (vme_cloud_id | string | length == 0) or (vme_layout_id | string | length == 0) or (vme_plan_id | string | length == 0))
+
+  # --- Create the cluster on the first host (embeds this host as the first member) -----------------------------------
+  # The VME Manager registers the cluster member under the 'sshHosts[].name' field (it overrides the top-level
+  # 'server.name'). We set that to 'inventory_hostname' (the connection IP stays in 'sshHosts[].ip'), so the FIRST
+  # host is registered by its host name (e.g. 'HVM-2') - consistent with the add-worker path below, which stores the
+  # member under 'hostname'/'name' = inventory_hostname. (Previously 'name' was the OS IP, so the first member showed
+  # up as '192.168.3.181' while every joined host showed up by name - a cosmetic but confusing inconsistency.)
+  - name: Build the cluster-create request body (integer ids required — jinja2_native is off)
+    set_fact:
+      vme_cluster_body: >-
+        {{
+          {
+            'cluster': {
+              'name': cluster_name,
+              'type': 'mvm-cluster',
+              'autoRecoverPowerState': false,
+              'group': {'id': vme_group_id | int},
+              'cloud': {'id': vme_cloud_id | int},
+              'layout': {'id': vme_layout_id | int},
+              'server': {
+                'name': inventory_hostname,
+                'nodeCount': 1,
+                'nodeType': 'worker',
+                'computeServerType': {'code': 'mvmHost'},
+                'sshHosts': [{'ip': os_ip_address, 'name': inventory_hostname, 'sshUsername': hvm_ssh_username, 'sshPassword': hvm_ssh_password}],
+                'sshPort': 22,
+                'sshUsername': hvm_ssh_username,
+                'sshPassword': hvm_ssh_password,
+                'cpuPlacementMode': 'unmanaged',
+                'plan': {'id': vme_plan_id | int},
+                'network': {'name': vme_mgmt_net_interface},
+                'networkInterfaces': [
+                  {'network': {'name': vme_mgmt_net_interface}}
+                ],
+                'config': {
+                  'diskMode': vme_disk_mode,
+                  'computeInterfaceName': vme_compute_net_interface,
+                  'computeVlans': vme_compute_vlans | join(','),
+                  'overlayInterfaceName': '',
+                  'cpuArch': 'x86_64',
+                  'cpuModel': 'host-passthrough',
+                  'dynamicPlacementMode': 'off',
+                  'drsAggressiveness': 'conservative',
+                  'powerPolicy': 'balanced'
+                }
+              }
+            }
+          } | to_json
+        }}
+    when: join_hvm_cluster | bool and (hvm_cluster_created_by_me | bool)
+
+  - name: Create the HVM cluster '{{ cluster_name }}' with '{{ inventory_hostname }}' as the first member
+    uri:
+      url: "{{ vme_manager_url }}/api/clusters"
+      method: POST
+      status_code: 200, 201
+      validate_certs: false
+      headers:
+        Authorization: "Bearer {{ vme_access_token }}"
+        Content-Type: "application/json"
+      body: "{{ vme_cluster_body }}"
+    register: vme_cluster_create
+    delegate_to: localhost
+    when: join_hvm_cluster | bool and (hvm_cluster_created_by_me | bool)
+
+  # --- Re-resolve the cluster id (now that it exists) for the hosts that must join -----------------------------------
+  - name: Re-look up the HVM cluster '{{ cluster_name }}' id
+    uri:
+      url: "{{ vme_manager_url }}/api/clusters?name={{ cluster_name | urlencode }}&max=1"
+      method: GET
+      validate_certs: false
+      headers:
+        Authorization: "Bearer {{ vme_access_token }}"
+        Accept: "application/json"
+    register: vme_cluster_lookup2
+    delegate_to: localhost
+    when: join_hvm_cluster | bool
+
+  - name: Update the cluster id fact
+    set_fact:
+      hvm_cluster_id: "{{ (vme_cluster_lookup2.json.clusters | default([]))[0].id | default('') }}"
+    when: join_hvm_cluster | bool
+
+  # --- Join the hosts that did not create the cluster (uses the same verified server schema) -------------------------
+  # NOTE: the add-worker endpoint 'POST /api/clusters/{id}/servers' does NOT accept the same server schema as the
+  #       cluster-create body (which embeds the server under 'cluster' with its layout). Two differences were verified
+  #       against the live VME Manager (see tests/Test_VME_add_worker.yml):
+  #         1. Server type: create derives it from the cluster layout, so 'computeServerType' alone is enough there.
+  #            Add-worker has no layout context and reads 'serverType' from the server object — omitting it fails with
+  #            "serverType: Server type not specified or not available". Both keys are sent (code 'mvmHost').
+  #         2. SSH host: create reads the host from the 'sshHosts' list; add-worker IGNORES 'sshHosts' and instead reads
+  #            the top-level 'hostname' (name) and 'sshHost' (IP). Omitting them fails with
+  #            "sshHosts: SSH Host IP and Hostname cannot be blank". Hence 'hostname' and 'sshHost' are sent explicitly
+  #            ('sshHosts' is kept only for parity with the create body; it is harmless but not used here).
+  - name: Build the add-host request body (integer ids required — jinja2_native is off)
+    set_fact:
+      vme_add_host_body: >-
+        {{
+          {
+            'server': {
+              'name': inventory_hostname,
+              'hostname': inventory_hostname,
+              'sshHost': os_ip_address,
+              'nodeCount': 1,
+              'nodeType': 'worker',
+              'computeServerType': {'code': 'mvmHost'},
+              'serverType': {'code': 'mvmHost'},
+              'sshHosts': [{'ip': os_ip_address, 'name': os_ip_address, 'sshUsername': hvm_ssh_username, 'sshPassword': hvm_ssh_password}],
+              'sshPort': 22,
+              'sshUsername': hvm_ssh_username,
+              'sshPassword': hvm_ssh_password,
+              'cpuPlacementMode': 'unmanaged',
+              'plan': {'id': vme_plan_id | int},
+              'network': {'name': vme_mgmt_net_interface},
+              'networkInterfaces': [
+                {'network': {'name': vme_mgmt_net_interface}}
+              ],
+              'config': {
+                'diskMode': vme_disk_mode,
+                'computeInterfaceName': vme_compute_net_interface,
+                'computeVlans': vme_compute_vlans | join(','),
+                'overlayInterfaceName': '',
+                'cpuArch': 'x86_64',
+                'cpuModel': 'host-passthrough',
+                'dynamicPlacementMode': 'off',
+                'drsAggressiveness': 'conservative',
+                'powerPolicy': 'balanced'
+              }
+            }
+          } | to_json
+        }}
+    when: join_hvm_cluster | bool and not (hvm_cluster_created_by_me | bool) and (hvm_cluster_id | string | length > 0)
+
+  - name: Add HVM host '{{ inventory_hostname }}' to cluster '{{ cluster_name }}'
+    uri:
+      url: "{{ vme_manager_url }}/api/clusters/{{ hvm_cluster_id }}/servers"
+      method: POST
+      status_code: 200, 201
+      validate_certs: false
+      headers:
+        Authorization: "Bearer {{ vme_access_token }}"
+        Content-Type: "application/json"
+      body: "{{ vme_add_host_body }}"
+    register: vme_add_host
+    delegate_to: localhost
+    when: join_hvm_cluster | bool and not (hvm_cluster_created_by_me | bool) and (hvm_cluster_id | string | length > 0)
+
+
+
+#--------------------------------------Display end-of-installation message ---------------------------------------------
+
+  - name: Force update of current timestamp
+    setup:
+      filter: 'ansible_date_time'
+    delegate_to: localhost
+
+  - name: Get runtime
+    # ansible-core 2.19 refuses to store native objects (a datetime subtraction yields a 'timedelta',
+    # which raises "Type 'timedelta' is unsupported for variable storage"). Cast to string for storage/display.
+    set_fact:
+      runtime: "{{ ((ansible_date_time.iso8601[:19] | to_datetime('%Y-%m-%dT%H:%M:%S')) - (start_time[:19] | to_datetime('%Y-%m-%dT%H:%M:%S'))) | string }}"
+
+  - name: Status of the HVM OS installation
+    debug:
+      msg:
+        - "{{ inventory_hostname }}.{{ domain }} HVM OS installation completed successfully!"
+        - "The host has been updated (apt), NTP configured{{ ' and firmware updated' if (enable_firmware_update | bool) else '' }}."
+        - "{{ ('The HVM cluster ' ~ cluster_name ~ ' was created in the VME Manager with this host as its first member.' if (hvm_cluster_created_by_me | default(false) | bool) else ('The host has been added to the HVM cluster ' ~ cluster_name ~ ' in the VME Manager.')) if (join_hvm_cluster | bool) else 'Cluster join was skipped (join_hvm_cluster is false).' }}"
+        - "To SSH to the new host from the Ansible control node, use: ssh {{ hvm_ssh_username }}@{{ inventory_hostname }}.{{ domain }}"
+        - "The provisioning task took {{ runtime }}."
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+#  Play 4 - Management/compute link redundancy: team second NIC(s) into OVS bond(s) (runs over SSH on each HVM host)
+# ---------------------------------------------------------------------------------------------------------------------
+#
+# The HPE 'hpe-vm' installer / VME Manager build the VME network(s) as Open vSwitch bridge(s): in the default converged
+# model the management AND compute (VM) networks share a single 'mgmt' bridge with the physical uplink 'mgmt0'; when a
+# separate compute network is used ('hvm_separate_compute_network'), a second OVS bridge is built on the dedicated
+# uplink 'comp0'. When a SECOND NIC is cabled for a role, this play teams it with the primary into an active-backup OVS
+# bond, giving link redundancy for that role.
+#
+# It is fully generic and bridge-name-agnostic: for each team defined in 'hvm_nic_teams' (mgmt always; compute only when
+# a separate compute network is used), it discovers WHICH OVS bridge currently owns the primary uplink with
+# 'ovs-vsctl port-to-br', then adds the bond there. In the converged model the compute team is absent and teaming 'mgmt0'
+# + 'mgmt1' protects management and all VM/compute VLAN traffic at once (they ride the same bridge).
+#
+# Why a native OVS bond (and not a Linux/networkd bond): if the kernel owned the ports (networkd bond), OVS could not
+# enslave them and would fail with "Device or resource busy". The bond is therefore built with 'ovs-vsctl', AFTER the
+# VME Manager has created the bridge(s) at cluster-join time.
+#
+# Safe by design:
+#   * runs only when 'hvm_second_nic_team' is true AND the cluster was joined;
+#   * per team, acts ONLY when the secondary NIC exists with an UP carrier (a cable present) and the primary is on an
+#     OVS bridge - a single-NIC host (the validated path) is a complete no-op;
+#   * the ovs-vsctl 'del-port' + 'add-bond' is a single atomic transaction so the live link is not lost;
+#   * idempotent - it skips any team whose bond already exists.
+
+- name: HVM management/compute link redundancy (second NIC OVS bond)
+  hosts: All
+  gather_facts: no
+  vars_files:
+    - vars/HVM_vars.yml
+    - vars/VME_Manager_vars_encrypted.yml
+  vars:
+    ansible_host: "{{ os_ip_address }}"
+    ansible_user: "{{ hvm_ssh_username }}"
+    ansible_ssh_private_key_file: "~/.ssh/id_rsa"
+    ansible_become: true
+    ansible_become_method: sudo
+    ansible_become_pass: "{{ hvm_ssh_password }}"
+    ansible_connection: ssh
+    ansible_python_interpreter: /usr/bin/python3
+    ansible_forks: 5
+
+  tasks:
+
+    - name: End play for this host when NIC teaming is disabled or the cluster was not joined
+      ansible.builtin.meta: end_host
+      when: not (hvm_second_nic_team | default(true) | bool) or not (join_hvm_cluster | bool)
+
+    - name: Wait for SSH to be available on '{{ inventory_hostname }}'
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+
+    - name: Wait for the VME Manager to create the OVS 'mgmt' bridge
+      ansible.builtin.command: ovs-vsctl br-exists mgmt
+      register: mgmt_bridge_check
+      changed_when: false
+      failed_when: false
+      retries: 30
+      delay: 10
+      until: mgmt_bridge_check.rc == 0
+
+    - name: End play for this host if the OVS 'mgmt' bridge never appeared
+      ansible.builtin.meta: end_host
+      when: mgmt_bridge_check.rc != 0
+
+    # For each team, only act when the secondary NIC is present with an active carrier (a cable) and the primary uplink
+    # is on an OVS bridge (discovered at run time). The del-port + add-bond is one atomic ovs-vsctl transaction.
+    # SELF-HEALING (mirrors RHEL): we record gateway reachability BEFORE building the bond and re-check it AFTER. If
+    # this bond took the gateway from reachable to unreachable (e.g. active-backup picked a slave that lands on a
+    # wrong/dead switch port on a non-LAG fabric), we revert that bond back to the single primary uplink so the host is
+    # never left unreachable. Teams that never carried the gateway path (e.g. a separate compute bond) are left alone.
+    - name: Team each cabled secondary NIC into an active-backup OVS bond on its bridge (self-healing)
+      ansible.builtin.shell: |
+        set -o pipefail
+        P="{{ item.primary }}"; S="{{ item.secondary }}"; BOND="{{ item.bond }}"
+        MODE="{{ hvm_mgmt_bond_mode | default('active-backup') }}"
+        GW="{{ gateway }}"
+        if [ ! -e "/sys/class/net/$S" ]; then echo "SKIP: $S absent"; exit 0; fi
+        ip link set "$S" up 2>/dev/null || true
+        sleep 2
+        if [ "$(cat /sys/class/net/$S/carrier 2>/dev/null || echo 0)" != "1" ]; then echo "SKIP: $S no carrier"; exit 0; fi
+        BR="$(ovs-vsctl port-to-br "$P" 2>/dev/null)" || { echo "SKIP: $P not on any OVS bridge"; exit 0; }
+        if ovs-vsctl list-ports "$BR" | grep -qx "$BOND"; then echo "SKIP: $BOND already on $BR"; exit 0; fi
+        # Gateway reachability BEFORE teaming (identifies the bond that owns the default-route path).
+        GW_BEFORE=0; ping -c1 -W2 "$GW" >/dev/null 2>&1 && GW_BEFORE=1
+        ovs-vsctl --timeout=15 \
+          -- --if-exists del-port "$BR" "$P" \
+          -- add-bond "$BR" "$BOND" "$P" "$S" bond_mode="$MODE" other_config:bond-detect-mode=carrier
+        sleep 3
+        # If this bond carried the gateway path and it is now unreachable, revert to the single primary uplink.
+        if [ "$GW_BEFORE" = "1" ]; then
+          GW_AFTER=0; ping -c2 -W2 "$GW" >/dev/null 2>&1 && GW_AFTER=1
+          if [ "$GW_AFTER" = "0" ]; then
+            ovs-vsctl --timeout=15 -- --if-exists del-port "$BR" "$BOND" -- add-port "$BR" "$P"
+            echo "REVERTED: $BOND made the gateway unreachable, restored single uplink $P on $BR"
+            exit 0
+          fi
+        fi
+        echo "CREATED: $BOND ($P + $S, $MODE) on $BR"
+      args:
+        executable: /bin/bash
+      loop: "{{ hvm_nic_teams }}"
+      loop_control:
+        label: "{{ item.bond }} ({{ item.primary }} + {{ item.secondary }})"
+      register: hvm_team_results
+      changed_when: "'CREATED:' in (hvm_team_results.stdout | default(''))"
+
+    - name: Report the NIC-team results
+      ansible.builtin.debug:
+        msg: "{{ item.stdout | default('(no output)') | trim }}"
+      loop: "{{ hvm_team_results.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item.bond }}"
+
+
+#--------------------------------------Display final end-of-provisioning message (includes NIC teaming) ---------------
+
+    # Only hosts that reach this point performed NIC teaming (single-NIC hosts end_host earlier and already printed
+    # their runtime at the end of Play 3). Recompute the runtime here so it also covers the Play 4 teaming work.
+
+    - name: Force update of current timestamp
+      ansible.builtin.setup:
+        filter: 'ansible_date_time'
+      delegate_to: localhost
+      # This play overrides 'ansible_host' with 'os_ip_address' and 'ansible_connection' with 'ssh' (to SSH into the
+      # hosts for teaming). In ansible-core 2.19 a 'delegate_to: localhost' task re-evaluates the connection vars in
+      # the DELEGATE's context, so it (a) tries to template 'ansible_host' -> "'os_ip_address' is undefined", and
+      # (b) would then SSH to localhost. Pin the local connection here so the control node's clock is read directly.
+      vars:
+        ansible_connection: local
+        ansible_host: localhost
+
+    - name: Get total runtime (including second-NIC link redundancy)
+      # ansible-core 2.19 refuses to store native objects (a datetime subtraction yields a 'timedelta',
+      # which raises "Type 'timedelta' is unsupported for variable storage"). Cast to string for storage/display.
+      set_fact:
+        runtime: "{{ ((ansible_date_time.iso8601[:19] | to_datetime('%Y-%m-%dT%H:%M:%S')) - (start_time[:19] | to_datetime('%Y-%m-%dT%H:%M:%S'))) | string }}"
+
+    - name: Final status of the HVM OS installation (with link redundancy)
+      ansible.builtin.debug:
+        msg:
+          - "{{ inventory_hostname }}.{{ domain }} HVM provisioning fully completed, including second-NIC link redundancy (OVS bond)."
+          - "To SSH to the new host from the Ansible control node, use: ssh {{ hvm_ssh_username }}@{{ inventory_hostname }}.{{ domain }}"
+          - "The provisioning task took {{ runtime }}."
+
+

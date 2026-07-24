@@ -26,9 +26,9 @@
 
   - name: Set a variable for all job templates items 
     set_fact:
-      job_templates: "{{ job_templates_response | json_query(query) | sort(attribute='name') }}"
+      job_templates: "{{ job_templates_response | json_query(jq) | sort(attribute='name') }}"
     vars:
-      query: "json.items"
+      jq: "json.items"
 
   - name: Set variables for each job template id
     set_fact:

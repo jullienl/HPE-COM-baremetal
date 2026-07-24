@@ -21,6 +21,10 @@
 
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+#  Play 1 - Server unprovisioning (COM orchestration, runs from the Ansible control node)
+# ---------------------------------------------------------------------------------------------------------------------
+
 - name: Deleting provisioned compute module(s)
   hosts: all
   gather_facts: no
@@ -54,10 +58,10 @@
     import_tasks: files/Create_COM_session.yml
 
 
-#--------------------------------------Capture Job Templates Resource Uri-----------------------------------------------------------------------------------------------
+#--------------------------------------Capture Job Templates IDs-----------------------------------------------------------------------------------------------------
 
-  - name: Capture Job Templates ResourceUri
-    import_tasks: files/Get_job_templates_resourceuri.yml
+  - name: Capture Job Templates IDs
+    import_tasks: files/Get_job_templates_id.yml
 
 
 #--------------------------------------Capture server information -----------------------------------------------------------------------------------------------------
@@ -131,10 +135,10 @@
     set_fact:
       server_group_id_found: "{{ server_info_from_ui_doorway.json.group_.id }}"
       server_group_name_found: "{{ server_info_from_ui_doorway.json.group_.name }}"
-    when: server_info_from_ui_doorway.json.group_ is defined and server_info_from_ui_doorway.json.group_ is not none
+    when: server_info_from_ui_doorway.json.get('group_') is not none
     
   - debug: var=server_group_name_found
-    when: server_info_from_ui_doorway.json.group_ is not none
+    when: server_info_from_ui_doorway.json.get('group_') is not none
 
   - name: Remove server '{{ inventory_hostname }}' from the server group of which it is currently a member
     uri:
@@ -151,12 +155,12 @@
           - deviceId: "{{ server_id }}"
     register: group_unassignment_result
     delegate_to: localhost
-    when: server_info_from_ui_doorway.json.group_ is defined and server_info_from_ui_doorway.json.group_ is not none
+    when: server_info_from_ui_doorway.json.get('group_') is not none
 
   - name: Wait for deletion to complete
     pause:
       seconds: 15
-    when: server_info_from_ui_doorway.json.group_ is defined and server_info_from_ui_doorway.json.group_ is not none
+    when: server_info_from_ui_doorway.json.get('group_') is not none
 
 
 #--------------------------------------Power off the server -----------------------------------------------------------------------------------------------------------
@@ -187,22 +191,31 @@
     set_fact:
       hostname: "{{ server_name.split('.')[0] }}"
 
-  - name: Remove '{{ hostname }}' SSH key from known_hosts file on Ansible control node
-    known_hosts:
-      name: '{{ hostname }}'
-      path: ~/.ssh/known_hosts
-      state: absent
+  # During provisioning the SSH tasks connected with 'ansible_host' set to the host's OS management IP, so its SSH
+  # host key was stored in known_hosts keyed by that IP (e.g. '192.168.3.10') - and possibly by the FQDN and short
+  # name as well. Removing only the name entries leaves the stale IP-keyed line behind, so resolve the OS IP from DNS
+  # and purge all three forms (matching the provisioning purge). The DNS record is still present at this point (it is
+  # deleted by the next play), so the lookup resolves. 'getent' is best-effort: if it returns nothing the IP is simply
+  # skipped. (Windows hosts connect over WinRM and have no SSH key, so the removal is simply a no-op for them.)
+  - name: Resolve the OS management IP of '{{ server_name }}' from DNS (for known_hosts cleanup)
+    ansible.builtin.shell: "getent ahostsv4 {{ server_name }} | awk '{ print $1; exit }'"
+    register: known_hosts_ip_lookup
+    changed_when: false
+    failed_when: false
     delegate_to: localhost
 
-  - name: Remove '{{ server_name }}' SSH key from known_hosts file on Ansible control node
+  - name: Remove any stale SSH host key for '{{ inventory_hostname }}' (IP, FQDN and short name) from known_hosts
     known_hosts:
-      name: '{{ server_name }}'
+      name: "{{ item }}"
       path: ~/.ssh/known_hosts
       state: absent
+    loop: "{{ [ known_hosts_ip_lookup.stdout | default('') | trim, server_name, hostname ] | select('string') | reject('equalto', '') | unique | list }}"
     delegate_to: localhost
 
 
-#-------------------------------------- Delete DNS record (WinRM mode) ------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
+#  Play 2 - Delete DNS record (WinRM Mode)
+# ---------------------------------------------------------------------------------------------------------------------
 
 - name: Remove the DNS record from DNS server
   hosts: all
@@ -214,7 +227,7 @@
   tasks:
 
     - name: Remove "{{ hostname }}" from "{{ dns_server }}" 
-      community.windows.win_dns_record:
+      ansible.windows.win_dns_record:
         name: "{{ hostname }}"
         type: "A"
         zone: "{{ domain }}"

@@ -11,6 +11,11 @@ nameserver1: "192.168.2.1"
 nameserver2: "192.168.2.3"
 netmask: "255.255.252.0"
 
+# Optional HTTP/HTTPS corporate proxy configured on the installed Windows host (persistent system WinHTTP proxy +
+# the machine WinINET setting), for post-provisioning outbound access. localhost and the local domain bypass the
+# proxy. Form "host:port" or "http://host:port" (the scheme is stripped automatically). Leave empty for direct.
+proxy_url: ""
+
 
 #----------------------  Microsoft Active Directory -------------------------------------------------------------------------------------
 

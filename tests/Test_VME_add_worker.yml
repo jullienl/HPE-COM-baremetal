@@ -1,0 +1,248 @@
+---
+# =====================================================================================================================
+# Standalone TEST playbook for the HPE VM Essentials (VME) Manager "add worker" (join existing cluster) task
+#
+# Purpose: exercise ONLY the add-worker call - 'POST /api/clusters/{id}/servers' - in isolation, so the
+#          'vme_add_host_body' schema can be validated without running a full HVM provisioning. It mirrors the join
+#          branch of HVM_provisioning.yml exactly.
+#
+# Background: the add-worker endpoint does NOT accept the same server schema as the cluster-create body. Two
+#             differences were verified live against the VME Manager:
+#               1. Server type: create derives it from the cluster layout, so 'computeServerType' alone suffices there.
+#                  Add-worker has no layout context and reads 'serverType' from the server object - omitting it fails
+#                  with "serverType: Server type not specified or not available". Both keys are sent (code 'mvmHost').
+#               2. SSH host: create reads the host from the 'sshHosts' list; add-worker IGNORES 'sshHosts' and instead
+#                  reads the top-level 'hostname' (name) and 'sshHost' (IP) - omitting them fails with
+#                  "sshHosts: SSH Host IP and Hostname cannot be blank". Both are sent explicitly.
+#             A 200 response with 'success: true' kicks off the (async) join; the worker then appears in
+#             'GET /api/clusters?name=...' -> clusters[0].servers[].
+#
+# It reuses the same variables and session logic (files/Create_VME_session.yml) as HVM_provisioning.yml.
+#
+# Usage (read-only - builds and prints the body, does NOT add the worker):
+#   ansible-playbook tests/Test_VME_add_worker.yml -i hosts_HVM --vault-password-file /path/to/vault_pass.txt
+#
+# Usage (actually add the worker to the existing cluster '{{ cluster_name }}'):
+#   ansible-playbook tests/Test_VME_add_worker.yml -i hosts_HVM --vault-password-file /path/to/vault_pass.txt \
+#       -e add_worker=true -e test_node_name=HVM-2 -e test_node_ip=192.168.3.181
+#
+# NOTE: the cluster '{{ cluster_name }}' must already exist (create it first, e.g. via
+#       tests/Test_VME_Manager.yml -e create_cluster=true, or by deploying the VME Manager host).
+# =====================================================================================================================
+
+- name: Test the VME Manager add-worker (join existing cluster) task
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars_files:
+    - ../vars/VME_Manager_vars_encrypted.yml
+    - ../vars/HVM_vars.yml
+    - ../vars/api_versions.yml
+  vars:
+    # Set to true (e.g. '-e add_worker=true') to actually add the worker to the cluster.
+    add_worker: false
+    # Node to add as a worker to the existing cluster. Override with -e for the host you want to test.
+    test_node_name: "HVM-2"
+    test_node_ip: "192.168.3.181"
+    # Morpheus service plan used for the MVM node.
+    vme_service_plan_name: "Default Manual"
+    # HVM node disk layout (from the VME Manager cluster wizard: config.diskMode). 'lvm' matches the HVM OS install.
+    vme_disk_mode: "lvm"
+
+  tasks:
+
+    # ---------------------------------------------------------------------------------------------------------------
+    # 1. Validate the required variables are defined
+    # ---------------------------------------------------------------------------------------------------------------
+
+    - name: Assert that all required VME variables are defined
+      ansible.builtin.assert:
+        that:
+          - vme_manager_url is defined and (vme_manager_url | length > 0)
+          - vme_manager_username is defined and (vme_manager_username | length > 0)
+          - vme_manager_password is defined and (vme_manager_password | length > 0)
+          - hvm_ssh_username is defined and (hvm_ssh_username | length > 0)
+          - hvm_ssh_password is defined and (hvm_ssh_password | length > 0)
+          - cluster_name is defined and (cluster_name | length > 0)
+          - vme_group_name is defined and (vme_group_name | length > 0)
+          - vme_cluster_layout is defined and (vme_cluster_layout | length > 0)
+          - vme_mgmt_net_interface is defined and (vme_mgmt_net_interface | length > 0)
+          - vme_compute_net_interface is defined and (vme_compute_net_interface | length > 0)
+          - vme_compute_vlans is defined and (vme_compute_vlans | length > 0)
+          - test_node_name is defined and (test_node_name | length > 0)
+          - test_node_ip is defined and (test_node_ip | length > 0)
+        fail_msg: "One or more required variables are missing. Check vars/VME_Manager_vars_encrypted.yml and vars/HVM_vars.yml."
+        success_msg: "All required variables are defined."
+
+    # ---------------------------------------------------------------------------------------------------------------
+    # 2. Authenticate to the VME Manager
+    # ---------------------------------------------------------------------------------------------------------------
+
+    - name: Authenticate to the VME Manager (proves connectivity + credentials)
+      ansible.builtin.import_tasks: ../files/Create_VME_session.yml
+
+    - name: Confirm a bearer token was obtained
+      ansible.builtin.assert:
+        that:
+          - vme_access_token is defined and (vme_access_token | length > 0)
+        fail_msg: "Authentication to the VME Manager failed - no access token returned. Check the URL and credentials."
+        success_msg: "Successfully authenticated to the VME Manager at {{ vme_manager_url }}."
+
+    # ---------------------------------------------------------------------------------------------------------------
+    # 3. Resolve the ids needed to build the add-worker body (group / cloud / layout / service plan)
+    # ---------------------------------------------------------------------------------------------------------------
+
+    - name: Look up the VME group '{{ vme_group_name }}'
+      ansible.builtin.uri:
+        url: "{{ vme_manager_url }}/api/groups?name={{ vme_group_name | urlencode }}&max=100"
+        method: GET
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{ vme_access_token }}"
+          Accept: "application/json"
+      register: vme_groups
+      delegate_to: localhost
+
+    - name: Set the group and cloud id facts
+      ansible.builtin.set_fact:
+        vme_group_id: "{{ (vme_groups.json.groups | default([]) | selectattr('name', 'equalto', vme_group_name) | list | first).id | default('') }}"
+        vme_cloud_id: "{{ ((vme_groups.json.groups | default([]) | selectattr('name', 'equalto', vme_group_name) | list | first).zones | default([]) | first).id | default('') }}"
+
+    - name: List the cluster layouts
+      ansible.builtin.uri:
+        url: "{{ vme_manager_url }}/api/library/cluster-layouts?max=200"
+        method: GET
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{ vme_access_token }}"
+          Accept: "application/json"
+      register: vme_layouts
+      delegate_to: localhost
+
+    - name: Set the layout id fact
+      ansible.builtin.set_fact:
+        vme_layout_id: "{{ (vme_layouts.json.layouts | default([]) | selectattr('name', 'equalto', vme_cluster_layout) | list | first).id | default('') }}"
+
+    - name: Look up the service plan '{{ vme_service_plan_name }}'
+      ansible.builtin.uri:
+        url: "{{ vme_manager_url }}/api/service-plans?phrase={{ vme_service_plan_name | urlencode }}&max=100"
+        method: GET
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{ vme_access_token }}"
+          Accept: "application/json"
+      register: vme_plans
+      delegate_to: localhost
+
+    - name: Set the service plan id fact
+      ansible.builtin.set_fact:
+        vme_plan_id: "{{ (vme_plans.json.servicePlans | default([]) | selectattr('name', 'equalto', vme_service_plan_name) | list | first).id | default('') }}"
+
+    # ---------------------------------------------------------------------------------------------------------------
+    # 4. Resolve the existing cluster id (the worker is added to it)
+    # ---------------------------------------------------------------------------------------------------------------
+
+    - name: Look up the HVM cluster '{{ cluster_name }}'
+      ansible.builtin.uri:
+        url: "{{ vme_manager_url }}/api/clusters?name={{ cluster_name | urlencode }}&max=1"
+        method: GET
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{ vme_access_token }}"
+          Accept: "application/json"
+      register: vme_cluster_lookup
+      delegate_to: localhost
+
+    - name: Set the cluster existence / id facts
+      ansible.builtin.set_fact:
+        hvm_cluster_exists: "{{ (vme_cluster_lookup.json.clusters | default([]) | length) > 0 }}"
+        hvm_cluster_id: "{{ (vme_cluster_lookup.json.clusters | default([]))[0].id | default('') }}"
+
+    - name: Fail if the cluster does not exist yet (nothing to add a worker to)
+      ansible.builtin.fail:
+        msg: "Cluster '{{ cluster_name }}' does not exist yet. Create it first (e.g. tests/Test_VME_Manager.yml -e create_cluster=true)."
+      when: not (hvm_cluster_exists | bool)
+
+    - name: Fail if any id needed to build the body could not be resolved
+      ansible.builtin.fail:
+        msg:
+          - "Could not resolve every id needed to build the add-worker body:"
+          - "group id='{{ vme_group_id }}', cloud id='{{ vme_cloud_id }}', layout id='{{ vme_layout_id }}', plan id='{{ vme_plan_id }}'."
+      when: (vme_group_id | length == 0) or (vme_cloud_id | length == 0) or (vme_layout_id | length == 0) or (vme_plan_id | length == 0)
+
+    # ---------------------------------------------------------------------------------------------------------------
+    # 5. Build the add-worker body (identical to HVM_provisioning.yml's 'vme_add_host_body', incl. the serverType fix)
+    # ---------------------------------------------------------------------------------------------------------------
+
+    - name: Build the add-host request body (integer ids required — jinja2_native is off)
+      ansible.builtin.set_fact:
+        vme_add_host_body: >-
+          {{
+            {
+              'server': {
+                'name': test_node_name,
+                'hostname': test_node_name,
+                'sshHost': test_node_ip,
+                'nodeCount': 1,
+                'nodeType': 'worker',
+                'computeServerType': {'code': 'mvmHost'},
+                'serverType': {'code': 'mvmHost'},
+                'sshHosts': [{'ip': test_node_ip, 'name': test_node_name}],
+                'sshPort': 22,
+                'sshUsername': hvm_ssh_username,
+                'sshPassword': hvm_ssh_password,
+                'cpuPlacementMode': 'unmanaged',
+                'plan': {'id': vme_plan_id | int},
+                'network': {'name': vme_mgmt_net_interface},
+                'networkInterfaces': [
+                  {'network': {'name': vme_mgmt_net_interface}}
+                ],
+                'config': {
+                  'diskMode': vme_disk_mode,
+                  'computeInterfaceName': vme_compute_net_interface,
+                  'computeVlans': vme_compute_vlans | join(','),
+                  'overlayInterfaceName': '',
+                  'cpuArch': 'x86_64',
+                  'cpuModel': 'host-passthrough',
+                  'dynamicPlacementMode': 'off',
+                  'drsAggressiveness': 'conservative',
+                  'powerPolicy': 'balanced'
+                }
+              }
+            } | to_json
+          }}
+
+    - name: Show the exact request body being sent to POST /api/clusters/{{ hvm_cluster_id }}/servers
+      ansible.builtin.debug:
+        msg: "{{ vme_add_host_body | from_json }}"
+
+    # ---------------------------------------------------------------------------------------------------------------
+    # 6. (Optional) Add the worker - only when add_worker=true
+    # ---------------------------------------------------------------------------------------------------------------
+
+    - name: Skip adding the worker (add_worker is false)
+      ansible.builtin.debug:
+        msg: "add_worker is false: the body was built and printed but NOT sent. Re-run with '-e add_worker=true' to add '{{ test_node_name }}' to '{{ cluster_name }}'."
+      when: not (add_worker | bool)
+
+    - name: Add HVM worker '{{ test_node_name }}' to cluster '{{ cluster_name }}' (id {{ hvm_cluster_id }})
+      ansible.builtin.uri:
+        url: "{{ vme_manager_url }}/api/clusters/{{ hvm_cluster_id }}/servers"
+        method: POST
+        status_code: 200, 201
+        validate_certs: false
+        headers:
+          Authorization: "Bearer {{ vme_access_token }}"
+          Content-Type: "application/json"
+        body: "{{ vme_add_host_body }}"
+      register: vme_add_worker
+      failed_when: false
+      delegate_to: localhost
+      when: add_worker | bool
+
+    - name: Report the add-worker result
+      ansible.builtin.debug:
+        msg:
+          - "Add worker HTTP status: {{ vme_add_worker.status }}"
+          - "Response: {{ vme_add_worker.json | default(vme_add_worker.content) | default('(no body)') }}"
+      when: add_worker | bool

@@ -1,0 +1,32 @@
+# =====================================================================================================================
+# Python (pip) requirements for the Ansible control node
+#
+# Install everything at once from the project root with:
+#     pip3 install -r files/pip-requirements.txt
+#
+# NOTE: This is the pip/Python package list. It is DIFFERENT from 'files/requirements.yml', which is the
+# ansible-galaxy file used to install the Ansible *collections* (see Ansible_control_node_requirements.md):
+#     ansible-galaxy collection install -r files/requirements.yml --force
+# =====================================================================================================================
+
+# --- Core Ansible + build helpers ------------------------------------------------------------------------------------
+ansible-core
+setuptools-rust
+wheel
+
+# --- json_query filter (community.general) requires jmespath ---------------------------------------------------------
+jmespath
+
+# --- password_hash('sha512') filter: use passlib instead of the deprecated Python 'crypt' module (removed in 3.13) ---
+passlib
+
+# --- Windows DNS management over WinRM (DNS record creation tasks) ----------------------------------------------------
+pywinrm
+
+# --- ESXi provisioning (VMware community collection) -----------------------------------------------------------------
+requests
+# The VMware vSphere automation SDK is installed from source (not on PyPI):
+git+https://github.com/vmware/vsphere-automation-sdk-python.git
+
+# --- Optional tooling ------------------------------------------------------------------------------------------------
+# ansible-lint      # useful to identify problems in playbooks

@@ -1,888 +1,1299 @@
-$ ansible-playbook -i hosts_ESX ESXi80_provisioning.yml --ask-vault-password --ask-become-pass
+$ ansible-playbook ESXi80_provisioning.yml -i hosts_ESX --ask-vault-password --ask-become-pass
 
-PLAY [DNS record for the bare metal ESXi server] **************************************************************************
+PLAY [DNS record for the bare metal ESXi server] *******************************
 
-TASK [Add 'ESX-001' with '192.168.3.175' on 'dc.lj.lab' in 'lj.lab' DNS domain] *******************************************
-changed: [ESX-001 -> dc.lj.lab]
+TASK [Add 'ESX-1' with '192.168.3.174' on 'dc.lj.lab' in 'lj.lab' DNS domain] ***
+ok: [ESX-2 -> dc.lj.lab]
+ok: [ESX-1 -> dc.lj.lab]
 
 PLAY [Automated ESXi 8.0 U2 installation on HPE Compute Ops Managmeent server(s) using an auto-generated ISO file with customized kickstart.] ***
 
-TASK [Gather subset facts on localhost] ***********************************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Gather subset facts on localhost] ****************************************
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Capture the start time (will be used later to filter COM activities and get the runtime of the playbook)] ***********
-ok: [ESX-001]
+TASK [Capture the start time (will be used later to filter COM activities and get the runtime of the playbook)] ***
+ok: [ESX-1]
+ok: [ESX-2]
 
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
-    "start_time": "2025-06-12T10:59:14Z"
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
+    "start_time": "2026-07-23T15:28:20Z"
+}
+ok: [ESX-2] => {
+    "start_time": "2026-07-23T15:28:20Z"
 }
 
-TASK [Set fact for the first host in inventory] ***************************************************************************
-ok: [ESX-001]
+TASK [Set fact for the first host in inventory] ********************************
+ok: [ESX-1]
+ok: [ESX-2]
 
-TASK [Create HPE Compute Ops Management session] **************************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Create HPE Compute Ops Management session] *******************************
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Set variable access_token for the bearer token] *********************************************************************
-ok: [ESX-001]
+TASK [Set variable access_token for the bearer token] **************************
+ok: [ESX-1]
+ok: [ESX-2]
 
-TASK [Capture all job templates] ******************************************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Capture all job templates] ***********************************************
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
 
-TASK [Set a variable for all job templates items] *************************************************************************
-ok: [ESX-001]
+TASK [Set a variable for all job templates items] ******************************
+ok: [ESX-1]
+ok: [ESX-2]
 
-TASK [Set variables for each job templates] *******************************************************************************
-ok: [ESX-001] => (item=Variable set: AnalyzeFirmwareUpdate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/5a657c6f-777d-4c7e-874a-1650b95b37f2)
-ok: [ESX-001] => (item=Variable set: AnalyzeFirmwareUpdateOrchestrator_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/87f47eff-7245-4788-bf58-5b6af361d1ba)
-ok: [ESX-001] => (item=Variable set: ApplianceUpdate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/1c4ac4be-8eeb-49f2-a86a-fd8c9182616c)
-ok: [ESX-001] => (item=Variable set: ApplySettingsTemplate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
-ok: [ESX-001] => (item=Variable set: CalculateiLOSettingsCompliance_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/497a5418-cbc2-4870-a1e7-1fc30c885f2f)
-ok: [ESX-001] => (item=Variable set: ColdBoot_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/aacfb3e0-6575-4d4f-a711-1ee1ae768407)
-ok: [ESX-001] => (item=Variable set: CollectServerLogs_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/2d744494-22d4-4d61-8c65-647ccadeb6b6)
-ok: [ESX-001] => (item=Variable set: CopyServerProfileTemplates_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
-ok: [ESX-001] => (item=Variable set: CreateOneviewComplianceReport_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/aae145a1-79a2-4516-b191-c98039c96542)
-ok: [ESX-001] => (item=Variable set: DataRoundupReportOrchestrator_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/b0001d36-6490-48ac-93af-a87adfb997ed)
-ok: [ESX-001] => (item=Variable set: DeleteVCenter_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/3f06fd6b-dfb1-4bad-bd04-939951797e97)
-ok: [ESX-001] => (item=Variable set: FirmwareUpdate_New_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/fd54a96c-cabc-42e3-aee3-374a2d009dba)
-ok: [ESX-001] => (item=Variable set: GatewayReboot_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/91afe709-8b0d-4162-81d5-2a365e0359f3)
-ok: [ESX-001] => (item=Variable set: GetDeviceAndSoftwareInventory_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/ee5d8016-6b9f-4410-9d55-e05e3e86a0c8)
-ok: [ESX-001] => (item=Variable set: GetFullServerInventory_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/d6595f1b-84e6-4587-ade5-656e2a5ea20d)
-ok: [ESX-001] => (item=Variable set: GetIloSecurityParams_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/e3fef4ec-eb72-43ff-bea5-13501353b501)
-ok: [ESX-001] => (item=Variable set: GetOneviewServerInventory_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/a0124cb1-00f1-46b7-818f-a9eb5f60591f)
-ok: [ESX-001] => (item=Variable set: GetOneViewSettings_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/fc16aa48-c73c-4463-9112-e061383ebfa9)
-ok: [ESX-001] => (item=Variable set: GetPowerMeterData_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/50fa7d05-5941-4e8e-90c3-5995f1d600a8)
-ok: [ESX-001] => (item=Variable set: GetServerExternalStorage_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/9310319e-7b7f-41ba-8b24-8b34eed1ca62)
-ok: [ESX-001] => (item=Variable set: GetSettingsForTemplate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/6cd671db-ce6b-45ce-894e-7b5ae23e0399)
-ok: [ESX-001] => (item=Variable set: GetSSOUrl_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/2c7de503-77af-4340-b68d-7a26e5359b8e)
-ok: [ESX-001] => (item=Variable set: GetStorageInventory_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/cbfc4fa8-2db4-4b6e-90a3-05cd6b659a08)
-ok: [ESX-001] => (item=Variable set: GroupAddActions_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/3eeff1ea-8419-4335-aaf3-796ef50789ba)
-ok: [ESX-001] => (item=Variable set: GroupApplianceUpdate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/f69f553a-5004-4a08-9283-5b60abd9eb4a)
-ok: [ESX-001] => (item=Variable set: GroupApplyExternalStorage_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/fcb79270-5954-42e9-9374-6a065b6d494a)
-ok: [ESX-001] => (item=Variable set: GroupApplyInternalStorageSettings_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/54095626-3911-4fea-9741-816e2531994e)
-ok: [ESX-001] => (item=Variable set: GroupApplyOneviewSettings_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/a229a162-b43f-45b0-b7bb-692df77b9746)
-ok: [ESX-001] => (item=Variable set: GroupApplyServerSettings_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/beff07ce-f36d-4699-9ac3-f872dcd63133)
-ok: [ESX-001] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/db3620d4-19a4-4b54-9804-83f8f59d48a4)
-ok: [ESX-001] => (item=Variable set: GroupExternalStorageCompliance_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/7177aa6a-e8f8-4e9b-ae31-e01dafcc81df)
-ok: [ESX-001] => (item=Variable set: GroupFirmwareCompliance_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/23b8ba2a-6c46-4223-b028-919382c7dcac)
-ok: [ESX-001] => (item=Variable set: GroupFirmwareUpdate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
-ok: [ESX-001] => (item=Variable set: GroupGetIloSecurityParams_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
-ok: [ESX-001] => (item=Variable set: GroupIloFirmwareUpdate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/512fb1f2-516f-4bda-bc84-e623947858e4)
-ok: [ESX-001] => (item=Variable set: GroupiLOSettingsCompliance_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/a55c8b26-3c57-4044-a4ee-1d0e3c108286)
-ok: [ESX-001] => (item=Variable set: GroupOSInstallation_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/e2952628-2629-4088-93db-91742304ef0c)
-ok: [ESX-001] => (item=Variable set: GroupServerInventoryReport_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
-ok: [ESX-001] => (item=Variable set: GroupStorageVolumeConfiguration_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/c708eb57-235d-4ea8-9e21-8ceea2438773)
-ok: [ESX-001] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/94caa4ef-9ff8-4805-9e97-18a09e673b66)
-ok: [ESX-001] => (item=Variable set: iLOSecurity_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/e1d69e76-38cc-4079-9192-a380baea2973)
-ok: [ESX-001] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/abfda355-6e58-4c00-be0a-af35dbd70398)
-ok: [ESX-001] => (item=Variable set: PowerOff_New_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
-ok: [ESX-001] => (item=Variable set: PowerOn_New_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/0cbb2377-1834-488d-840c-d5bf788c34fb)
-ok: [ESX-001] => (item=Variable set: ReconnectCredentialServer_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/d9713316-58f3-464e-bc69-1dd0728fa0d5)
-ok: [ESX-001] => (item=Variable set: Restart_New_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/30110551-cad6-4069-95b8-dbce9bbd8525)
-ok: [ESX-001] => (item=Variable set: ServerNetworkConnectivity_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
-ok: [ESX-001] => (item=Variable set: SetIloSettings_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/cf4f929b-d44a-4a90-93a9-820955458fd4)
-ok: [ESX-001] => (item=Variable set: UpdateCredentialBasedServer_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/f399e08a-6fed-45ba-a646-88d20691ff0f)
-ok: [ESX-001] => (item=Variable set: VcenterFirmwareBundlesSync_job_template_resourceUri = /compute-ops-mgmt/v1beta2/job-templates/0fe73adb-9d52-4f00-9540-6ec82f265d82)
+TASK [Set variables for each job template id] **********************************
+ok: [ESX-1] => (item=Variable set: AnalyzeFirmwareUpdate_job_template_id = 5a657c6f-777d-4c7e-874a-1650b95b37f2)
+ok: [ESX-1] => (item=Variable set: AnalyzeFirmwareUpdateOrchestrator_job_template_id = 87f47eff-7245-4788-bf58-5b6af361d1ba)
+ok: [ESX-1] => (item=Variable set: ApplianceUpdate_job_template_id = 1c4ac4be-8eeb-49f2-a86a-fd8c9182616c)
+ok: [ESX-2] => (item=Variable set: AnalyzeFirmwareUpdate_job_template_id = 5a657c6f-777d-4c7e-874a-1650b95b37f2)
+ok: [ESX-1] => (item=Variable set: ApplySettingsTemplate_job_template_id = 2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
+ok: [ESX-2] => (item=Variable set: AnalyzeFirmwareUpdateOrchestrator_job_template_id = 87f47eff-7245-4788-bf58-5b6af361d1ba)
+ok: [ESX-1] => (item=Variable set: CalculateiLOSettingsCompliance_job_template_id = 497a5418-cbc2-4870-a1e7-1fc30c885f2f)
+ok: [ESX-2] => (item=Variable set: ApplianceUpdate_job_template_id = 1c4ac4be-8eeb-49f2-a86a-fd8c9182616c)
+ok: [ESX-1] => (item=Variable set: ColdBoot_job_template_id = aacfb3e0-6575-4d4f-a711-1ee1ae768407)
+ok: [ESX-2] => (item=Variable set: ApplySettingsTemplate_job_template_id = 2d0f40f7-2a07-4c74-92e1-d1afaf49e632)
+ok: [ESX-1] => (item=Variable set: CollectServerLogs_job_template_id = 2d744494-22d4-4d61-8c65-647ccadeb6b6)
+ok: [ESX-2] => (item=Variable set: CalculateiLOSettingsCompliance_job_template_id = 497a5418-cbc2-4870-a1e7-1fc30c885f2f)
+ok: [ESX-1] => (item=Variable set: CopyServerProfileTemplates_job_template_id = 7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
+ok: [ESX-2] => (item=Variable set: ColdBoot_job_template_id = aacfb3e0-6575-4d4f-a711-1ee1ae768407)
+ok: [ESX-1] => (item=Variable set: CreateOneviewComplianceReport_job_template_id = aae145a1-79a2-4516-b191-c98039c96542)
+ok: [ESX-2] => (item=Variable set: CollectServerLogs_job_template_id = 2d744494-22d4-4d61-8c65-647ccadeb6b6)
+ok: [ESX-1] => (item=Variable set: DeleteVCenter_job_template_id = 3f06fd6b-dfb1-4bad-bd04-939951797e97)
+ok: [ESX-2] => (item=Variable set: CopyServerProfileTemplates_job_template_id = 7134bdd9-dead-40e2-baef-a23b0e6c0bd5)
+ok: [ESX-1] => (item=Variable set: FirmwareDownload_job_template_id = 0683ada8-1a89-49dd-bf04-6df715b708a6)
+ok: [ESX-2] => (item=Variable set: CreateOneviewComplianceReport_job_template_id = aae145a1-79a2-4516-b191-c98039c96542)
+ok: [ESX-1] => (item=Variable set: FirmwareUpdate_New_job_template_id = fd54a96c-cabc-42e3-aee3-374a2d009dba)
+ok: [ESX-2] => (item=Variable set: DeleteVCenter_job_template_id = 3f06fd6b-dfb1-4bad-bd04-939951797e97)
+ok: [ESX-1] => (item=Variable set: GatewayDiscoverIlos_job_template_id = d0afcc35-c6a9-4d05-adc8-f9e686b5fdfc)
+ok: [ESX-2] => (item=Variable set: FirmwareDownload_job_template_id = 0683ada8-1a89-49dd-bf04-6df715b708a6)
+ok: [ESX-1] => (item=Variable set: GatewayReboot_job_template_id = 91afe709-8b0d-4162-81d5-2a365e0359f3)
+ok: [ESX-2] => (item=Variable set: FirmwareUpdate_New_job_template_id = fd54a96c-cabc-42e3-aee3-374a2d009dba)
+ok: [ESX-1] => (item=Variable set: GetDeviceAndSoftwareInventory_job_template_id = ee5d8016-6b9f-4410-9d55-e05e3e86a0c8)
+ok: [ESX-2] => (item=Variable set: GatewayDiscoverIlos_job_template_id = d0afcc35-c6a9-4d05-adc8-f9e686b5fdfc)
+ok: [ESX-1] => (item=Variable set: GetFullServerInventory_job_template_id = d6595f1b-84e6-4587-ade5-656e2a5ea20d)
+ok: [ESX-2] => (item=Variable set: GatewayReboot_job_template_id = 91afe709-8b0d-4162-81d5-2a365e0359f3)
+ok: [ESX-1] => (item=Variable set: GetIloSecurityParams_job_template_id = e3fef4ec-eb72-43ff-bea5-13501353b501)
+ok: [ESX-2] => (item=Variable set: GetDeviceAndSoftwareInventory_job_template_id = ee5d8016-6b9f-4410-9d55-e05e3e86a0c8)
+ok: [ESX-1] => (item=Variable set: GetOneviewServerInventory_job_template_id = a0124cb1-00f1-46b7-818f-a9eb5f60591f)
+ok: [ESX-2] => (item=Variable set: GetFullServerInventory_job_template_id = d6595f1b-84e6-4587-ade5-656e2a5ea20d)
+ok: [ESX-1] => (item=Variable set: GetOneViewSettings_job_template_id = fc16aa48-c73c-4463-9112-e061383ebfa9)
+ok: [ESX-2] => (item=Variable set: GetIloSecurityParams_job_template_id = e3fef4ec-eb72-43ff-bea5-13501353b501)
+ok: [ESX-1] => (item=Variable set: GetPowerMeterData_job_template_id = 50fa7d05-5941-4e8e-90c3-5995f1d600a8)
+ok: [ESX-2] => (item=Variable set: GetOneviewServerInventory_job_template_id = a0124cb1-00f1-46b7-818f-a9eb5f60591f)
+ok: [ESX-1] => (item=Variable set: GetServerExternalStorage_job_template_id = 9310319e-7b7f-41ba-8b24-8b34eed1ca62)
+ok: [ESX-2] => (item=Variable set: GetOneViewSettings_job_template_id = fc16aa48-c73c-4463-9112-e061383ebfa9)
+ok: [ESX-1] => (item=Variable set: GetSettingsForTemplate_job_template_id = 6cd671db-ce6b-45ce-894e-7b5ae23e0399)
+ok: [ESX-2] => (item=Variable set: GetPowerMeterData_job_template_id = 50fa7d05-5941-4e8e-90c3-5995f1d600a8)
+ok: [ESX-1] => (item=Variable set: GetSSOUrl_job_template_id = 2c7de503-77af-4340-b68d-7a26e5359b8e)
+ok: [ESX-2] => (item=Variable set: GetServerExternalStorage_job_template_id = 9310319e-7b7f-41ba-8b24-8b34eed1ca62)
+ok: [ESX-1] => (item=Variable set: GetTelemetryDriveMetrics_job_template_id = ee46afcf-4f47-45b5-a958-cb9b02bb0e00)
+ok: [ESX-2] => (item=Variable set: GetSettingsForTemplate_job_template_id = 6cd671db-ce6b-45ce-894e-7b5ae23e0399)
+ok: [ESX-1] => (item=Variable set: GroupAddActions_job_template_id = 3eeff1ea-8419-4335-aaf3-796ef50789ba)
+ok: [ESX-2] => (item=Variable set: GetSSOUrl_job_template_id = 2c7de503-77af-4340-b68d-7a26e5359b8e)
+ok: [ESX-1] => (item=Variable set: GroupApplianceUpdate_job_template_id = f69f553a-5004-4a08-9283-5b60abd9eb4a)
+ok: [ESX-2] => (item=Variable set: GetTelemetryDriveMetrics_job_template_id = ee46afcf-4f47-45b5-a958-cb9b02bb0e00)
+ok: [ESX-1] => (item=Variable set: GroupApplyExternalStorage_job_template_id = fcb79270-5954-42e9-9374-6a065b6d494a)
+ok: [ESX-2] => (item=Variable set: GroupAddActions_job_template_id = 3eeff1ea-8419-4335-aaf3-796ef50789ba)
+ok: [ESX-1] => (item=Variable set: GroupApplyInternalStorageSettings_job_template_id = 54095626-3911-4fea-9741-816e2531994e)
+ok: [ESX-2] => (item=Variable set: GroupApplianceUpdate_job_template_id = f69f553a-5004-4a08-9283-5b60abd9eb4a)
+ok: [ESX-1] => (item=Variable set: GroupApplyOneviewSettings_job_template_id = a229a162-b43f-45b0-b7bb-692df77b9746)
+ok: [ESX-2] => (item=Variable set: GroupApplyExternalStorage_job_template_id = fcb79270-5954-42e9-9374-6a065b6d494a)
+ok: [ESX-1] => (item=Variable set: GroupApplyServerSettings_job_template_id = beff07ce-f36d-4699-9ac3-f872dcd63133)
+ok: [ESX-2] => (item=Variable set: GroupApplyInternalStorageSettings_job_template_id = 54095626-3911-4fea-9741-816e2531994e)
+ok: [ESX-1] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_id = db3620d4-19a4-4b54-9804-83f8f59d48a4)
+ok: [ESX-2] => (item=Variable set: GroupApplyOneviewSettings_job_template_id = a229a162-b43f-45b0-b7bb-692df77b9746)
+ok: [ESX-1] => (item=Variable set: GroupExternalStorageCompliance_job_template_id = 7177aa6a-e8f8-4e9b-ae31-e01dafcc81df)
+ok: [ESX-2] => (item=Variable set: GroupApplyServerSettings_job_template_id = beff07ce-f36d-4699-9ac3-f872dcd63133)
+ok: [ESX-1] => (item=Variable set: GroupFirmwareCompliance_job_template_id = 23b8ba2a-6c46-4223-b028-919382c7dcac)
+ok: [ESX-2] => (item=Variable set: GroupCopyServerProfileTemplates_job_template_id = db3620d4-19a4-4b54-9804-83f8f59d48a4)
+ok: [ESX-1] => (item=Variable set: GroupFirmwareDownload_job_template_id = a17a7aa9-4540-4c21-bbf2-31af4ff65e98)
+ok: [ESX-2] => (item=Variable set: GroupExternalStorageCompliance_job_template_id = 7177aa6a-e8f8-4e9b-ae31-e01dafcc81df)
+ok: [ESX-1] => (item=Variable set: GroupFirmwareUpdate_job_template_id = 91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
+ok: [ESX-2] => (item=Variable set: GroupFirmwareCompliance_job_template_id = 23b8ba2a-6c46-4223-b028-919382c7dcac)
+ok: [ESX-1] => (item=Variable set: GroupGetIloSecurityParams_job_template_id = 08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
+ok: [ESX-2] => (item=Variable set: GroupFirmwareDownload_job_template_id = a17a7aa9-4540-4c21-bbf2-31af4ff65e98)
+ok: [ESX-1] => (item=Variable set: GroupIloFirmwareUpdate_job_template_id = 512fb1f2-516f-4bda-bc84-e623947858e4)
+ok: [ESX-2] => (item=Variable set: GroupFirmwareUpdate_job_template_id = 91159b5e-9eeb-11ec-a9da-00155dc0a0c0)
+ok: [ESX-1] => (item=Variable set: GroupiLOSettingsCompliance_job_template_id = a55c8b26-3c57-4044-a4ee-1d0e3c108286)
+ok: [ESX-2] => (item=Variable set: GroupGetIloSecurityParams_job_template_id = 08be2b1b-a9b3-4abb-82a2-8048f35dbccb)
+ok: [ESX-1] => (item=Variable set: GroupOSInstallation_job_template_id = e2952628-2629-4088-93db-91742304ef0c)
+ok: [ESX-2] => (item=Variable set: GroupIloFirmwareUpdate_job_template_id = 512fb1f2-516f-4bda-bc84-e623947858e4)
+ok: [ESX-1] => (item=Variable set: GroupServerInventoryReport_job_template_id = 2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
+ok: [ESX-2] => (item=Variable set: GroupiLOSettingsCompliance_job_template_id = a55c8b26-3c57-4044-a4ee-1d0e3c108286)
+ok: [ESX-1] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_id = 94caa4ef-9ff8-4805-9e97-18a09e673b66)
+ok: [ESX-2] => (item=Variable set: GroupOSInstallation_job_template_id = e2952628-2629-4088-93db-91742304ef0c)
+ok: [ESX-1] => (item=Variable set: iLOSecurity_job_template_id = e1d69e76-38cc-4079-9192-a380baea2973)
+ok: [ESX-2] => (item=Variable set: GroupServerInventoryReport_job_template_id = 2dfe138a-21b7-4797-8c6b-4d8e7e5f847c)
+ok: [ESX-1] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_id = abfda355-6e58-4c00-be0a-af35dbd70398)
+ok: [ESX-2] => (item=Variable set: IloOnlyFirmwareUpdate_job_template_id = 94caa4ef-9ff8-4805-9e97-18a09e673b66)
+ok: [ESX-1] => (item=Variable set: OrchestratorDriveMetrics_job_template_id = 1f3ca251-a008-4fed-b53e-6521cce61b97)
+ok: [ESX-2] => (item=Variable set: iLOSecurity_job_template_id = e1d69e76-38cc-4079-9192-a380baea2973)
+ok: [ESX-1] => (item=Variable set: PowerOff_New_job_template_id = d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
+ok: [ESX-2] => (item=Variable set: OrchestratorAddUpdateServerTemplates_job_template_id = abfda355-6e58-4c00-be0a-af35dbd70398)
+ok: [ESX-1] => (item=Variable set: PowerOn_New_job_template_id = 0cbb2377-1834-488d-840c-d5bf788c34fb)
+ok: [ESX-2] => (item=Variable set: OrchestratorDriveMetrics_job_template_id = 1f3ca251-a008-4fed-b53e-6521cce61b97)
+ok: [ESX-1] => (item=Variable set: ReconnectCredentialServer_job_template_id = d9713316-58f3-464e-bc69-1dd0728fa0d5)
+ok: [ESX-2] => (item=Variable set: PowerOff_New_job_template_id = d0c13b58-748c-461f-9a61-c0c5c71f1bb4)
+ok: [ESX-1] => (item=Variable set: ResetIlo_job_template_id = 394b492c-8d88-4e4e-a775-1a95cb5f1065)
+ok: [ESX-2] => (item=Variable set: PowerOn_New_job_template_id = 0cbb2377-1834-488d-840c-d5bf788c34fb)
+ok: [ESX-1] => (item=Variable set: Restart_New_job_template_id = 30110551-cad6-4069-95b8-dbce9bbd8525)
+ok: [ESX-2] => (item=Variable set: ReconnectCredentialServer_job_template_id = d9713316-58f3-464e-bc69-1dd0728fa0d5)
+ok: [ESX-1] => (item=Variable set: ServerMaintenanceModeDisable_job_template_id = 2798720f-b090-427d-b210-e48d33ce2f27)
+ok: [ESX-2] => (item=Variable set: ResetIlo_job_template_id = 394b492c-8d88-4e4e-a775-1a95cb5f1065)
+ok: [ESX-1] => (item=Variable set: ServerMaintenanceModeEnable_job_template_id = 4eb92af1-1ce4-4cb0-8581-fb5a7dcdbf2b)
+ok: [ESX-2] => (item=Variable set: Restart_New_job_template_id = 30110551-cad6-4069-95b8-dbce9bbd8525)
+ok: [ESX-1] => (item=Variable set: ServerNetworkConnectivity_job_template_id = b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
+ok: [ESX-2] => (item=Variable set: ServerMaintenanceModeDisable_job_template_id = 2798720f-b090-427d-b210-e48d33ce2f27)
+ok: [ESX-1] => (item=Variable set: SetIloSettings_job_template_id = cf4f929b-d44a-4a90-93a9-820955458fd4)
+ok: [ESX-2] => (item=Variable set: ServerMaintenanceModeEnable_job_template_id = 4eb92af1-1ce4-4cb0-8581-fb5a7dcdbf2b)
+ok: [ESX-1] => (item=Variable set: UidIndicatorOff_job_template_id = fd837434-a2f2-4bc8-b1b4-ec068bd036aa)
+ok: [ESX-2] => (item=Variable set: ServerNetworkConnectivity_job_template_id = b21ca9e2-8a1b-11ee-b9d1-0242ac120002)
+ok: [ESX-1] => (item=Variable set: UidIndicatorOn_job_template_id = a46b210a-b0c7-4223-ab43-c4c1e77e680c)
+ok: [ESX-2] => (item=Variable set: SetIloSettings_job_template_id = cf4f929b-d44a-4a90-93a9-820955458fd4)
+ok: [ESX-1] => (item=Variable set: UpdateCredentialBasedServer_job_template_id = f399e08a-6fed-45ba-a646-88d20691ff0f)
+ok: [ESX-2] => (item=Variable set: UidIndicatorOff_job_template_id = fd837434-a2f2-4bc8-b1b4-ec068bd036aa)
+ok: [ESX-1] => (item=Variable set: VcenterFirmwareBundlesSync_job_template_id = 0fe73adb-9d52-4f00-9540-6ec82f265d82)
+ok: [ESX-2] => (item=Variable set: UidIndicatorOn_job_template_id = a46b210a-b0c7-4223-ab43-c4c1e77e680c)
+ok: [ESX-2] => (item=Variable set: UpdateCredentialBasedServer_job_template_id = f399e08a-6fed-45ba-a646-88d20691ff0f)
+ok: [ESX-2] => (item=Variable set: VcenterFirmwareBundlesSync_job_template_id = 0fe73adb-9d52-4f00-9540-6ec82f265d82)
 
-TASK [Capture server 'CZ2311004G' information] ****************************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Ensure hostname is supported for ESXi server 'ESX-1'] ********************
+ok: [ESX-1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [ESX-2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
 
-TASK [Exit if server 'CZ2311004G' does not exist] *************************************************************************
-skipping: [ESX-001]
+TASK [Capture server 'CZ2311004H' information] *********************************
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
 
-TASK [Capture server 'CZ2311004G' generation, id, uri, connection status and iLO IP] **************************************
-ok: [ESX-001]
+TASK [Exit if server 'CZ2311004H' does not exist] ******************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
+TASK [Capture server 'CZ2311004H' id, uri and connection status] ***************
+ok: [ESX-1]
+ok: [ESX-2]
+
+TASK [Exit if server 'CZ2311004H' is not connected to COM] *********************
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [Wait until server 'CZ2311004H' hardware information (generation, model, power state) is populated] ***
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
+
+TASK [Capture server 'CZ2311004H' generation, model, power state and iLO IP] ***
+ok: [ESX-1]
+ok: [ESX-2]
+
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
     "msg": [
         "Generation: GEN_10",
         "Model: ProLiant DL360 Gen10 Plus",
-        "ID: P28948-B21+CZ2311004G",
-        "URI: /compute-ops-mgmt/v1beta2/servers/P28948-B21+CZ2311004G",
+        "ID: P28948-B21+CZ2311004H",
+        "URI: /compute-ops-mgmt/v1beta2/servers/P28948-B21+CZ2311004H",
         "Connection status: True",
-        "iLO IP: 192.168.0.20"
+        "iLO IP: ",
+        "Power state: ON"
     ]
 }
-
-TASK [Exit if server 'CZ2311004G' is not connected to COM] ****************************************************************
-skipping: [ESX-001]
-
-TASK [Wait until the server 'CZ2311004G' raw inventory information is available (necessary when the server has recently been added to COM) then capture the data] ***
-ok: [ESX-001 -> localhost]
-
-TASK [Wait until the complete discovery of server 'CZ2311004G' is complete (necessary when the server has recently been added to COM).] ***
-ok: [ESX-001 -> localhost]
-
-TASK [Power on the server 'CZ2311004G' to get the storage inventory information] ******************************************
-ok: [ESX-001 -> localhost]
-
-TASK [Set a variable for the job resource URI] ****************************************************************************
-ok: [ESX-001]
-
-TASK [Wait for the server power on job to complete] ***********************************************************************
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the server power on job to complete (60 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the server power on job to complete (59 retries left).
-ok: [ESX-001 -> localhost]
-
-TASK [Display the server power on job result] *****************************************************************************
-ok: [ESX-001] => {
+ok: [ESX-2] => {
     "msg": [
-        "State: COMPLETE",
-        "ResultCode: SUCCESS",
-        "Status: Complete"
+        "Generation: GEN_11",
+        "Model: ProLiant DL365 Gen11",
+        "ID: P53933-B21+CZJ3100GD9",
+        "URI: /compute-ops-mgmt/v1beta2/servers/P53933-B21+CZJ3100GD9",
+        "Connection status: True",
+        "iLO IP: 192.168.1.56",
+        "Power state: ON"
     ]
 }
 
-TASK [Exit when server power on job is failing] ***************************************************************************
-skipping: [ESX-001]
+TASK [Wait until the server 'CZ2311004H' inventory information is available (necessary when the server has recently been added to COM) then capture the data] ***
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Check if workload profile 'Virtualization - Power Efficient' exists] ************************************************
-ok: [ESX-001 -> localhost]
+TASK [Wait until the complete discovery of server 'CZ2311004H' is complete (necessary when the server has recently been added to COM).] ***
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Exit if workload profile 'Virtualization - Power Efficient' does not exist] *****************************************
-skipping: [ESX-001]
+TASK [Power on the server 'CZ2311004H' to get the storage inventory information (only if not already ON)] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Set a variable for the resourceUri of workload profile 'Virtualization - Power Efficient'] **************************
-ok: [ESX-001]
-
-TASK [Wait until PCI devices information is available then capture the server 'CZ2311004G' raw inventory information] *****
-ok: [ESX-001 -> localhost]
-
-TASK [Run a server inventory job to collect the local storage information] ************************************************
-ok: [ESX-001 -> localhost]
-
-TASK [Set a variable for the job resource URI] ****************************************************************************
-ok: [ESX-001]
-
-TASK [Wait for the server inventory job to complete] **********************************************************************
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the server inventory job to complete (60 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the server inventory job to complete (59 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the server inventory job to complete (58 retries left).
-ok: [ESX-001 -> localhost]
-
-TASK [Display the server inventory job result] ****************************************************************************
-ok: [ESX-001] => {
-    "msg": [
-        "State: COMPLETE",
-        "ResultCode: SUCCESS",
-        "Status: Complete"
-    ]
+TASK [Report that server 'CZ2311004H' is already powered on (skipping power on)] ***
+ok: [ESX-1] => {
+    "msg": "Server 'CZ2311004H' is already powered on (power state 'ON'). Skipping the power on job."
+}
+ok: [ESX-2] => {
+    "msg": "Server 'CZJ3100GD9' is already powered on (power state 'ON'). Skipping the power on job."
 }
 
-TASK [Exit when server inventory job is failing] **************************************************************************
-skipping: [ESX-001]
+TASK [Set a variable for the job resource URI] *********************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Capture the server 'CZ2311004G' inventory information] **************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Wait for the server power on job to complete] ****************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Capture the presence of a NS204i NVMe boot controller in server 'CZ2311004G'] ***************************************
-ok: [ESX-001] => (item=never)
+TASK [Display the server power on job result] **********************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
-    "msg": "NS204i found in server 'CZ2311004G'! NVMe RAID1 volume will be used as the target volume for the installation of ESXi!"
+TASK [Exit when server power on job is failing] ********************************
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [Check if workload profile 'Virtualization - Power Efficient' exists] *****
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
+
+TASK [Exit if workload profile 'Virtualization - Power Efficient' does not exist] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [Set a variable for the resourceUri of workload profile 'Virtualization - Power Efficient'] ***
+ok: [ESX-1]
+ok: [ESX-2]
+
+TASK [Wait until the storage inventory of server 'CZ2311004H' is populated then capture the inventory] ***
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait until the storage inventory of server 'CZ2311004H' is populated then capture the inventory (30 retries left).
+ok: [ESX-2 -> localhost]
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait until the storage inventory of server 'CZ2311004H' is populated then capture the inventory (29 retries left).
+ok: [ESX-1 -> localhost]
+
+TASK [Capture the server 'CZ2311004H' inventory information] *******************
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
+
+TASK [Capture the presence of a NS204i NVMe boot controller in server 'CZ2311004H'] ***
+ok: [ESX-1] => (item=never)
+skipping: [ESX-1] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+ok: [ESX-2] => (item=never)
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
+    "msg": "NS204i found in server 'CZ2311004H'! NVMe RAID1 volume will be used as the target volume for the installation of ESXi!"
+}
+ok: [ESX-2] => {
+    "msg": "NS204i found in server 'CZJ3100GD9'! NVMe RAID1 volume will be used as the target volume for the installation of ESXi!"
 }
 
-TASK [debug] **************************************************************************************************************
-skipping: [ESX-001]
+TASK [debug] *******************************************************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Capture size of the NS204i RAID1 volume if any] *********************************************************************
-ok: [ESX-001] => (item=never)
+TASK [Capture size of the NS204i RAID1 volume if any] **************************
+ok: [ESX-1] => (item=never)
+skipping: [ESX-1] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+ok: [ESX-2] => (item=never)
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
 
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
+    "msg": "Size of NS204i volume: 447.1 GB"
+}
+ok: [ESX-2] => {
     "msg": "Size of NS204i volume: 447.1 GB"
 }
 
-TASK [Capture storage RAID controller information when an HPE MR or SR controller is used with available drives] **********
-skipping: [ESX-001] => (item=never) 
-skipping: [ESX-001]
+TASK [Capture storage RAID controller information when an HPE MR or SR controller is used with available drives] ***
+skipping: [ESX-1] => (item=never) 
+skipping: [ESX-1] => (item=never) 
+skipping: [ESX-1]
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2]
 
-TASK [Set a variable for the name of the storage RAID controller found] ***************************************************
-skipping: [ESX-001]
+TASK [Set a variable for the name of the storage RAID controller found] ********
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [debug] **************************************************************************************************************
-skipping: [ESX-001]
+TASK [debug] *******************************************************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Capture size of the HPE MR or SR RAID1 volume if any] ***************************************************************
-skipping: [ESX-001] => (item=never) 
-skipping: [ESX-001]
+TASK [Capture size of the HPE MR or SR RAID1 volume if any] ********************
+skipping: [ESX-1] => (item=never) 
+skipping: [ESX-1] => (item=never) 
+skipping: [ESX-1]
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2]
 
-TASK [debug] **************************************************************************************************************
-skipping: [ESX-001]
+TASK [debug] *******************************************************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Set controller type if disk found and when no NS204i and no SR/MR controller with disk available found] *************
-skipping: [ESX-001] => (item=never) 
-skipping: [ESX-001]
+TASK [Set controller type if disk found and when no NS204i and no SR/MR controller with disk available found] ***
+skipping: [ESX-1] => (item=never) 
+skipping: [ESX-1] => (item=never) 
+skipping: [ESX-1]
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2]
 
-TASK [debug] **************************************************************************************************************
-skipping: [ESX-001]
+TASK [debug] *******************************************************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Exit if no NS204i and no SR/MR controller with disk available found and no local disk found] ************************
-skipping: [ESX-001]
+TASK [Exit if no NS204i and no SR/MR controller with disk available found and no local disk found] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
 TASK [Set a variable for the name of the storage controller when no NS204i and no SR/MR controller with disk available found] ***
-skipping: [ESX-001]
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [debug] **************************************************************************************************************
-skipping: [ESX-001]
+TASK [debug] *******************************************************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Capture size of the local disk if any] ******************************************************************************
-skipping: [ESX-001] => (item=never) 
-skipping: [ESX-001]
+TASK [Capture size of the local disk if any] ***********************************
+skipping: [ESX-1] => (item=never) 
+skipping: [ESX-1] => (item=never) 
+skipping: [ESX-1]
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2] => (item=never) 
+skipping: [ESX-2]
 
-TASK [debug] **************************************************************************************************************
-skipping: [ESX-001]
+TASK [debug] *******************************************************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Set a controller type variable for kickstart creation when a NS204i controller or local disk is present] ************
-ok: [ESX-001]
+TASK [Set a controller type variable for kickstart creation when a NS204i controller or local disk is present] ***
+ok: [ESX-1]
+ok: [ESX-2]
 
 TASK [Set a controller type variable for kickstart creation when there is no NS204i but an SR/MR controller is present.] ***
-skipping: [ESX-001]
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
+    "msg": "Controller type found that will be used by kickstart: NS204i"
+}
+ok: [ESX-2] => {
     "msg": "Controller type found that will be used by kickstart: NS204i"
 }
 
-TASK [Check if settings 'RAID1' already exist] ****************************************************************************
-skipping: [ESX-001]
+TASK [Check if settings 'RAID1' already exist] *********************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
 TASK [Create internal storage configuration using 'RAID1' with a volume size of '-1' GB for the OS boot volume when it does not exist] ***
-skipping: [ESX-001]
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Result of the 'RAID1' creation task] ********************************************************************************
-skipping: [ESX-001]
+TASK [Result of the 'RAID1' creation task] *************************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Set a variable for the resourceUri of the internal storage configuration 'RAID1' just created] **********************
-skipping: [ESX-001]
+TASK [Set a variable for the resourceUri of the internal storage configuration 'RAID1' just created] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Update internal storage configuration using 'RAID1' with a volume size of '-1' GB for the OS boot volume] ***********
-skipping: [ESX-001]
+TASK [Update internal storage configuration using 'RAID1' with a volume size of '-1' GB for the OS boot volume] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Result of the 'RAID1' update task] **********************************************************************************
-skipping: [ESX-001]
+TASK [Result of the 'RAID1' update task] ***************************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Set a variable for the resourceUri of the internal storage configuration 'RAID1' just updated] **********************
-skipping: [ESX-001]
+TASK [Set a variable for the resourceUri of the internal storage configuration 'RAID1' just updated] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [debug] **************************************************************************************************************
-skipping: [ESX-001]
+TASK [debug] *******************************************************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Create server group name 'ESX-001_server_group' variable] ***********************************************************
-ok: [ESX-001]
+TASK [Create server group name 'ESX-1_server_group' variable] ******************
+ok: [ESX-1]
+ok: [ESX-2]
 
-TASK [Check if group 'ESX-001_server_group' already exists] ***************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Check if group 'ESX-1_server_group' already exists] **********************
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
 
-TASK [Create temporary group 'ESX-001_server_group' with no local storage configuration definition (if it does not exist)] ***
-ok: [ESX-001 -> localhost]
+TASK [Create temporary group 'ESX-1_server_group' with no local storage configuration definition (if it does not exist)] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Display response of the temporary group 'ESX-001_server_group' creation request] ************************************
-ok: [ESX-001] => {
-    "server_group_result.msg": "OK (1254 bytes)"
+TASK [Display response of the temporary group 'ESX-1_server_group' creation request] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [Set variables for the id and the resourceUri of temporary group 'ESX-1_server_group' just created] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [Update temporary group 'ESX-1_server_group' with no local storage configuration definition (if it does exist)] ***
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
+
+TASK [Display response of the temporary group 'ESX-1_server_group' update request] ***
+ok: [ESX-1] => {
+    "server_group_result.msg": "OK (1250 bytes)"
+}
+ok: [ESX-2] => {
+    "server_group_result.msg": "OK (1250 bytes)"
 }
 
-TASK [Set variables for the id and the resourceUri of temporary group 'ESX-001_server_group' just created] ****************
-ok: [ESX-001]
+TASK [Set variables for the id and the resourceUri of temporary group 'ESX-1_server_group' just updated] ***
+ok: [ESX-1]
+ok: [ESX-2]
 
-TASK [Update temporary group 'ESX-001_server_group' with no local storage configuration definition (if it does exist)] ****
-skipping: [ESX-001]
-
-TASK [Display response of the temporary group 'ESX-001_server_group' update request] **************************************
-skipping: [ESX-001]
-
-TASK [Set variables for the id and the resourceUri of temporary group 'ESX-001_server_group' just updated] ****************
-skipping: [ESX-001]
-
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
-    "temporary_group_id": "0fa80bab-494e-4f2d-9360-abccee97189c"
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
+    "temporary_group_id": "1b100e6f-5a1a-414e-a9f8-baca052722e5"
+}
+ok: [ESX-2] => {
+    "temporary_group_id": "1e1f6cbc-9b7a-47a0-9082-c16211aac531"
 }
 
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
-    "temporary_group_resourceuri": "/compute-ops-mgmt/v1/groups/0fa80bab-494e-4f2d-9360-abccee97189c"
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
+    "temporary_group_resourceuri": "/compute-ops-mgmt/v1/groups/1b100e6f-5a1a-414e-a9f8-baca052722e5"
+}
+ok: [ESX-2] => {
+    "temporary_group_resourceuri": "/compute-ops-mgmt/v1/groups/1e1f6cbc-9b7a-47a0-9082-c16211aac531"
 }
 
-TASK [Create temporary group 'ESX-001_server_group' with local storage configuration definition (if it does not exist)] ***
-skipping: [ESX-001]
+TASK [Create temporary group 'ESX-1_server_group' with local storage configuration definition (if it does not exist)] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Display response of the temporary group 'ESX-001_server_group' creation request] ************************************
-skipping: [ESX-001]
+TASK [Display response of the temporary group 'ESX-1_server_group' creation request] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Set variables for the id and the resourceUri of temporary group 'ESX-001_server_group' just created] ****************
-skipping: [ESX-001]
+TASK [Set variables for the id and the resourceUri of temporary group 'ESX-1_server_group' just created] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Update temporary group 'ESX-001_server_group' with no local storage configuration definition (if it does exist)] ****
-skipping: [ESX-001]
+TASK [Update temporary group 'ESX-1_server_group' with no local storage configuration definition (if it does exist)] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Display response of the temporary group 'ESX-001_server_group' update request] **************************************
-skipping: [ESX-001]
+TASK [Display response of the temporary group 'ESX-1_server_group' update request] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Set variables for the id and the resourceUri of temporary group 'ESX-001_server_group' just updated] ****************
-skipping: [ESX-001]
+TASK [Set variables for the id and the resourceUri of temporary group 'ESX-1_server_group' just updated] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
-    "temporary_group_id": "0fa80bab-494e-4f2d-9360-abccee97189c"
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
+    "temporary_group_id": "1b100e6f-5a1a-414e-a9f8-baca052722e5"
+}
+ok: [ESX-2] => {
+    "temporary_group_id": "1e1f6cbc-9b7a-47a0-9082-c16211aac531"
 }
 
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
-    "temporary_group_resourceuri": "/compute-ops-mgmt/v1/groups/0fa80bab-494e-4f2d-9360-abccee97189c"
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
+    "temporary_group_resourceuri": "/compute-ops-mgmt/v1/groups/1b100e6f-5a1a-414e-a9f8-baca052722e5"
+}
+ok: [ESX-2] => {
+    "temporary_group_resourceuri": "/compute-ops-mgmt/v1/groups/1e1f6cbc-9b7a-47a0-9082-c16211aac531"
 }
 
-TASK [Check if server 'CZ2311004G' is already member of a server group] ***************************************************
-ok: [ESX-001 -> localhost]
+TASK [Check if server 'CZ2311004H' is already member of a server group] ********
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
 
-TASK [Capture the id of the server group of which the server 'CZ2311004G' is a member (if applicable)] ********************
-skipping: [ESX-001]
+TASK [Capture the id of the server group of which the server 'CZ2311004H' is a member (if applicable)] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [debug] **************************************************************************************************************
-skipping: [ESX-001]
+TASK [debug] *******************************************************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Remove server 'CZ2311004G' from the server group of which it is currently a member] *********************************
-skipping: [ESX-001]
+TASK [Remove server 'CZ2311004H' from the server group of which it is currently a member] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Wait for deletion to complete] **************************************************************************************
-skipping: [ESX-001]
+TASK [Wait for deletion to complete] *******************************************
+skipping: [ESX-1]
 
-TASK [Assign server 'CZ2311004G' to temporary group 'ESX-001_server_group'] ***********************************************
-ok: [ESX-001 -> localhost]
+TASK [Assign server 'CZ2311004H' to temporary group 'ESX-1_server_group'] ******
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
 
-TASK [Display response of the group assignment task] **********************************************************************
-ok: [ESX-001] => {
+TASK [Display response of the group assignment task] ***************************
+ok: [ESX-1] => {
+    "group_assignment_result.msg": "OK (0 bytes)"
+}
+ok: [ESX-2] => {
     "group_assignment_result.msg": "OK (0 bytes)"
 }
 
 TASK [Check if HPE ESXi Custom ISO file 'VMware-ESXi-8.0.2-22380479-HPE-802.0.0.11.4.0.14-Sep2023.iso' exists in '/home/labrat/ISOs/esxiisosrc' on 'ansible.lj.lab'] ***
-ok: [ESX-001 -> localhost]
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Create the directory '/home/labrat/ISOs/esxiisosrc' to host the ISO file on 'ansible.lj.lab'] ***********************
-skipping: [ESX-001]
+TASK [Create the directory '/home/labrat/ISOs/esxiisosrc' to host the ISO file on 'ansible.lj.lab'] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
 TASK [Check if ESXi ISO 'https://liogw.lj.lab/deployment/esxi80u2//VMware-ESXi-8.0.2-22380479-HPE-802.0.0.11.4.0.14-Sep2023.iso' exists] ***
-skipping: [ESX-001]
+skipping: [ESX-1]
+skipping: [ESX-2]
 
 TASK [Download file 'VMware-ESXi-8.0.2-22380479-HPE-802.0.0.11.4.0.14-Sep2023.iso' to 'ansible.lj.lab' in '/home/labrat/ISOs/esxiisosrc' if not present] ***
-skipping: [ESX-001]
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Create '/mnt/ESX-001' on 'ansible.lj.lab' if it does not exist] *****************************************************
-changed: [ESX-001 -> localhost]
+TASK [Create '/usr/share/nginx/html/isos/' on 'ansible.lj.lab' if it does not exist] ***
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Create '/home/labrat/staging/baremetal/ESX-001/' on 'ansible.lj.lab' if it does not exist] **************************
-changed: [ESX-001 -> localhost]
+TASK [Check if the shared prepared ESXi boot ISO 'VMware-ESXi-8.0.2-22380479-prepared.iso' already exists on nginx] ***
+ok: [ESX-1 -> localhost]
 
-TASK [Mount ESXi ISO '/home/labrat/ISOs/esxiisosrc/VMware-ESXi-8.0.2-22380479-HPE-802.0.0.11.4.0.14-Sep2023.iso' to '/mnt/ESX-001/'] ***
-changed: [ESX-001 -> localhost]
+TASK [Create '/mnt/_prepared_iso_esxi' if it does not exist] *******************
+skipping: [ESX-1]
 
-TASK [Copy ISO files to '/home/labrat/staging/baremetal/ESX-001/' on 'ansible.lj.lab'] ************************************
-changed: [ESX-001 -> localhost]
+TASK [Create the staging directory for the prepared boot ISO] ******************
+skipping: [ESX-1]
 
-TASK [Set permissions to allow the user running the Ansible playbook to delete the folder '/home/labrat/staging/baremetal/ESX-001'] ***
-changed: [ESX-001 -> localhost]
+TASK [Mount the source ESXi ISO '/home/labrat/ISOs/esxiisosrc/VMware-ESXi-8.0.2-22380479-HPE-802.0.0.11.4.0.14-Sep2023.iso'] ***
+skipping: [ESX-1]
 
-TASK [Unmount directory '/mnt/ESX-001'] ***********************************************************************************
-changed: [ESX-001 -> localhost]
+TASK [Copy the ISO files to the prepared staging directory] ********************
+skipping: [ESX-1]
 
-TASK [Modify UEFI bootloader for kickstart installation from CDROM] *******************************************************
-changed: [ESX-001 -> localhost]
+TASK [Set permissions so the Ansible user can modify the prepared staging directory] ***
+skipping: [ESX-1]
 
-TASK [Create kickstart file in '/home/labrat/staging/baremetal/ESX-001/' on 'ansible.lj.lab' with variable substitution] ***
-changed: [ESX-001 -> localhost]
+TASK [Unmount '/mnt/_prepared_iso_esxi'] ***************************************
+skipping: [ESX-1]
 
-TASK [Create customized bootable ISO in '/home/labrat/staging/baremetal/ESX-001/'] ****************************************
-changed: [ESX-001 -> localhost]
+TASK [Point the ESXi bootloader at the externally-attached kickstart (ks=cdrom:/KS.CFG)] ***
+skipping: [ESX-1]
 
-TASK [Create '/usr/share/nginx/html/isos/' on 'ansible.lj.lab' if it does not exist] **************************************
-ok: [ESX-001 -> localhost]
+TASK [Build the prepared boot ISO with mkisofs (host-agnostic, no per-host content)] ***
+skipping: [ESX-1]
 
-TASK [Move created ISO to the nginx default html folder. ISO URL='http://ansible.lj.lab/isos/ESX-001.iso'] ****************
-changed: [ESX-001 -> localhost]
+TASK [Move the prepared boot ISO to the nginx html folder. ISO URL='http://ansible.lj.lab/isos/VMware-ESXi-8.0.2-22380479-prepared.iso'] ***
+skipping: [ESX-1]
+
+TASK [Create the seed staging directory '/home/labrat/staging/baremetal/ESX-1/seed'] ***
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
+
+TASK [Render the ESXi kickstart 'KS.CFG' seed for 'ESX-1' with variable substitution] ***
+changed: [ESX-1 -> localhost]
+changed: [ESX-2 -> localhost]
+
+TASK [Build the per-host kickstart seed ISO for 'ESX-1'] ***********************
+changed: [ESX-1 -> localhost]
+changed: [ESX-2 -> localhost]
+
+TASK [Move the per-host seed ISO to the nginx default html folder. ISO URL='http://ansible.lj.lab/isos/ESX-1-seed.iso'] ***
+changed: [ESX-1 -> localhost]
+changed: [ESX-2 -> localhost]
 
 TASK [Update SELinux security contexts so that Nginx is allowed to serve content from the '/usr/share/nginx/html/isos/' directory.] ***
-changed: [ESX-001 -> localhost]
+changed: [ESX-1 -> localhost]
+changed: [ESX-2 -> localhost]
 
-TASK [Check if the operating system image server setting 'OS_Image_ESXi8.0.u2_for_ESX-001' exists] ************************
-ok: [ESX-001 -> localhost]
+TASK [Check if the operating system image server setting 'OS_Image_ESXi8.0.u2_for_ESX-1' exists] ***
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Create an operating system image server setting 'OS_Image_ESXi8.0.u2_for_ESX-001' if it does not exist] *************
-ok: [ESX-001 -> localhost]
+TASK [Create an operating system image server setting 'OS_Image_ESXi8.0.u2_for_ESX-1' if it does not exist] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Result of the 'OS_Image_ESXi8.0.u2_for_ESX-001' creation task] ******************************************************
-ok: [ESX-001] => {
-    "OS_image_server_setting_result.msg": "OK (435 bytes)"
+TASK [Result of the 'OS_Image_ESXi8.0.u2_for_ESX-1' creation task] *************
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [Set variables for the id and the resourceUri of the OS Image configuration 'OS_Image_ESXi8.0.u2_for_ESX-1' just created] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [Update the operating system image server setting 'OS_Image_ESXi8.0.u2_for_ESX-1' if it does not exist] ***
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
+
+TASK [Result of the 'OS_Image_ESXi8.0.u2_for_ESX-1' update task] ***************
+ok: [ESX-1] => {
+    "OS_image_server_setting_result.msg": "OK (537 bytes)"
+}
+ok: [ESX-2] => {
+    "OS_image_server_setting_result.msg": "OK (537 bytes)"
 }
 
-TASK [Set variables for the id and the resourceUri of the OS Image configuration 'OS_Image_ESXi8.0.u2_for_ESX-001' just created] ***
-ok: [ESX-001]
+TASK [Set variables for the id and the resourceUri of the OS Image configuration 'OS_Image_ESXi8.0.u2_for_ESX-1' just updated] ***
+ok: [ESX-1]
+ok: [ESX-2]
 
-TASK [Update the operating system image server setting 'OS_Image_ESXi8.0.u2_for_ESX-001' if it does not exist] ************
-skipping: [ESX-001]
-
-TASK [Result of the 'OS_Image_ESXi8.0.u2_for_ESX-001' update task] ********************************************************
-skipping: [ESX-001]
-
-TASK [Set variables for the id and the resourceUri of the OS Image configuration 'OS_Image_ESXi8.0.u2_for_ESX-001' just updated] ***
-skipping: [ESX-001]
-
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
-    "OS_image_server_setting_resourceuri": "/compute-ops-mgmt/v1/settings/b5f990d9-e5ff-4b6f-a9a8-71f3c32f2383"
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
+    "OS_image_server_setting_resourceuri": "/compute-ops-mgmt/v1/settings/65d0803b-c6fd-4146-ac26-959150914ae3"
+}
+ok: [ESX-2] => {
+    "OS_image_server_setting_resourceuri": "/compute-ops-mgmt/v1/settings/af5420f6-f47e-485c-8f2c-e7077ca18e5e"
 }
 
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
-    "OS_image_server_setting_id": "b5f990d9-e5ff-4b6f-a9a8-71f3c32f2383"
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
+    "OS_image_server_setting_id": "65d0803b-c6fd-4146-ac26-959150914ae3"
+}
+ok: [ESX-2] => {
+    "OS_image_server_setting_id": "af5420f6-f47e-485c-8f2c-e7077ca18e5e"
 }
 
-TASK [Update temporary group 'ESX-001_server_group' to add OS image installation settings with NS204i] ********************
-ok: [ESX-001 -> localhost]
+TASK [Update temporary group 'ESX-1_server_group' to add OS image installation settings with NS204i] ***
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
 
-TASK [Display response of the group 'ESX-001_server_group' update request with NS204i] ************************************
-ok: [ESX-001] => {
-    "server_group_result.msg": "OK (1809 bytes)"
+TASK [Display response of the group 'ESX-1_server_group' update request with NS204i] ***
+ok: [ESX-1] => {
+    "server_group_result.msg": "OK (1805 bytes)"
+}
+ok: [ESX-2] => {
+    "server_group_result.msg": "OK (1799 bytes)"
 }
 
-TASK [Update temporary group 'ESX-001_server_group' to add OS image installation settings with storage controller (without NS204i)] ***
-skipping: [ESX-001]
+TASK [Update temporary group 'ESX-1_server_group' to add OS image installation settings with storage controller (without NS204i)] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Display response of the group 'ESX-001_server_group' update request with storage controller] ************************
-skipping: [ESX-001]
+TASK [Display response of the group 'ESX-1_server_group' update request with storage controller] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Start OS image installation in group 'ESX-001_server_group'] ********************************************************
-ok: [ESX-001 -> localhost]
+TASK [Start OS image installation in group 'ESX-1_server_group'] ***************
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Display response of the OS image installation request in group 'ESX-001_server_group'] ******************************
-ok: [ESX-001] => {
-    "group_os_installation_result.msg": "OK (1055 bytes)"
+TASK [Display response of the OS image installation request in group 'ESX-1_server_group'] ***
+ok: [ESX-1] => {
+    "group_os_installation_result.msg": "OK (818 bytes)"
+}
+ok: [ESX-2] => {
+    "group_os_installation_result.msg": "OK (818 bytes)"
 }
 
-TASK [Wait for the OS image installation of server 'CZ2311004G' to complete] **********************************************
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (60 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (59 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (58 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (57 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (56 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (55 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (54 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (53 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (52 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (51 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (50 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (49 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (48 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (47 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the OS image installation of server 'CZ2311004G' to complete (46 retries left).
-ok: [ESX-001 -> localhost]
+TASK [Wait for the OS image installation of server 'CZ2311004H' to complete] ***
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (60 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (60 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (59 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (59 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (58 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (58 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (57 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (57 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (56 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (56 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (55 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (55 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (54 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (54 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (53 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (53 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (52 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (52 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (51 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (51 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (50 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (50 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (49 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (49 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (48 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (48 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (47 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (47 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (46 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (46 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (45 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (45 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (44 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (44 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (43 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (43 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (42 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (42 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (41 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (41 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (40 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (40 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (39 retries left).
+ok: [ESX-1 -> localhost]
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (38 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (37 retries left).
+FAILED - RETRYING: [ESX-2 -> localhost]: Wait for the OS image installation of server 'CZ2311004H' to complete (36 retries left).
+ok: [ESX-2 -> localhost]
 
-TASK [Exit if operating system image installation task of server 'CZ2311004G' failed to complete] *************************
-skipping: [ESX-001]
+TASK [Exit if operating system image installation task of server 'CZ2311004H' failed to complete] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Remove server 'CZ2311004G' from temporary group 'ESX-001_server_group'] *********************************************
-ok: [ESX-001 -> localhost]
+TASK [Remove server 'CZ2311004H' from temporary group 'ESX-1_server_group'] ****
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Wait for deletion to complete] **************************************************************************************
+TASK [Wait for deletion to complete] *******************************************
 Pausing for 15 seconds
 (ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
-ok: [ESX-001]
+ok: [ESX-1]
 
-TASK [Display response of the temporary group unassignment task] **********************************************************
-ok: [ESX-001] => {
+TASK [Display response of the temporary group unassignment task] ***************
+ok: [ESX-1] => {
+    "group_unassignment_result.msg": "OK (0 bytes)"
+}
+ok: [ESX-2] => {
     "group_unassignment_result.msg": "OK (0 bytes)"
 }
 
-TASK [Delete temporary group 'ESX-001_server_group'] **********************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Delete temporary group 'ESX-1_server_group'] *****************************
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
 
-TASK [Display response of the temporary group deletion task] **************************************************************
-ok: [ESX-001] => {
+TASK [Display response of the temporary group deletion task] *******************
+ok: [ESX-1] => {
+    "server_group_deletion_result.msg": "OK (unknown bytes)"
+}
+ok: [ESX-2] => {
     "server_group_deletion_result.msg": "OK (unknown bytes)"
 }
 
-TASK [Delete operating system image server setting 'OS_Image_ESXi8.0.u2_for_ESX-001'] *************************************
-ok: [ESX-001 -> localhost]
+TASK [Delete operating system image server setting 'OS_Image_ESXi8.0.u2_for_ESX-1'] ***
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Display response of the operating system image server setting deletion task] ****************************************
-ok: [ESX-001] => {
+TASK [Display response of the operating system image server setting deletion task] ***
+ok: [ESX-1] => {
+    "OS_image_server_setting_deletion_result.msg": "OK (unknown bytes)"
+}
+ok: [ESX-2] => {
     "OS_image_server_setting_deletion_result.msg": "OK (unknown bytes)"
 }
 
-TASK [Wait for '192.168.3.175' to respond on port 80...] ******************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Wait for '192.168.3.174' to respond on port 80...] ***********************
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
 
-TASK [Wait a little longer so that the ESX host is truly ready to be added to vCenter] ************************************
-ok: [ESX-001 -> localhost]
+TASK [Wait a little longer so that the ESX host is truly ready to be added to vCenter] ***
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Create a kickstart backup directory if it does not exist] ***********************************************************
-ok: [ESX-001 -> localhost]
+TASK [Create a kickstart backup directory if it does not exist] ****************
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Check if kickstart file '/home/labrat/staging/baremetal/ESX-001/KS.CFG' exists] *************************************
-ok: [ESX-001 -> localhost]
+TASK [Check if kickstart file '/home/labrat/staging/baremetal/ESX-1/KS.CFG' exists] ***
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Create a backup of the kickstart file named 'ESX-001_ks.cfg' in '/home/labrat/staging/kickstarts_backup/ESXi' folder] ***
-changed: [ESX-001 -> localhost]
+TASK [Create a backup of the kickstart file named 'ESX-1_ks.cfg' in '/home/labrat/staging/kickstarts_backup/ESXi' folder] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Delete all related files from staging location and nginx web server folder] *****************************************
-changed: [ESX-001 -> localhost]
+TASK [Delete all related files from staging location and nginx web server folder] ***
+changed: [ESX-1 -> localhost]
+changed: [ESX-2 -> localhost]
 
-TASK [Check if ESXi cluster 'DL-Cluster-01' exists in vCenter 'vcenter.lj.lab'] *******************************************
-ok: [ESX-001 -> localhost]
+TASK [Check if ESXi cluster 'DL-Cluster-01' exists in vCenter 'vcenter.lj.lab'] ***
+skipping: [ESX-2]
+ok: [ESX-1 -> localhost]
 
-TASK [Create ESXi cluster 'DL-Cluster-01' in vCenter 'vcenter.lj.lab' if not present] *************************************
-changed: [ESX-001 -> localhost]
+TASK [Create ESXi cluster 'DL-Cluster-01' in vCenter 'vcenter.lj.lab' if not present] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Pause for 10 seconds for the cluster to be ready] *******************************************************************
-Pausing for 10 seconds
-(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
-ok: [ESX-001]
+TASK [Pause for 10 seconds for the cluster to be ready] ************************
+skipping: [ESX-1]
 
-TASK [Enable HA without admission control on 'DL-Cluster-01' cluster] *****************************************************
-changed: [ESX-001 -> localhost]
+TASK [Enable HA without admission control on 'DL-Cluster-01' cluster] **********
+skipping: [ESX-2]
+ok: [ESX-1 -> localhost]
 
-TASK [Enable DRS with VM distribution across hosts for availability on 'DL-Cluster-01' cluster] ***************************
-changed: [ESX-001 -> localhost]
+TASK [Enable DRS with VM distribution across hosts for availability on 'DL-Cluster-01' cluster] ***
+skipping: [ESX-2]
+ok: [ESX-1 -> localhost]
 
-TASK [Pause for 10 seconds for the cluster to be ready] *******************************************************************
-Pausing for 10 seconds
-(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
-ok: [ESX-001]
+TASK [Pause for 10 seconds for the cluster to be ready] ************************
+skipping: [ESX-1]
 
-TASK [Add ESXi host 'esx-001.lj.lab' to 'DL-Cluster-01' cluster] **********************************************************
-changed: [ESX-001 -> localhost]
+TASK [Add ESXi host 'esx-1.lj.lab' to 'DL-Cluster-01' cluster] *****************
+changed: [ESX-2 -> localhost]
+changed: [ESX-1 -> localhost]
 
-TASK [Assign ESXi license to Host] ****************************************************************************************
-fatal: [ESX-001 -> localhost]: FAILED! => {"changed": false, "msg": "Could not assign \"Q4624-4T34M-48LG0-0UAKH-CD545\" (vSphere 7 Enterprise Plus) to vCenter."}
-...ignoring
+TASK [Assign ESXi license to Host] *********************************************
+changed: [ESX-2 -> localhost]
+changed: [ESX-1 -> localhost]
 
-TASK [Add vmnic1 to standard switch vSwitch0] *****************************************************************************
-changed: [ESX-001 -> localhost]
+TASK [Gather vmnic info for ESXi host 'esx-1.lj.lab' (to check vmnic1 link state before teaming)] ***
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Pause for 10 seconds to give time for the vswitch0 configuration] ***************************************************
-Pausing for 10 seconds
-(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
-ok: [ESX-001]
+TASK [Determine whether vmnic1 is physically connected] ************************
+ok: [ESX-1]
+ok: [ESX-2]
 
-TASK [Add vMotion Portgroup to standard switch vSwitch0] ******************************************************************
-changed: [ESX-001 -> localhost]
+TASK [Add vmnic1 to standard switch vSwitch0 (management-link redundancy, only if vmnic1 is connected)] ***
+skipping: [ESX-2]
+changed: [ESX-1 -> localhost]
 
-TASK [Pause for 10 seconds to give time for the vswitch0 configuration] ***************************************************
-Pausing for 10 seconds
-(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
-ok: [ESX-001]
-
-TASK [Re-add ESXi host 'esx-001.lj.lab' to 'DL-Cluster-01' cluster (sometimes the host disconnects for an unknown reason)] ***
-ok: [ESX-001 -> localhost]
-
-TASK [Pause for 10 seconds to give time for the vswitch0 configuration] ***************************************************
-Pausing for 10 seconds
-(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
-ok: [ESX-001]
-
-TASK [Change Advanced Settings with Core Dump Warning Disable] ************************************************************
-changed: [ESX-001 -> localhost]
-
-TASK [Set the Power Management Policy to high-performance] ****************************************************************
-changed: [ESX-001 -> localhost]
-
-TASK [Configure NTP servers] **********************************************************************************************
-changed: [ESX-001 -> localhost]
-
-TASK [Start NTP Service and set to start at boot] *************************************************************************
-changed: [ESX-001 -> localhost]
-
-TASK [Start ESXi Shell Service and setting to enable at boot] *************************************************************
-changed: [ESX-001 -> localhost]
-
-TASK [Start SSH Service and setting to enable at boot] ********************************************************************
-changed: [ESX-001 -> localhost]
-
-TASK [Collect firmware bundles] *******************************************************************************************
-ok: [ESX-001 -> localhost]
-
-TASK [Set variable for Gen10 firmware bundle '2024.09.00.00'] *************************************************************
-ok: [ESX-001]
-
-TASK [Exit if Gen10 firmware bundle '2024.09.00.00' does not exist] *******************************************************
-skipping: [ESX-001]
-
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
-    "Gen10_10p_firmware_bundle_ID": "89948285605f44c8ba6061921ca1003d"
+TASK [Report the vSwitch0 uplink outcome for 'esx-1.lj.lab'] *******************
+ok: [ESX-1] => {
+    "msg": "vSwitch0 uplinks for 'esx-1.lj.lab': vmnic0 + vmnic1 (redundant)"
+}
+ok: [ESX-2] => {
+    "msg": "vSwitch0 uplinks for 'esx-2.lj.lab': vmnic0 only (vmnic1 not connected)"
 }
 
-TASK [Set variable for '' associated patch for Gen10 firmware bundle '2024.09.00.00'] *************************************
-skipping: [ESX-001]
+TASK [Pause for 10 seconds to give time for the vswitch0 configuration] ********
+Pausing for 10 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [ESX-1]
 
-TASK [Exit if Gen10 associated patch '' does not exist] *******************************************************************
-skipping: [ESX-001]
+TASK [Add vMotion Portgroup to standard switch vSwitch0] ***********************
+changed: [ESX-2 -> localhost]
+changed: [ESX-1 -> localhost]
 
-TASK [debug] **************************************************************************************************************
-skipping: [ESX-001]
+TASK [Pause for 10 seconds to give time for the vswitch0 configuration] ********
+Pausing for 10 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [ESX-1]
 
-TASK [Set variable for Gen11 firmware bundle '2024.09.01.00'] *************************************************************
-ok: [ESX-001]
+TASK [Re-add ESXi host 'esx-1.lj.lab' to 'DL-Cluster-01' cluster (sometimes the host disconnects for an unknown reason)] ***
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
 
-TASK [Exit if Gen11 firmware bundle '2024.09.01.00' does not exist] *******************************************************
-skipping: [ESX-001]
+TASK [Pause for 10 seconds to give time for the vswitch0 configuration] ********
+Pausing for 10 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [ESX-1]
 
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
-    "Gen11_firmware_bundle_ID": "a53b51727901421da06411806461f1c2"
+TASK [Change Advanced Settings with Core Dump Warning Disable] *****************
+changed: [ESX-2 -> localhost]
+changed: [ESX-1 -> localhost]
+
+TASK [Set the Power Management Policy to high-performance] *********************
+changed: [ESX-2 -> localhost]
+changed: [ESX-1 -> localhost]
+
+TASK [Configure NTP servers] ***************************************************
+changed: [ESX-2 -> localhost]
+changed: [ESX-1 -> localhost]
+
+TASK [Start NTP Service and set to start at boot] ******************************
+changed: [ESX-1 -> localhost]
+changed: [ESX-2 -> localhost]
+
+TASK [Start ESXi Shell Service and setting to enable at boot] ******************
+changed: [ESX-2 -> localhost]
+changed: [ESX-1 -> localhost]
+
+TASK [Start SSH Service and setting to enable at boot] *************************
+changed: [ESX-2 -> localhost]
+changed: [ESX-1 -> localhost]
+
+TASK [Collect firmware bundles] ************************************************
+skipping: [ESX-2]
+ok: [ESX-1 -> localhost]
+
+TASK [Set variable for Gen10 firmware bundle '2025.11.00.00'] ******************
+skipping: [ESX-2]
+ok: [ESX-1]
+
+TASK [Exit if Gen10 firmware bundle '2025.11.00.00' does not exist] ************
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
+    "Gen10_10p_firmware_bundle_ID": "efa0f78b19144f69af9bf32c7a974cbd"
 }
+skipping: [ESX-2]
 
-TASK [debug] **************************************************************************************************************
-skipping: [ESX-001]
+TASK [Set variable for Gen11 firmware bundle '2025.11.01.00'] ******************
+ok: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Set variable for '' associated patch for Gen11 firmware bundle '2024.09.01.00'] *************************************
-skipping: [ESX-001]
+TASK [Exit if Gen11 firmware bundle '2025.11.01.00' does not exist] ************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Exit if Gen11 associated patch '' does not exist] *******************************************************************
-skipping: [ESX-001]
-
-TASK [debug] **************************************************************************************************************
-skipping: [ESX-001]
-
-TASK [Set the final variable value for the Gen10 firmware bundle ID] ******************************************************
-skipping: [ESX-001]
-
-TASK [Set the final variable value for the Gen11 firmware bundle ID] ******************************************************
-skipping: [ESX-001]
-
-TASK [Fail if the firmware baselines for Gen10/Gen10+ and Gen11 servers could not be found.] ******************************
-skipping: [ESX-001]
-
-TASK [Fail if the firmware baseline for Gen10/Gen10+ servers could not be found.] *****************************************
-skipping: [ESX-001]
-
-TASK [Fail if the firmware baseline for Gen11 servers could not be found.] ************************************************
-skipping: [ESX-001]
-
-TASK [Set firmware bundle id for Gen10/Gen10+ server] *********************************************************************
-ok: [ESX-001]
-
-TASK [Set firmware bundle id for Gen11 server] ****************************************************************************
-skipping: [ESX-001]
-
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
-    "bundle_id": "89948285605f44c8ba6061921ca1003d"
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
+    "Gen11_firmware_bundle_ID": "0c4fda93c0c54f4a9ef2ae4de4ccd128"
 }
+skipping: [ESX-2]
 
-TASK [Check if the firmware server setting 'ESXi firmware baseline' exists] ***********************************************
-ok: [ESX-001 -> localhost]
+TASK [Set variable for Gen12 firmware bundle '2025.11.01.00'] ******************
+skipping: [ESX-2]
+ok: [ESX-1]
 
-TASK [Create the firmware server setting 'ESXi firmware baseline'] ********************************************************
-skipping: [ESX-001]
+TASK [Exit if Gen12 firmware bundle '2025.11.01.00' does not exist] ************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Display response of the firmware server setting 'ESXi firmware baseline' creation request] **************************
-skipping: [ESX-001]
-
-TASK [Set variable for the resourceuri of the firmware server setting 'ESXi firmware baseline' just created] **************
-skipping: [ESX-001]
-
-TASK [Update the firmware server setting 'ESXi firmware baseline'] ********************************************************
-ok: [ESX-001 -> localhost]
-
-TASK [Display response of the firmware server setting 'ESXi firmware baseline' update task] *******************************
-ok: [ESX-001] => {
-    "firmware_server_setting_result.msg": "OK (479 bytes)"
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
+    "Gen12_firmware_bundle_ID": "391c8f4745734f0886880497b2510aa8"
 }
+skipping: [ESX-2]
 
-TASK [Set variable for the resourceuri of the firmware server setting 'ESXi firmware baseline' just updated] **************
-ok: [ESX-001]
+TASK [Fail if the firmware baselines for Gen10/Gen10+, Gen11, and Gen12 servers could not be found.] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
+TASK [Fail if the firmware baseline for Gen10/Gen10+ servers could not be found.] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [Fail if the firmware baseline for Gen11 servers could not be found.] *****
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [Fail if the firmware baseline for Gen12 servers could not be found.] *****
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [Set firmware bundle id for Gen10/Gen10+ server] **************************
+ok: [ESX-1]
+skipping: [ESX-2]
+
+TASK [Set firmware bundle id for Gen11 server] *********************************
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [Set firmware bundle id for Gen12 server] *********************************
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
+    "bundle_id": "efa0f78b19144f69af9bf32c7a974cbd"
+}
+skipping: [ESX-2]
+
+TASK [Check if the firmware server setting 'ESXi firmware baseline' exists] ****
+skipping: [ESX-2]
+ok: [ESX-1 -> localhost]
+
+TASK [Create the firmware server setting 'ESXi firmware baseline'] *************
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [Display response of the firmware server setting 'ESXi firmware baseline' creation request] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [Set variable for the resourceuri of the firmware server setting 'ESXi firmware baseline' just created] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
+
+TASK [Update the firmware server setting 'ESXi firmware baseline'] *************
+skipping: [ESX-2]
+ok: [ESX-1 -> localhost]
+
+TASK [Display response of the firmware server setting 'ESXi firmware baseline' update task] ***
+ok: [ESX-1] => {
+    "firmware_server_setting_result.msg": "OK (709 bytes)"
+}
+skipping: [ESX-2]
+
+TASK [Set variable for the resourceuri of the firmware server setting 'ESXi firmware baseline' just updated] ***
+skipping: [ESX-2]
+ok: [ESX-1]
+
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
     "firmware_server_setting_resourceuri": "/compute-ops-mgmt/v1/settings/187b2f5d-1d07-4f1b-9fd9-a72aeb9aa5b3"
 }
+skipping: [ESX-2]
 
-TASK [Check if definitive group 'ESXi_group' already exist] ***************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Check if definitive group 'ESXi_group' already exist] ********************
+skipping: [ESX-2]
+ok: [ESX-1 -> localhost]
 
-TASK [Create definitive group 'ESXi_group' if it does not exist] **********************************************************
-skipping: [ESX-001]
+TASK [Create definitive group 'ESXi_group' if it does not exist] ***************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Display response of the definitive group 'ESXi_group' creation request] *********************************************
-skipping: [ESX-001]
+TASK [Display response of the definitive group 'ESXi_group' creation request] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Set variables for the id and the resourceUri of the definitive group 'ESXi_group' just created] *********************
-skipping: [ESX-001]
+TASK [Set variables for the id and the resourceUri of the definitive group 'ESXi_group' just created] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Update definitive group 'ESXi_group' if it does exist] **************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Update definitive group 'ESXi_group' if it does exist] *******************
+skipping: [ESX-2]
+ok: [ESX-1 -> localhost]
 
-TASK [Display response of the group 'ESXi_group' update request] **********************************************************
-ok: [ESX-001] => {
-    "definitive_server_group_result.msg": "OK (1761 bytes)"
+TASK [Display response of the group 'ESXi_group' update request] ***************
+ok: [ESX-1] => {
+    "definitive_server_group_result.msg": "OK (1759 bytes)"
 }
+skipping: [ESX-2]
 
-TASK [Set variables for the id and the resourceUri of the existing definitive group 'ESXi_group' just updated] ************
-ok: [ESX-001]
+TASK [Set variables for the id and the resourceUri of the existing definitive group 'ESXi_group' just updated] ***
+skipping: [ESX-2]
+ok: [ESX-1]
 
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
     "definitive_group_id": "24e9a61e-8142-4bcb-a525-8b9669d81fa0"
 }
+skipping: [ESX-2]
 
-TASK [debug] **************************************************************************************************************
-ok: [ESX-001] => {
+TASK [debug] *******************************************************************
+ok: [ESX-1] => {
     "definitive_group_resourceuri": "/compute-ops-mgmt/v1/groups/24e9a61e-8142-4bcb-a525-8b9669d81fa0"
 }
+skipping: [ESX-2]
 
-TASK [Re-add ESXi host 'esx-001.lj.lab' to 'DL-Cluster-01' cluster (sometimes the host disconnects for an unknown reason)] ***
-ok: [ESX-001 -> localhost]
+TASK [Re-add ESXi host 'esx-1.lj.lab' to 'DL-Cluster-01' cluster (sometimes the host disconnects for an unknown reason)] ***
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Wait until VMware host is 'connected' in vCenter] *******************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Wait until VMware host is 'connected' in vCenter] ************************
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
 
-TASK [Place ESXi host 'esx-001.lj.lab' into maintenance mode] *************************************************************
-changed: [ESX-001 -> localhost]
+TASK [Place ESXi host 'esx-1.lj.lab' into maintenance mode] ********************
+changed: [ESX-1 -> localhost]
+changed: [ESX-2 -> localhost]
 
-TASK [Gather subset facts on localhost] ***********************************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Gather subset facts on localhost] ****************************************
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
 
-TASK [Capture the start time of the firmware update (will be used later to filter COM activities, etc.)] ******************
-ok: [ESX-001]
+TASK [Capture the start time of the firmware update (will be used later to filter COM activities, etc.)] ***
+ok: [ESX-1]
+ok: [ESX-2]
 
-TASK [Display the start time of the firmware update] **********************************************************************
-ok: [ESX-001] => {
-    "msg": "2025-06-12T11:22:40Z"
+TASK [Display the start time of the firmware update] ***************************
+ok: [ESX-1] => {
+    "msg": "2026-07-23T15:58:49Z"
+}
+ok: [ESX-2] => {
+    "msg": "2026-07-23T15:58:49Z"
 }
 
-TASK [Get definitive group 'ESXi_group' information] **********************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Get definitive group 'ESXi_group' information] ***************************
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Set variable for existing definitive group 'ESXi_group' id] *********************************************************
-ok: [ESX-001]
+TASK [Set variable for existing definitive group 'ESXi_group' id] **************
+ok: [ESX-1]
+ok: [ESX-2]
 
-TASK [Check if server 'CZ2311004G' is already member of definitive server group 'ESXi_group'] *****************************
-ok: [ESX-001]
+TASK [Check if server 'CZ2311004H' is already member of definitive server group 'ESXi_group'] ***
+ok: [ESX-1]
+ok: [ESX-2]
 
-TASK [Add server 'CZ2311004G' to definitive server group 'ESXi_group'] ****************************************************
-ok: [ESX-001 -> localhost]
+TASK [Add server 'CZ2311004H' to definitive server group 'ESXi_group'] *********
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
 
-TASK [Display response of the group assignment task] **********************************************************************
-ok: [ESX-001] => {
+TASK [Display response of the group assignment task] ***************************
+ok: [ESX-1] => {
+    "group_assignment_result.msg": "OK (0 bytes)"
+}
+ok: [ESX-2] => {
     "group_assignment_result.msg": "OK (0 bytes)"
 }
 
-TASK [Wait for assignment to truly complete] ******************************************************************************
+TASK [Wait for assignment to truly complete] ***********************************
 Pausing for 15 seconds
 (ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
-ok: [ESX-001]
+ok: [ESX-1]
 
-TASK [Get definitive group 'ESXi_group' information (first host only)] ****************************************************
-ok: [ESX-001 -> localhost]
+TASK [Build the list of device ids for the servers being provisioned in this run (first host only)] ***
+ok: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Set fact for the list of server IDs member of the definitive server group (first host only)] ************************
-ok: [ESX-001]
-
-TASK [Display the server IDs found (first host only)] *********************************************************************
-ok: [ESX-001] => {
+TASK [Display the server IDs found (first host only)] **************************
+ok: [ESX-1] => {
     "server_ids": [
-        "P28948-B21+CZ2311004G",
-        "P53933-B21+CZJ3100GDB"
+        "P28948-B21+CZ2311004H",
+        "P53933-B21+CZJ3100GD9"
     ]
 }
+skipping: [ESX-2]
 
-TASK [Create HPE Compute Ops Management session] **************************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Create HPE Compute Ops Management session] *******************************
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Set variable access_token for the bearer token] *********************************************************************
-ok: [ESX-001]
+TASK [Set variable access_token for the bearer token] **************************
+ok: [ESX-1]
+ok: [ESX-2]
 
-TASK [Start a group firmware update job using the defined firmware baseline (first host only)] ****************************
-ok: [ESX-001 -> localhost]
+TASK [Start a group firmware update job using the defined firmware baseline (first host only)] ***
+skipping: [ESX-2]
+ok: [ESX-1 -> localhost]
 
-TASK [Display response of the group firmware update job (first host only)] ************************************************
-ok: [ESX-001] => {
-    "group_firmware_update_job.msg": "OK (1185 bytes)"
+TASK [Display response of the group firmware update job (first host only)] *****
+ok: [ESX-1] => {
+    "group_firmware_update_job.msg": "OK (875 bytes)"
 }
+skipping: [ESX-2]
 
-TASK [Capture the resourceUri of the group firmware update job (first host only)] *****************************************
-ok: [ESX-001]
+TASK [Capture the resourceUri of the group firmware update job (first host only)] ***
+ok: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Display the group firmware update job resource uri (first host only)] ***********************************************
-ok: [ESX-001] => {
-    "group_firmware_update_job_resourceUri": "/compute-ops-mgmt/v1beta3/jobs/3d8730ca-69d9-46c5-8e03-452f43c4826f"
+TASK [Display the group firmware update job resource uri (first host only)] ****
+ok: [ESX-1] => {
+    "group_firmware_update_job_resourceUri": "/compute-ops-mgmt/v1/jobs/feaa939b-4b4d-4bed-9b6e-2a0064c925ac"
 }
+skipping: [ESX-2]
 
-TASK [Wait for the group firmware update job to complete (first host only)] ***********************************************
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the group firmware update job to complete (first host only) (600 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the group firmware update job to complete (first host only) (599 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the group firmware update job to complete (first host only) (598 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the group firmware update job to complete (first host only) (597 retries left).
-FAILED - RETRYING: [ESX-001 -> localhost]: Wait for the group firmware update job to complete (first host only) (596 retries left).
-ok: [ESX-001 -> localhost]
+TASK [Wait for the group firmware update job to complete (first host only)] ****
+skipping: [ESX-2]
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (600 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (599 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (598 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (597 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (596 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (595 retries left).
+FAILED - RETRYING: [ESX-1 -> localhost]: Wait for the group firmware update job to complete (first host only) (594 retries left).
+ok: [ESX-1 -> localhost]
 
-TASK [Display the group firmware update job result (first host only)] *****************************************************
-ok: [ESX-001] => {
+TASK [Display the group firmware update job result (first host only)] **********
+ok: [ESX-1] => {
     "msg": [
         "State: COMPLETE",
         "ResultCode: SUCCESS",
         "Status: Complete"
     ]
 }
+skipping: [ESX-2]
 
-TASK [Get the latest activity of server 'CZ2311004G'] *********************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Get the latest activity of server 'CZ2311004H'] **************************
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Extract items containing 'Firmware update'] *************************************************************************
-ok: [ESX-001]
+TASK [Extract items containing 'Firmware update'] ******************************
+ok: [ESX-1]
+ok: [ESX-2]
 
-TASK [Display the firmware update activity status when successful] ********************************************************
-ok: [ESX-001] => {
+TASK [Display the firmware update activity status when successful] *************
+ok: [ESX-1] => {
     "msg": [
         "Message: Firmware update successful",
         "",
-        "**Note:** The server firmware is already up to date with specified baseline SPP 2024.09.00.00 (20 Sep 2024). The specified baseline has been set for the server.",
+        "**Note:** The server firmware is already up to date with specified baseline SPP 2025.11.00.00 (12 Dec 2025) and component versions higher than the baseline were not downgraded.",
+        ""
+    ]
+}
+ok: [ESX-2] => {
+    "msg": [
+        "Message: Firmware update successful",
+        "",
+        "**Note:** The server firmware is already up to date with specified baseline SPP 2025.11.01.00 (10 Feb 2026) and component versions higher than the baseline were not downgraded.",
         ""
     ]
 }
 
-TASK [Display the firmware update activity status with recommanded actions when failed] ***********************************
-skipping: [ESX-001]
+TASK [Display the firmware update activity status with recommanded actions when failed] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Capture server information] *****************************************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Capture server information] **********************************************
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Capture last firmware update information if any] ********************************************************************
-skipping: [ESX-001]
+TASK [Capture last firmware update information if any] *************************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Display server last firmware update information if up-to-date] ******************************************************
-skipping: [ESX-001]
+TASK [Display server last firmware update information if up-to-date] ***********
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Wait until VMware host is 'connected' in vCenter] *******************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Wait until VMware host is 'connected' in vCenter] ************************
+ok: [ESX-2 -> localhost]
+ok: [ESX-1 -> localhost]
 
-TASK [Take ESXi host 'esx-001.lj.lab' out of maintenance mode] ************************************************************
-changed: [ESX-001 -> localhost]
+TASK [Take ESXi host 'esx-1.lj.lab' out of maintenance mode] *******************
+changed: [ESX-1 -> localhost]
+changed: [ESX-2 -> localhost]
 
-TASK [Force update of current timestamp] **********************************************************************************
-ok: [ESX-001 -> localhost]
+TASK [Force update of current timestamp] ***************************************
+ok: [ESX-1 -> localhost]
+ok: [ESX-2 -> localhost]
 
-TASK [Get runtime] ********************************************************************************************************
-ok: [ESX-001]
+TASK [Get runtime] *************************************************************
+ok: [ESX-1]
+ok: [ESX-2]
 
-TASK [Status of the OS installation with the firmware update with HPE drivers and software] *******************************
-skipping: [ESX-001]
+TASK [Status of the OS installation with the firmware update with HPE drivers and software] ***
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-TASK [Status of the OS installation with the firmware update without HPE drivers and software] ****************************
-ok: [ESX-001] => {
+TASK [Status of the OS installation with the firmware update without HPE drivers and software] ***
+ok: [ESX-1] => {
     "msg": [
-        "ESX-001.lj.lab installation and firmware update completed successfully!",
+        "ESX-1.lj.lab installation and firmware update completed successfully!",
         "OS is configured and running and added to the vCenter cluster 'DL-Cluster-01'",
-        "To SSH to the new host from Ansible control node, use: ssh root@ESX-001.lj.lab",
-        "The provisioning task took 0:29:37."
+        "To SSH to the new host from Ansible control node, use: ssh root@ESX-1.lj.lab",
+        "The provisioning task took 0:38:15."
+    ]
+}
+ok: [ESX-2] => {
+    "msg": [
+        "ESX-2.lj.lab installation and firmware update completed successfully!",
+        "OS is configured and running and added to the vCenter cluster 'DL-Cluster-01'",
+        "To SSH to the new host from Ansible control node, use: ssh root@ESX-2.lj.lab",
+        "The provisioning task took 0:38:15."
     ]
 }
 
-TASK [Status of the OS installation with firmware update failure] *********************************************************
-skipping: [ESX-001]
+TASK [Status of the OS installation with firmware update failure] **************
+skipping: [ESX-1]
+skipping: [ESX-2]
 
-PLAY RECAP ****************************************************************************************************************
-ESX-001                    : ok=152  changed=28   unreachable=0    failed=0    skipped=75   rescued=0    ignored=1   
+PLAY RECAP *********************************************************************
+ESX-1                      : ok=143  changed=17   unreachable=0    failed=0    skipped=85   rescued=0    ignored=0   
+ESX-2                      : ok=105  changed=16   unreachable=0    failed=0    skipped=105  rescued=0    ignored=0   

@@ -1,0 +1,391 @@
+#cloud-config
+# ---------------------------------------------------------------------------------------------------------------------
+# HPE Morpheus VM Essentials - HVM OS (Ubuntu 24.04) autoinstall seed
+#
+# This file is the Ubuntu Subiquity/cloud-init "autoinstall" user-data used to perform a fully unattended
+# installation of the HVM OS on HPE Compute Ops Management servers.
+#
+# It is rendered by Ansible (Jinja2) from 'HVM_provisioning.yml' and written to '/server/user-data' inside a
+# per-host copy of the HPE HVM Install ISO. The ISO GRUB menu entry already boots with:
+#     linux /casper/vmlinuz quiet autoinstall ds=nocloud;s=/cdrom/server/ ...
+# so no bootloader modification is required - the installer automatically reads this file from '/cdrom/server/'.
+#
+# IMPORTANT - The stock HPE ISO ships a semi-interactive seed with:
+#     interactive-sections: [storage, identity, network, proxy]
+# Those sections are intentionally NOT present here so the installation runs fully unattended.
+#
+# IMPORTANT - The 'user-data.runcmd' block at the bottom REPLICATES the HPE-specific post-install logic found in
+# the original HPE ISO seed (IOMMU + hugepages kernel arguments, removal of the Ubuntu Pulp repositories and
+# configuration of the HPE VME package repositories). This logic is MANDATORY for a valid HVM host and must be
+# preserved. Do not remove it.
+#
+# WHAT THIS SEED CONFIGURES (item by item, top to bottom):
+#   1. Localization      - locale 'en_US.UTF-8' and US keyboard layout.
+#   2. Installer behaviour - fully offline install from the HPE ISO (no network refresh/update/upgrade), using the
+#                          minimal 'ubuntu-server-minimal' source shipped on the media.
+#   3. Identity          - sets the hostname ('inventory_hostname') and the management/SSH admin account
+#                          ('hvm_ssh_username') with a SHA-512 hashed password. Same account is reused by the
+#                          post-install Ansible play and by the VME Manager for cluster join.
+#   4. SSH               - installs OpenSSH server and authorizes the Ansible control node public key (password
+#                          auth also enabled) so post-install tasks can connect over SSH.
+#   5. Network           - assigns the management IP to a SINGLE stable physical NIC 'mgmt0' (matched by MAC, so it
+#                          is generation-independent), optionally on a tagged mgmt VLAN. A second mgmt NIC ('mgmt1')
+#                          and any dedicated compute NICs ('comp0'/'comp1') are only renamed, left unconfigured, so
+#                          the VME 'hpe-vm' installer / OVS can later enslave them (no Linux bond/bridge is pre-built).
+#   6. Early-commands    - disk preparation before storage probing: identifies the boot disk by controller type +
+#                          COM-detected size, wipes its partition table, and neutralizes only disks with a foreign/
+#                          unreadable partition table (to avoid the Subiquity 'unsupported' guided-storage crash).
+#   7. Storage           - single-disk guided LVM with the root LV grown to the whole disk; the target disk is pinned
+#                          by NS204i model or by exact size so SAN/data disks are never selected.
+#   8. Proxy             - optional APT/installer proxy when 'proxy_url' is set.
+#   9. Late-commands     - applies the HPE IOMMU-passthrough + hugepages kernel cmdline to the TARGET GRUB so it is
+#                          active on the first boot (HPE hypervisor requirement), and copies the bundled HPE amsd
+#                          .deb from the CIDATA seed to '/root/hpe' for an offline install.
+#  10. Post-install runcmd (first boot) - runs the HPE 'postcommand.sh', installs + enables amsd (so iLO/COM detect
+#                          OS-install completion and eject the virtual media), cleans up, removes the Ubuntu Pulp
+#                          repos and wires in the HPE VME (zion) package repositories.
+# ---------------------------------------------------------------------------------------------------------------------
+
+autoinstall:
+  version: 1
+
+  # --- Localization ------------------------------------------------------------------------------------------------
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+
+  # --- Installer behaviour -----------------------------------------------------------------------------------------
+  # Packages are pulled from the HPE-curated repositories configured post-install (see user-data.runcmd below),
+  # therefore the installer itself must not attempt to update/upgrade over the network during install.
+  refresh-installer:
+    update: false
+  apt:
+    preserve_sources_list: true
+    geoip: false
+    update: false
+    upgrade: false
+  packages: []
+
+  # HVM OS uses the minimal Ubuntu Server source shipped in the HPE ISO.
+  source:
+    search_drivers: false
+    id: ubuntu-server-minimal
+
+  # --- Identity (management admin account) ------------------------------------------------------------------------
+  # The account username ('hvm_ssh_username') and password ('hvm_ssh_password', hashed here) are defined once in the
+  # encrypted 'vars/VME_Manager_vars_encrypted.yml'. This same account is the SSH admin user used later by the Ansible
+  # post-install play and by the VME Manager to add the host to an HVM cluster. 'password' must be a SHA-512 crypted
+  # hash - see 'hashed_root_password' in vars/HVM_vars.yml (derived from 'hvm_ssh_password').
+  identity:
+    hostname: "{{ inventory_hostname }}"
+    username: "{{ hvm_ssh_username }}"
+    password: "{{ hashed_root_password }}"
+
+  # --- SSH ---------------------------------------------------------------------------------------------------------
+  # OpenSSH is installed and the Ansible control node public key is authorized so post-install tasks can run over SSH.
+  ssh:
+    install-server: true
+    allow-pw: true
+    authorized-keys:
+      - "{{ ansible_ssh_public_key }}"
+
+  # --- Network -----------------------------------------------------------------------------------------------------
+  # IMPORTANT - HVM networking model:
+  # The HPE 'hpe-vm' installer builds the VME management/compute networks as Open vSwitch (OVS) bridges (named 'mgmt'
+  # and used by the libvirt 'Management'/'Compute' networks). It does this by taking a *physical* management interface
+  # ('hpe-vm -i <iface>') and enslaving it into the OVS 'mgmt' bridge, moving the management IP onto the bridge.
+  #
+  # Therefore the autoinstall seed must NOT pre-build a Linux (networkd) bond or bridge over the management NICs: if it
+  # does, the physical ports are already owned by the kernel bond and OVS cannot enslave them, failing with
+  # "could not add network device <nic> to ofproto (Device or resource busy)" - the OVS 'mgmt' bridge then has no
+  # uplink and the VME Manager VM fails to start ("Cannot get interface MTU on 'mgmt'").
+  #
+  # So here we assign the management IP to a SINGLE plain physical NIC (renamed to a stable 'mgmt0' via MAC match, which
+  # is generation-independent). 'hpe-vm -i mgmt0 -c mgmt0 -v <vlans>' then builds the OVS bridges cleanly on top.
+  # (Management-link redundancy via a *native OVS* bond can be added later once the flow is validated.)
+  #
+  # Interface selection is generation-independent: predictable interface NAMES change across ProLiant generations
+  # (eno1, ens10f0, ens1f0, ...), but MAC addresses do not. When 'bond_member_macs' is provided (listed in vars or
+  # auto-derived from the COM inventory), the first MAC is used and its port is renamed to 'mgmt0'. When the list is
+  # empty, the first name in 'bond_interfaces' is used instead.
+  #
+  #  - '{{ mgmt_vlan }}' : optional management VLAN id. When defined (> 0) the management IP is placed on a tagged VLAN
+  #                        interface (mgmt0.<vlan>); otherwise it is placed directly on 'mgmt0'.
+  network:
+    version: 2
+    ethernets:
+{% if bond_member_macs is defined and (bond_member_macs | length) > 0 %}
+      mgmt0:
+        match:
+          macaddress: "{{ bond_member_macs[0] | lower }}"
+        set-name: mgmt0
+        dhcp4: false
+        dhcp6: false
+{% if not (mgmt_vlan is defined and (mgmt_vlan | int) > 0) %}
+        addresses:
+          - {{ os_ip_address }}/{{ netmask_cidr }}
+        routes:
+          - to: default
+            via: {{ gateway }}
+        nameservers:
+          addresses:
+{% for ns in nameserver.split(',') %}
+            - {{ ns | trim }}
+{% endfor %}
+          search:
+            - {{ domain }}
+{% endif %}
+{% if (bond_member_macs is defined) and ((bond_member_macs | length) > 1) and (hvm_second_nic_team | default(true) | bool) %}
+      # Second management NIC: renamed to a stable 'mgmt1' (plain port, no IP). It is left unconfigured here on
+      # purpose - management-link redundancy is added AFTER the host joins the HVM cluster by bonding it to 'mgmt0'
+      # inside the OVS 'mgmt' bridge (a native OVS bond, see Play 4 of HVM_provisioning.yml). A Linux/networkd bond
+      # must NOT be pre-built, otherwise OVS could not enslave the ports ("Device or resource busy").
+      mgmt1:
+        match:
+          macaddress: "{{ bond_member_macs[1] | lower }}"
+        set-name: mgmt1
+        dhcp4: false
+        dhcp6: false
+{% endif %}
+{% else %}
+      {{ bond_interfaces[0] }}:
+        dhcp4: false
+        dhcp6: false
+{% if not (mgmt_vlan is defined and (mgmt_vlan | int) > 0) %}
+        addresses:
+          - {{ os_ip_address }}/{{ netmask_cidr }}
+        routes:
+          - to: default
+            via: {{ gateway }}
+        nameservers:
+          addresses:
+{% for ns in nameserver.split(',') %}
+            - {{ ns | trim }}
+{% endfor %}
+          search:
+            - {{ domain }}
+{% endif %}
+{% endif %}
+{% if (compute_bond_member_macs is defined) and ((compute_bond_member_macs | length) > 0) and (hvm_separate_compute_network | default(false) | bool) %}
+      # Dedicated compute (VM) NIC(s): renamed to a stable 'comp0' (+ 'comp1'), plain ports with no IP. The VME Manager
+      # builds a separate OVS compute bridge on 'comp0' at cluster-join time; a cabled 'comp1' is then teamed with
+      # 'comp0' by Play 4 of HVM_provisioning.yml (native OVS bond). Only rendered when a separate compute network is
+      # requested ('hvm_separate_compute_network' true); the default converged model keeps compute on the mgmt bridge.
+      comp0:
+        match:
+          macaddress: "{{ compute_bond_member_macs[0] | lower }}"
+        set-name: comp0
+        dhcp4: false
+        dhcp6: false
+{% if (compute_bond_member_macs | length) > 1 and (hvm_second_nic_team | default(true) | bool) %}
+      comp1:
+        match:
+          macaddress: "{{ compute_bond_member_macs[1] | lower }}"
+        set-name: comp1
+        dhcp4: false
+        dhcp6: false
+{% endif %}
+{% endif %}
+{% if mgmt_vlan is defined and (mgmt_vlan | int) > 0 %}
+    vlans:
+{% if bond_member_macs is defined and (bond_member_macs | length) > 0 %}
+      mgmt0.{{ mgmt_vlan }}:
+        id: {{ mgmt_vlan }}
+        link: mgmt0
+{% else %}
+      {{ bond_interfaces[0] }}.{{ mgmt_vlan }}:
+        id: {{ mgmt_vlan }}
+        link: {{ bond_interfaces[0] }}
+{% endif %}
+        dhcp4: false
+        dhcp6: false
+        addresses:
+          - {{ os_ip_address }}/{{ netmask_cidr }}
+        routes:
+          - to: default
+            via: {{ gateway }}
+        nameservers:
+          addresses:
+{% for ns in nameserver.split(',') %}
+            - {{ ns | trim }}
+{% endfor %}
+          search:
+            - {{ domain }}
+{% endif %}
+
+  # --- Early commands (disk preparation, run before storage probing) -----------------------------------------------
+  # This is the Subiquity equivalent of the RHEL kickstart '%pre' storage logic ('clearpart --all --initlabel' +
+  # 'ignoredisk --only-use'). It runs BEFORE the installer probes/applies storage (Subiquity re-scans disks after
+  # 'early-commands'), and does three things:
+  #   1. Identifies the OS boot disk by controller type ('{{ Controller_type }}') + the COM-detected size
+  #      ({{ boot_drive_bytes_size }} bytes), exactly like the RHEL/ESXi kickstarts.
+  #   2. Clears that boot disk's partition table (wipefs + sgdisk --zap-all) so guided LVM can reformat it cleanly
+  #      even if a previous (failed) install left stale partitions on it.
+  #   3. Neutralizes ONLY disks whose partition table is foreign/unreadable to the installer (blkid PTTYPE is neither
+  #      'gpt' nor 'dos'). Such a disk makes Subiquity guided storage crash with
+  #      "Disk(ptable='unsupported' ...)" -> "KeyError: 'unsupported'" during 'convert_autoinstall_config', even when
+  #      it is NOT the install target (the crash happens while enumerating boot candidates across ALL disks). Disks
+  #      with a valid GPT/DOS table (i.e. real data disks) are LEFT UNTOUCHED. Controlled by
+  #      'hvm_clear_foreign_partitions' (default true).
+  early-commands:
+    - |
+      set +e
+      exec > /var/log/hvm-early-storage.log 2>&1
+      echo "== HVM early storage preparation =="
+      CONTROLLER="{{ Controller_type }}"
+      SIZEB="{{ boot_drive_bytes_size }}"
+      case "$CONTROLLER" in
+        *NS204i*) INDEX="nvme" ;;
+        *MR*|*SR*) INDEX="sd" ;;
+        *) if lsblk -dno NAME | grep -q '^nvme'; then INDEX="nvme"; else INDEX="sd"; fi ;;
+      esac
+      echo "Controller='$CONTROLLER' index='$INDEX' target_size='$SIZEB'"
+      # 1. Identify the OS boot disk by controller index + exact COM-detected size (fallback: largest on that index)
+      TARGET=""
+      if [ -n "$SIZEB" ] && [ "$SIZEB" != "0" ]; then
+        TARGET=$(lsblk -dbno NAME,SIZE,TYPE | awk -v idx="$INDEX" -v s="$SIZEB" '$3=="disk" && index($1,idx)==1 && $2==s {print $1; exit}')
+      fi
+      if [ -z "$TARGET" ]; then
+        TARGET=$(lsblk -dbno NAME,SIZE,TYPE | awk -v idx="$INDEX" '$3=="disk" && index($1,idx)==1 {print $1, $2}' | sort -k2 -n | tail -1 | awk '{print $1}')
+      fi
+      echo "Boot target disk: ${TARGET:-<none found>}"
+      # 2. Clear the boot disk's partition table (clearpart --all --initlabel equivalent)
+      if [ -n "$TARGET" ]; then
+        wipefs -a "/dev/$TARGET"  2>/dev/null
+        sgdisk --zap-all "/dev/$TARGET" 2>/dev/null
+        partprobe "/dev/$TARGET"  2>/dev/null
+      fi
+{% if hvm_clear_foreign_partitions | default(true) | bool %}
+      # 3. Neutralize ONLY disks with a foreign/unreadable partition table (PTTYPE not gpt/dos) so guided storage
+      #    does not crash. Valid GPT/DOS data disks are preserved.
+      for d in $(lsblk -dno NAME,TYPE | awk '$2=="disk"{print $1}'); do
+        [ "$d" = "$TARGET" ] && continue
+        case "$d" in loop*|sr*) continue ;; esac
+        [ "$(cat /sys/block/$d/removable 2>/dev/null)" = "1" ] && continue
+        PT=$(blkid -p -s PTTYPE -o value "/dev/$d" 2>/dev/null)
+        if [ -n "$PT" ] && [ "$PT" != "gpt" ] && [ "$PT" != "dos" ]; then
+          echo "Clearing FOREIGN partition table ('$PT') on /dev/$d to avoid the Subiquity 'unsupported' crash"
+          wipefs -a "/dev/$d"  2>/dev/null
+          sgdisk --zap-all "/dev/$d" 2>/dev/null
+          partprobe "/dev/$d"  2>/dev/null
+        else
+          echo "Keeping /dev/$d (PTTYPE='${PT:-none}') untouched"
+        fi
+      done
+{% endif %}
+      echo "== HVM early storage preparation done =="
+      true
+
+  # --- Storage -----------------------------------------------------------------------------------------------------
+  # The OS is installed on a single disk configured as an LVM group, matching the HPE deployment guide.
+  # 'sizing-policy: all' forces the root logical volume to consume the entire volume group (equivalent to the manual
+  # "resize ubuntu-lv to the maximum disk size" step described in the HPE guide - by default Subiquity would only use
+  # about half of the disk).
+  #
+  # Disk selection: COM has detected the OS boot volume size as {{ ((boot_drive_bytes_size | int) / (1024 ** 3)) | round(1) }} GB
+  # on controller '{{ Controller_type }}'. To avoid selecting the wrong disk when several are present (e.g. SAN or
+  # local data disks larger than the boot volume), the target is pinned:
+  #   - with an NS204i boot controller, by model ('*NS204i*'), which is generation-independent and never matches
+  #     SAS/MR data disks;
+  #   - otherwise (MR/SR RAID volume or a single local disk), by size ('{{ install_disk_match }}').
+  # In all cases the 'early-commands' above have already cleared this disk's partition table so guided LVM reformats
+  # it cleanly. As recommended in the project README, do NOT present SAN volumes during installation.
+  storage:
+    layout:
+      name: lvm
+      sizing-policy: all
+{% if NS204i_data is defined %}
+      match:
+        model: "*NS204i*"
+{% else %}
+      match:
+        size: "{{ install_disk_match }}"
+{% endif %}
+
+  # --- Proxy -------------------------------------------------------------------------------------------------------
+  # Optional corporate proxy. The HVM install itself is offline (from the ISO), so this proxy is used for the
+  # POST-INSTALL network access: the first-boot 'runcmd' reaching the HPE VME 'zion' repos (update1.linux.hpe.com),
+  # the Ansible 'apt upgrade', and the VME cluster join. Ubuntu also writes it to the installed system's apt config.
+  # Set 'proxy_url' in vars/HVM_vars.yml (full URL, e.g. "http://proxy.example.com:8080"); empty = direct connection.
+{% if proxy_url is defined and (proxy_url | length) > 0 %}
+  proxy: {{ proxy_url }}
+{% else %}
+  proxy: null
+{% endif %}
+
+  # --- Late commands (run in the installer, with the installed system mounted at /target) --------------------------
+  # 1) Apply the HPE-required kernel command line (IOMMU passthrough + hugepages) to the TARGET GRUB configuration now,
+  #    so it is already active on the FIRST boot of the installed system. This is an HPE HVM hypervisor requirement
+  #    (the stock HPE seed sets the same cmdline): 'iommu=pt' (+ 'amd_iommu=on'/'intel_iommu=on') puts host-owned
+  #    devices in IOMMU passthrough (identity-mapped) mode while keeping the IOMMU available for VM PCI passthrough,
+  #    and the hugepages settings back the VME VMs (do NOT use 'amd_iommu=off' on a hypervisor). As a side effect it
+  #    also clears the harmless 'AMD-Vi: IO_PAGE_FAULT' seen on AMD Gen11 when the IOMMU runs in translation mode.
+  #    We apply it in 'late-commands' (rather than only in the first-boot 'runcmd', as the stock seed does) so it is
+  #    active from the very first boot instead of requiring an extra reboot. 'update-grub' is run inside the target
+  #    via 'curtin in-target'.
+  #    NOTE: this is NOT the fix for amsd/COM OS-install-completion detection. That symptom was a transient iLO CHIF
+  #    wedge ('smad: No iLO available / channels busy' + 'hpilo ... could not dequeue a packet') cleared by an iLO
+  #    reset / firmware update on the server - unrelated to the kernel cmdline.
+  late-commands:
+    - curtin in-target --target=/target -- bash -c 'VENDOR=$(grep -m1 "vendor_id" /proc/cpuinfo); [[ "$VENDOR" == *"GenuineIntel"* ]] && iommu_opt="iommu=pt intel_iommu=on"; [[ "$VENDOR" == *"AuthenticAMD"* ]] && iommu_opt="iommu=pt amd_iommu=on"; hugepage_opt="default_hugepagesz=2M hugepagesz=1G hugepagesz=2M hugepages=0"; cmdline="${iommu_opt:+$iommu_opt }$hugepage_opt"; sed -i "s/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX=\"$cmdline\"/" /etc/default/grub && update-grub'
+{% if install_ams | default(true) %}
+    # 2) Copy the bundled HPE amsd .deb from the cloud-init seed ISO (labelled CIDATA, attached by COM as virtual
+    #    media) onto the installed system so it can be installed offline on first boot (see 'user-data.runcmd' below).
+    #    This keeps the amsd binary self-contained in the media - no access to the HPE SDR is needed.
+    - |
+      set +e
+      mkdir -p /target/root/hpe
+      seed_dev="$(blkid -L CIDATA 2>/dev/null)"
+      if [ -n "$seed_dev" ]; then
+        mkdir -p /mnt/hpe-seed
+        mount -o ro "$seed_dev" /mnt/hpe-seed 2>/dev/null
+        cp /mnt/hpe-seed/*.deb /target/root/hpe/ 2>/dev/null
+        umount /mnt/hpe-seed 2>/dev/null
+      fi
+      true
+{% endif %}
+
+  # --- Post-install (cloud-init on first boot of the installed system) ---------------------------------------------
+  # NOTE: the following block is reproduced from the original HPE HVM ISO seed and is REQUIRED to produce a valid
+  # HVM host. It enables IOMMU + hugepages, removes the Ubuntu Pulp repositories and wires in the HPE VME
+  # (zion) package repositories. It additionally installs the HPE Agentless Management Service (amsd) - which the
+  # stock HPE seed does NOT do - so iLO can report the OS as installed and COM can mark the Group OS Installation job
+  # as complete (and eject the virtual media). Time synchronization, package upgrade and cluster join are performed
+  # afterwards by the Ansible playbook over SSH.
+  user-data:
+    runcmd:
+      - bash /root/postcommand.sh
+{% if install_ams | default(true) %}
+      # Install the bundled HPE Agentless Management Service (amsd). The .deb is shipped in the project
+      # ('files/{{ hvm_build }}/{{ AMS_package }}'), added to the cloud-init seed ISO and copied to /root/hpe by the
+      # 'late-commands' below, so the install is fully offline - no access to the HPE SDR or the Ubuntu archive is
+      # required. All of amsd's dependencies (libc6, libgcc-s1, libjson-c5, libstdc++6, libsystemd0, lsof) already
+      # ship in the minimal HVM image, so a plain 'dpkg -i' succeeds without downloading anything. amsd is what makes
+      # iLO report the OS as installed to COM, so COM marks the Group OS Installation job as complete and ejects the
+      # iLO virtual media (boot ISO + cloud-init seed). Without it the COM job times out.
+      - dpkg -i /root/hpe/{{ AMS_package }} > /dev/null 2>&1
+      - systemctl enable --now amsd > /dev/null 2>&1
+{% endif %}
+      - apt autoremove -y > /dev/null 2>&1
+      - sudo systemctl reset-failed > /dev/null 2>&1
+      - sudo rm -rf /root/postcommand.sh > /dev/null 2>&1
+      - sudo rm -rf /var/log/unattended-upgrades > /dev/null 2>&1
+      # NOTE: the IOMMU + hugepages kernel command line (iommu=pt ...) is applied to the target GRUB in 'late-commands'
+      # above (HPE hypervisor requirement), so it is already active on this first boot - see that comment.
+      # Remove the Ubuntu Pulp repos
+      - rm -rf /etc/apt/sources.list.d/ubuntu.sources
+      - rm -rf /etc/apt/sources.list.d/ubuntu.sources.curtin.orig
+      - |
+        bash -c '
+          private_repo="https://update1.linux.hpe.com/repo/hpevme/zion-private-ubuntu/";
+          file_path="/etc/apt/sources.list.d/hpe-ubuntu.sources";
+          sig_key="/etc/apt/keyrings/zion_repo_public.key"
+          echo -e "Types: deb\nURIs: $private_repo\nSuites: pulp\nComponents: upload\nCheck-Valid-Until: False\nTrusted: True\nsigned-by: $sig_key\n\n" > "$file_path";
+          '
+      - |
+        bash -c '
+          update_repo="https://update1.linux.hpe.com/repo/hpevme/zion-os-updates-prod/ubuntu2404-os-updates/"
+          file_path="/etc/apt/sources.list.d/hpe-ubuntu.sources"
+          sig_key="/etc/apt/keyrings/zion_repo_public.key"
+          echo -e "Types: deb\nURIs: $update_repo\nSuites: noble-updates\nComponents: main\nCheck-Valid-Until: False\nTrusted: True\nsigned-by: $sig_key\n" >> "$file_path"
+          '
