@@ -208,14 +208,14 @@ Each operating system has two single-run, end-to-end playbooks — one to **prov
 - **Provisioning** — From bare metal to a fully configured host in one run: install RHEL, configure networking and storage, and update firmware/drivers.   
   `Shared prepared boot ISO (built once) + per-host OEMDRV kickstart seed ISO → COM server-group config → firmware`
 
-    <img src="images/ESXi_prov.png" alt="RHEL provisioning process flow" width="100%">
+    <img src="images/RHEL_prov.png" alt="RHEL provisioning process flow" width="100%">
 
 ### Windows Server (2022 and equivalents)
 
 - **Provisioning** — From bare metal to a domain-joined host in one run: install Windows, run post-install networking, install HPE SUT, and update firmware/drivers.   
   `Per-host WinPE image → COM server-group config → SUT + AD domain join → firmware`
 
-    <img src="images/ESXi_prov.png" alt="Windows Server provisioning process flow" width="100%">
+    <img src="images/WIN_prov.png" alt="Windows Server provisioning process flow" width="100%">
 
 
 ### RHEL & Windows Server unprovisioning
