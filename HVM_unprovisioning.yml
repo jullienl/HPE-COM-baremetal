@@ -233,7 +233,7 @@
       - vme_server_id | string | length > 0
       - not (hvm_whole_cluster_teardown | bool)
 
-  - name: Wait until HVM host '{{ inventory_hostname }}' (server id {{ vme_server_id }}) has left the VME Manager
+  - name: Wait until HVM host '{{ inventory_hostname }}' (server id {{ vme_server_id | default('n/a') }}) has left the VME Manager
     uri:
       url: "{{ vme_manager_url }}/api/servers/{{ vme_server_id }}"
       method: GET
