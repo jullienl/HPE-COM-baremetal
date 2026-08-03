@@ -1164,6 +1164,21 @@
       host: "{{ os_ip_address }}"
       port: 22
     delegate_to: localhost
+    register: hvm_ssh_wait
+    ignore_errors: true
+
+  - name: Fail with cabling guidance if the host never came up on its management IP
+    fail:
+      msg:
+        - "Host '{{ inventory_hostname }}' ({{ os_ip_address }}) did not respond on SSH port 22 within the timeout."
+        - "The HVM OS install itself likely completed (COM reported it complete), but the host is unreachable on its"
+        - "management IP. The most common cause is that 'mgmt0' (which carries the IP) landed on an UN-CABLED port:"
+        - "in 'auto' mode the IP is placed on the FIRST COM-inventory Ethernet port of the '{{ bond_member_adapter_match | default('') }}' adapter,"
+        - "and that selection is NOT carrier-aware. Check the host's iLO remote console: 'ip -br link' (which port has"
+        - "carrier?) and 'sudo netplan get' (which MAC is mgmt0?)."
+        - "Fix: cable the first inventory port (or cable both), OR pin the cabled port with 'bond_member_selection: mac'"
+        - "and 'bond_member_macs' (first MAC = cabled port) in vars/HVM_vars.yml, then re-run."
+    when: hvm_ssh_wait is failed
 
   - name: Wait a little longer so the HVM host is truly ready
     wait_for:

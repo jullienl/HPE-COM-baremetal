@@ -141,6 +141,14 @@ enable_nic_bonding: true
 #   'auto'   : derive the MACs from the COM inventory (recommended, default).
 #   'mac'    : use the explicit MACs in 'bond_member_macs' below.
 #   'manual' : use the explicit interface names in 'bond_interfaces' below.
+#
+# IMPORTANT (cabling): in 'auto' mode the OS installs over the PRIMARY NIC = the FIRST Ethernet port of the matched
+# adapter in COM-inventory order, which MUST be cabled to the management network. Selection is by MAC order and is NOT
+# carrier-aware for the primary, so on a multi-port adapter where only a later port is patched the install can target
+# an un-cabled port (Anaconda fails the network-repo fetch, or the host is unreachable post-install). If your cabled
+# port is not the first inventory port, pin it with 'bond_member_selection: mac' + 'bond_member_macs' (first MAC =
+# cabled port), or narrow the adapter with 'bond_member_adapter_match'. (If MAC derivation yields nothing, the
+# kickstart %pre falls back to the first carrier-up NIC.)
 bond_member_selection: "auto"
 # Number of Ethernet ports to derive in 'auto' mode. The first is the install/primary NIC; the second (when
 # cabled) becomes the bond backup. Keep >= 2 for redundancy.

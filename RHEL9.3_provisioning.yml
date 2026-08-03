@@ -1548,6 +1548,19 @@
       host: "{{ os_ip_address }}"
       port: 22
     delegate_to: localhost
+    register: rhel_ssh_wait
+    ignore_errors: true
+
+  - name: Fail with cabling guidance if the host never came up on its management IP
+    fail:
+      msg:
+        - "Host '{{ inventory_hostname }}' ({{ os_ip_address }}) did not respond on SSH port 22 within the timeout."
+        - "The RHEL install runs over the PRIMARY NIC = the FIRST COM-inventory Ethernet port (selection is by MAC"
+        - "order and is NOT carrier-aware). If only a later port on a multi-port adapter is cabled, the install can"
+        - "target an un-cabled port and the host is unreachable."
+        - "Fix: cable the first inventory port, OR pin the cabled port with 'bond_member_selection: mac' and"
+        - "'bond_member_macs' (first MAC = cabled port) in vars/RHEL9.3_vars.yml, then re-run."
+    when: rhel_ssh_wait is failed
 
   # The host has just been (re)installed, so its SSH host key is new. Any key left in the control node's known_hosts
   # from a previous install of the same IP/name would make ssh refuse the upcoming SSH tasks (SUT install) with

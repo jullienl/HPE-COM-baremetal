@@ -31,6 +31,14 @@ domain: "lj.lab"
 #   'mac'    -> use the explicit MAC list in 'bond_member_macs' below (also generation-independent).
 #   'manual' -> use the explicit interface NAMES in 'bond_interfaces' below (only works if the names are correct for
 #               the specific server model).
+#
+# IMPORTANT (cabling): in 'auto' mode the management IP is placed on 'mgmt0' = the FIRST Ethernet port of the matched
+# adapter in COM-inventory order. That first port MUST be cabled to the management network. The selection is by MAC
+# order and is NOT carrier-aware, so on a multi-port adapter (e.g. an I350 quad-port) where only a later port is
+# patched, 'mgmt0' can land on an un-cabled port and the host installs but never answers on its IP (a 30-min
+# 'Timeout when waiting for <ip>:22' at the post-install SSH wait). If your cabled port is not the first inventory
+# port, pin it explicitly with 'bond_member_selection: mac' + 'bond_member_macs' (first MAC = cabled port), or cable
+# the first port (cabling both ports is ideal: 'mgmt0' gets the IP and the self-healing team uses the second as backup).
 bond_member_selection: "auto"
 
 # Number of Ethernet ports to derive when 'bond_member_selection' is 'auto'. Only the first is currently used for the
@@ -186,7 +194,7 @@ workload_profile_name: "Virtualization - Power Efficient"
 join_hvm_cluster: true
 
 # Name of the HVM cluster in the VME Manager (created if not present when join_hvm_cluster is true).
-cluster_name: "HVM-Cluster-01"
+cluster_name: "HVM-Prod-Cluster"
 
 # VME Manager "Group" the cluster belongs to (a Morpheus concept). The group must already exist in the manager.
 vme_group_name: "VME_Group"
