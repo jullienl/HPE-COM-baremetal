@@ -23,7 +23,7 @@ enable_nic_bonding: true
 proxy_url: ""
 
 vcenter_hostname: "vcenter.lj.lab"
-cluster_name: "DL-Cluster-01" # created if not present
+cluster_name: "Prod-Cluster" # created if not present
 datacenter_name: "Mougins"
 
 

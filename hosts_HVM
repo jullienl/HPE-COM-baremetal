@@ -20,7 +20,5 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 # interactive step, enabling automated processes to run without manual intervention.
 
 [All]
-; HVM-1 os_ip_address=192.168.3.180 serial_number=CZ2311004G       # DL360 Gen11 (NS204i boot controller)   [iLO: 192.168.0.20]  P28948-B21  - Runs VME Manager
-HVM-2 os_ip_address=192.168.3.181 serial_number=CZ2311004H         # ProLiant DL360 Gen10 Plus              [iLO: 192.168.0.21]
-HVM-3 os_ip_address=192.168.3.182 serial_number=CZJ3100GD9         # DL365 Gen11                            [iLO: 192.168.1.56]
-
+HVM-1 os_ip_address=192.168.3.180 serial_number=CZ2311004G       
+HVM-2 os_ip_address=192.168.3.181 serial_number=CZ2311004H        

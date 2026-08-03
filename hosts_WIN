@@ -13,6 +13,6 @@ localhost ansible_python_interpreter="{{ ansible_playbook_python }}" ansible_con
 # local directive informs Ansible that it should execute the tasks locally instead of connecting over SSH 
 
 [WIN2022]
-WIN-11 os_ip_address=192.168.3.178 serial_number=CZ2311004H       # ProLiant DL360 Gen10 Plus              [iLO: 192.168.0.21]
-WIN-12 os_ip_address=192.168.3.179 serial_number=CZJ3100GD9       # DL365 Gen11                            [iLO: 192.168.1.56]
+WIN-11 os_ip_address=192.168.3.178 serial_number=CZ2311004H      
+WIN-12 os_ip_address=192.168.3.179 serial_number=CZJ3100GD9      
 

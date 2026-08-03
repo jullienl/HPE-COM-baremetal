@@ -23,7 +23,7 @@ ansible_python_interpreter=/usr/bin/python3
 # interactive step, enabling automated processes to run without manual intervention.
 
 [All]
-RHEL-1 os_ip_address=192.168.3.176 serial_number=CZ2311004H         # ProLiant DL360 Gen10 Plus              [iLO: 192.168.0.21]
-RHEL-2 os_ip_address=192.168.3.177 serial_number=CZJ3100GD9         # DL365 Gen11                            [iLO: 192.168.1.56]
+RHEL-1 os_ip_address=192.168.3.176 serial_number=CZ2311004H        
+RHEL-2 os_ip_address=192.168.3.177 serial_number=CZJ3100GD9        
 
 
