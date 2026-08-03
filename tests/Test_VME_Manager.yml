@@ -190,7 +190,7 @@
       ansible.builtin.debug:
         msg: >-
           Service plan '{{ vme_service_plan_name }}'
-          {{ 'FOUND (id ' ~ vme_plan_id ~ ')' if (vme_plan_id | length > 0) else 'NOT FOUND. Available: '
+          {{ 'FOUND (id ' ~ vme_plan_id ~ ')' if (vme_plan_id | string | length > 0) else 'NOT FOUND. Available: '
           ~ (vme_plans.json.servicePlans | default([]) | map(attribute='name') | list) }}
 
     # ---------------------------------------------------------------------------------------------------------------

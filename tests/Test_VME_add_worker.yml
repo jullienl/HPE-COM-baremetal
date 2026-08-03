@@ -168,7 +168,7 @@
         msg:
           - "Could not resolve every id needed to build the add-worker body:"
           - "group id='{{ vme_group_id }}', cloud id='{{ vme_cloud_id }}', layout id='{{ vme_layout_id }}', plan id='{{ vme_plan_id }}'."
-      when: (vme_group_id | length == 0) or (vme_cloud_id | length == 0) or (vme_layout_id | length == 0) or (vme_plan_id | length == 0)
+      when: (vme_group_id | string | length == 0) or (vme_cloud_id | string | length == 0) or (vme_layout_id | string | length == 0) or (vme_plan_id | string | length == 0)
 
     # ---------------------------------------------------------------------------------------------------------------
     # 5. Build the add-worker body (identical to HVM_provisioning.yml's 'vme_add_host_body', incl. the serverType fix)
