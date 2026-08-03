@@ -97,6 +97,24 @@ sudo dnf -y install isomd5sum
 ```
 
 
+## Create and activate a Python virtual environment
+
+This project requires **Python 3.11 in a virtualenv**. Do **not** install the Python packages system-wide: on Rocky/RHEL 9 the default Python is 3.9 and its `site-packages` is not writable by a normal user, so `pip3 install ...` (and the OpenSSL workaround install) fail with `Permission denied` (e.g. `.../usr/lib/python3.9/site-packages/... Permission denied`). Installing as root instead would pollute the OS Python. A virtualenv avoids both problems.
+
+```
+# Rocky/RHEL 9 ships Python 3.9 by default; install 3.11 for this project
+sudo dnf -y install python3.11
+
+# Create the virtualenv (the playbooks and docs assume ~/.venvs/ansible)
+python3.11 -m venv ~/.venvs/ansible
+
+# Activate it - do this in every new shell before running the setup script or any playbook
+source ~/.venvs/ansible/bin/activate
+```
+
+> **Note**: The `./files/setup-control-node.sh` bootstrap script does this for you automatically: if you are not already inside a virtualenv, it installs `python3.11`, creates/activates `~/.venvs/ansible`, and installs everything there. You still need to run `source ~/.venvs/ansible/bin/activate` in each new shell afterwards before running a playbook.
+
+
 ## Ansible installation and requirements
 
 ```

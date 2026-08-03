@@ -3,6 +3,7 @@
 # Control-node bootstrap for the HPE Compute Ops Management bare metal provisioning project.
 #
 # One command sets up the whole Ansible control node (Rocky Linux 9.x). It installs, in order:
+#   0. Python virtualenv     : creates/activates ~/.venvs/ansible (Python 3.11) unless already inside one
 #   1. System (dnf) packages : ISO tooling, nginx, rsync, unzip, wimlib, pykickstart, git, python3-pip
 #   2. Python (pip) packages : from files/pip-requirements.txt (ansible-core, jmespath, passlib, pywinrm, ...)
 #   3. Ansible collections   : from files/requirements.yml (community.general/vmware/windows, microsoft.ad)
@@ -15,6 +16,9 @@
 #
 # Notes:
 #   - Uses 'sudo' for the dnf steps; you will be prompted for your password.
+#   - You do NOT need to create a virtualenv first: if you are not already inside one, the script creates and uses
+#     ~/.venvs/ansible automatically. Override the location with VENV_DIR=/path ./files/setup-control-node.sh.
+#     After it finishes, run 'source ~/.venvs/ansible/bin/activate' in each new shell before running playbooks.
 #   - Optional tools (ansible-lint) are left commented in files/pip-requirements.txt.
 #   - See files/Ansible_control_node_requirements.md for the detailed, per-dependency explanation.
 # =====================================================================================================================
@@ -27,6 +31,32 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${PROJECT_ROOT}"
 
 echo "==> Project root: ${PROJECT_ROOT}"
+
+# --- 0. Python virtual environment -----------------------------------------------------------------------------------
+# This project requires Python 3.11 in a virtualenv (see files/Ansible_control_node_requirements.md). If the script is
+# run against the system Python instead, the pip and OpenSSL-workaround steps below try to write into the system
+# site-packages (e.g. /usr/lib/python3.9/site-packages) and fail with "Permission denied" for a non-root user - and
+# running them as root would pollute the OS Python. To make the script robust regardless of how it is launched: if we
+# are not already inside a virtualenv, create/activate the project one at ~/.venvs/ansible and use it for every
+# python/pip step that follows. (Rocky/RHEL 9's default Python is 3.9, so python3.11 is installed first if missing.)
+VENV_DIR="${VENV_DIR:-${HOME}/.venvs/ansible}"
+
+if [ -z "${VIRTUAL_ENV:-}" ]; then
+  echo "==> [0/3] No active virtualenv detected; preparing ${VENV_DIR} ..."
+  if ! command -v python3.11 >/dev/null 2>&1; then
+    echo "    Installing python3.11 (Rocky/RHEL 9 default Python is 3.9) ..."
+    sudo dnf -y install python3.11
+  fi
+  if [ ! -d "${VENV_DIR}" ]; then
+    echo "    Creating virtualenv with python3.11 at ${VENV_DIR} ..."
+    python3.11 -m venv "${VENV_DIR}"
+  fi
+  # shellcheck disable=SC1091
+  source "${VENV_DIR}/bin/activate"
+  echo "    Activated virtualenv: ${VIRTUAL_ENV}"
+else
+  echo "==> [0/3] Using the already-active virtualenv: ${VIRTUAL_ENV}"
+fi
 
 # --- 1. System (dnf) packages ----------------------------------------------------------------------------------------
 echo "==> [1/3] Installing system packages with dnf ..."
@@ -90,6 +120,9 @@ ansible-galaxy collection install -r files/requirements.yml --force
 
 echo ""
 echo "==> Control node setup complete."
+echo "    Everything above was installed into the virtualenv: ${VIRTUAL_ENV:-${VENV_DIR}}"
+echo "    Activate it in each new shell before running playbooks:"
+echo "      source ${VENV_DIR}/bin/activate"
 echo "    Next steps (see files/Ansible_control_node_requirements.md):"
 echo "      - Generate the SSH key pair:  ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N \"\""
 echo "      - Enable nginx directory browsing (autoindex) if desired."
